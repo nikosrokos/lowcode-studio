@@ -64,6 +64,10 @@
           "properties": { "type": "object" },
           "x": { "type": "number" },
           "y": { "type": "number" },
+          "color": {
+            "type": "string",
+            "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"
+          },
           "children": {
             "type": "array",
             "items": { "$ref": "#/properties/activities/items" }

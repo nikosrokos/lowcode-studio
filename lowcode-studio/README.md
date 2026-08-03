@@ -24,11 +24,13 @@ Built for UiPath practitioners who design, framework, develop, deploy, and test 
 
 - Visual **Sequence** designer for `.lcs.json`
 - Visual **Flowchart** mode — free-form canvas, ports, True/False/Next links, auto-layout
+- **Custom container colors** per activity (presets + color picker)
 - One-click **REFramework** template (Init → Get Data → Process → End)
+- **Import UiPath** project folders or `.nupkg` packages (best-effort XAML → `.lcs.json`)
+- **Export for Studio Web** (Portable UiPath project with `.xaml` + `project.json`)
 - Activity toolbox: System, Control Flow, UI, Data, Messaging, Flowchart, REFramework
 - Properties panel + Variables manager + Project Explorer
 - Validate + Dry Run simulator (F5), including flowchart transaction loops
-- Export to pseudocode
 - Works in VS Code, Cursor, and other VS Code forks
 
 ## Install (Mac / Cursor / VS Code)
@@ -45,7 +47,7 @@ npm run package
 Then in Cursor / VS Code:
 
 1. Command Palette → **Extensions: Install from VSIX…**
-2. Select the generated `lowcode-studio-0.2.0.vsix`
+2. Select the generated `lowcode-studio-0.3.0.vsix`
 3. Reload the window
 
 ### Develop
@@ -93,6 +95,38 @@ MyREFramework/
 - **Auto Layout** arranges nodes by graph depth
 - Dry Run follows connections from the Start node
 
+## Custom container colors
+
+Select any activity → **Container color** in Properties:
+
+- Click a preset swatch, or
+- Use the color picker / `#RRGGBB` field, or
+- **Reset** to the activity-type default
+
+Colors are saved in the `.lcs.json` (`color` on each activity) for sequences and flowcharts.
+
+## Import UiPath packages / projects
+
+| Command | What it does |
+|---|---|
+| **Import UiPath Project Folder** | Reads Studio `project.json` + `.xaml` → LowCode Studio project |
+| **Import UiPath Package (.nupkg)** | Unpacks NuGet package and imports XAML sources |
+
+Notes:
+
+- Best-effort mapping for common activities (Log Message, Assign, If, While, For Each, Try Catch, Delay, Invoke Workflow, UI stubs, …)
+- Unknown activities become `Imported.*` placeholders — see `IMPORT_NOTES.md`
+- `.nupkg` must include sources (publish from Studio with **Include Sources**, or import the original project folder)
+
+## Export for Studio Web (simple path)
+
+No Orchestrator publish from this extension — keep publishing in Studio Web.
+
+1. **LowCode Studio: Export for Studio Web**
+2. Creates `YourProject.StudioWeb/` with Portable `project.json` + `.xaml`
+3. **Open Studio Web** (`https://studio.uipath.com`) and import/upload that folder (or use Git sync)
+4. Publish to Orchestrator from Studio Web when ready
+
 ## Quick start (blank)
 
 1. **LowCode Studio: New Project** → Blank → Sequence or Flowchart
@@ -104,7 +138,7 @@ Samples:
 - `samples/HelloWorld.lcs.json`
 - `samples/FlowchartDemo.lcs.json`
 
-## Activity catalog (v0.2)
+## Activity catalog (v0.3)
 
 | Category | Activities |
 |---|---|
@@ -125,6 +159,10 @@ UI/messaging activities are **design + dry-run stubs** on Mac (no local robot ru
 |---|---|
 | New Project | — |
 | New REFramework Project | — |
+| Import UiPath Project Folder | — |
+| Import UiPath Package (.nupkg) | — |
+| Export for Studio Web | — |
+| Open Studio Web | — |
 | New Workflow | Cmd+Alt+N |
 | Validate Workflow | Cmd+Shift+V |
 | Dry Run | F5 |
@@ -138,13 +176,13 @@ UI/messaging activities are **design + dry-run stubs** on Mac (no local robot ru
 | Focus | Maestro Flows / orchestration | Classic Studio + REFramework low-code |
 | File type | `.flow` | `.lcs.json` |
 | Mac support | Yes (VS Code) | Yes (VS Code / Cursor) |
-| Cloud deploy | Orchestrator via `uip` CLI | Local design + dry-run (extensible) |
+| Cloud deploy | Orchestrator via `uip` CLI | Export → Studio Web → publish |
 
 ## Roadmap ideas
 
+- Richer XAML activity coverage / selector round-trip
 - Selector recorder helpers
-- Import/export bridges toward Studio Web / XAML-inspired interchange
-- Real runner adapters (CLI / Orchestrator hooks)
+- Optional Orchestrator API publish (only if needed later)
 
 ## License
 

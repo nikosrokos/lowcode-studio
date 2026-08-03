@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Studio-like low-code RPA designer for VS Code and Cursor on Mac. Sequence + Flowchart designer, REFramework template, activity toolbox, and dry-run simulation.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -115,6 +115,25 @@
         "title": "LowCode Studio: Export Pseudocode"
       },
       {
+        "command": "lowcodeStudio.importUiPathProject",
+        "title": "LowCode Studio: Import UiPath Project Folder",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "lowcodeStudio.importUiPathPackage",
+        "title": "LowCode Studio: Import UiPath Package (.nupkg)",
+        "icon": "$(file-zip)"
+      },
+      {
+        "command": "lowcodeStudio.exportStudioWeb",
+        "title": "LowCode Studio: Export for Studio Web",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "lowcodeStudio.openStudioWeb",
+        "title": "LowCode Studio: Open Studio Web"
+      },
+      {
         "command": "lowcodeStudio.showGettingStarted",
         "title": "LowCode Studio: Getting Started"
       }
@@ -128,6 +147,16 @@
         },
         {
           "command": "lowcodeStudio.newREFramework",
+          "when": "view == lowcodeStudio.projects",
+          "group": "navigation"
+        },
+        {
+          "command": "lowcodeStudio.importUiPathPackage",
+          "when": "view == lowcodeStudio.projects",
+          "group": "navigation"
+        },
+        {
+          "command": "lowcodeStudio.exportStudioWeb",
           "when": "view == lowcodeStudio.projects",
           "group": "navigation"
         },
@@ -239,11 +268,12 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package --no-dependencies",
+    "package": "vsce package",
     "lint": "tsc --noEmit",
-    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js"
+    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.2.1",
@@ -253,5 +283,9 @@
     "type": "git",
     "url": "https://github.com/nikosrokos/lowcode-studio"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "adm-zip": "^0.6.0",
+    "fast-xml-parser": "^5.10.1"
+  }
 }

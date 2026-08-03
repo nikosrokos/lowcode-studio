@@ -36,6 +36,8 @@ export interface ActivityNode {
   /** Flowchart canvas position */
   x?: number;
   y?: number;
+  /** Custom accent color (hex), overrides activity-type default */
+  color?: string;
 }
 
 export interface FlowConnection {
@@ -190,14 +192,25 @@ export function parseWorkflow(text: string): WorkflowDocument {
     type: raw.type === 'Flowchart' ? 'Flowchart' : 'Sequence',
     variables: Array.isArray(raw.variables) ? raw.variables : [],
     arguments: Array.isArray(raw.arguments) ? raw.arguments : [],
-    activities: raw.activities.map((a) => ({
-      ...a,
-      x: typeof a.x === 'number' ? a.x : undefined,
-      y: typeof a.y === 'number' ? a.y : undefined
-    })),
+    activities: raw.activities.map((a) => normalizeActivity(a)),
     connections: Array.isArray(raw.connections) ? raw.connections : [],
     startActivityId: raw.startActivityId,
     metadata: raw.metadata || {}
+  };
+}
+
+function normalizeActivity(a: ActivityNode): ActivityNode {
+  return {
+    ...a,
+    x: typeof a.x === 'number' ? a.x : undefined,
+    y: typeof a.y === 'number' ? a.y : undefined,
+    color: typeof a.color === 'string' && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(a.color)
+      ? a.color
+      : undefined,
+    children: Array.isArray(a.children) ? a.children.map(normalizeActivity) : a.children,
+    elseChildren: Array.isArray(a.elseChildren)
+      ? a.elseChildren.map(normalizeActivity)
+      : a.elseChildren
   };
 }
 

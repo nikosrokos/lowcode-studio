@@ -6,10 +6,12 @@ Studio-like low-code RPA extension for Mac users who cannot run UiPath Studio De
 
 See [`lowcode-studio/README.md`](lowcode-studio/README.md) for full docs.
 
-## Highlights (v0.2)
+## Highlights (v0.3)
 
-- Sequence + **Flowchart** designer
+- Sequence + **Flowchart** designer + custom container colors
 - One-click **REFramework** template
+- **Import** UiPath `.nupkg` / Studio folders
+- **Export for Studio Web** (simple path — publish from Studio Web)
 - Dry-run simulator (F5)
 
 ![Flowchart mode](lowcode-studio/docs/images/vscode-flowchart-mode.png)
@@ -24,4 +26,4 @@ npm test
 npm run package
 ```
 
-Then: **Extensions: Install from VSIX…** → `lowcode-studio-0.2.0.vsix`.
+Then: **Extensions: Install from VSIX…** → `lowcode-studio-0.3.0.vsix`.

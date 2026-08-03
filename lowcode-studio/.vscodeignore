@@ -11,3 +11,4 @@ samples/**
 .git/**
 out/test/**
 docs/images/**
+**/*.map

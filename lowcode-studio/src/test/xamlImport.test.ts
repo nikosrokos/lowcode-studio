@@ -1,0 +1,57 @@
+import assert from 'assert';
+import * as fs from 'fs';
+import * as path from 'path';
+import { importXaml } from '../interop/xamlImport';
+import { exportWorkflowToXaml, exportUiPathProjectJson } from '../interop/xamlExport';
+import { validateWorkflow, dryRunWorkflow } from '../commands/simulator';
+
+function run(): void {
+  const fixture = path.join(__dirname, 'fixtures', 'sample.xaml');
+  // When running from out/test, fixtures are not copied — load from src
+  const srcFixture = path.join(__dirname, '..', '..', 'src', 'test', 'fixtures', 'sample.xaml');
+  const xamlPath = fs.existsSync(fixture) ? fixture : srcFixture;
+  const xaml = fs.readFileSync(xamlPath, 'utf8');
+
+  const { workflow, warnings } = importXaml(xaml, 'Main');
+  assert.strictEqual(workflow.type, 'Sequence');
+  assert.ok(workflow.variables.some((v) => v.name === 'message'));
+  assert.ok(workflow.variables.some((v) => v.name === 'counter'));
+  assert.ok(workflow.activities.some((a) => a.type === 'System.LogMessage'));
+  assert.ok(workflow.activities.some((a) => a.type === 'Programming.Assign'));
+  assert.ok(workflow.activities.some((a) => a.type === 'ControlFlow.If'));
+  assert.ok(workflow.activities.some((a) => a.type === 'REFramework.InvokeWorkflow'));
+  assert.ok(workflow.activities.some((a) => a.type === 'System.Delay'));
+
+  const errors = validateWorkflow(workflow).filter((i) => i.severity === 'error');
+  assert.strictEqual(errors.length, 0, errors.map((e) => e.message).join('; '));
+
+  const dry = dryRunWorkflow(workflow);
+  assert.strictEqual(dry.ok, true);
+
+  // Custom color round-trip via JSON shape
+  workflow.activities[0].color = '#F59E0B';
+  assert.strictEqual(workflow.activities[0].color, '#F59E0B');
+
+  const exported = exportWorkflowToXaml(workflow);
+  assert.ok(exported.includes('ui:LogMessage'));
+  assert.ok(exported.includes('<Sequence'));
+  assert.ok(exported.includes('Variable'));
+
+  const projectJson = exportUiPathProjectJson({
+    name: 'Demo',
+    main: 'Main.xaml'
+  });
+  const parsed = JSON.parse(projectJson) as { targetFramework: string; main: string };
+  assert.strictEqual(parsed.targetFramework, 'Portable');
+  assert.strictEqual(parsed.main, 'Main.xaml');
+
+  // Re-import exported XAML still parses
+  const again = importXaml(exported, 'RoundTrip');
+  assert.ok(again.workflow.activities.length > 0);
+
+  console.log(
+    `xamlImport.test.ts: ok (${workflow.activities.length} activities, ${warnings.length} warnings)`
+  );
+}
+
+run();
