@@ -1,0 +1,245 @@
+{
+  "name": "lowcode-studio",
+  "displayName": "LowCode Studio",
+  "description": "Studio-like low-code RPA designer for VS Code and Cursor on Mac, Windows, and Linux. Visual workflows, activity toolbox, variables, and dry-run simulation.",
+  "version": "0.1.0",
+  "publisher": "lowcode-studio",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "rpa",
+    "low-code",
+    "automation",
+    "studio",
+    "workflow",
+    "uipath",
+    "mac"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "icon": "media/icon.png",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "lowcodeStudio.workflowEditor",
+        "displayName": "LowCode Studio Designer",
+        "selector": [
+          {
+            "filenamePattern": "*.lcs.json"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "lowcodeStudio",
+          "title": "LowCode Studio",
+          "icon": "media/activitybar.svg"
+        }
+      ]
+    },
+    "views": {
+      "lowcodeStudio": [
+        {
+          "id": "lowcodeStudio.projects",
+          "name": "Project Explorer"
+        },
+        {
+          "id": "lowcodeStudio.activities",
+          "name": "Activities"
+        },
+        {
+          "id": "lowcodeStudio.variables",
+          "name": "Variables"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "lowcodeStudio.newProject",
+        "title": "LowCode Studio: New Project",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "lowcodeStudio.newWorkflow",
+        "title": "LowCode Studio: New Workflow",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "lowcodeStudio.openDesigner",
+        "title": "LowCode Studio: Open Designer"
+      },
+      {
+        "command": "lowcodeStudio.validateWorkflow",
+        "title": "LowCode Studio: Validate Workflow",
+        "icon": "$(check)"
+      },
+      {
+        "command": "lowcodeStudio.dryRun",
+        "title": "LowCode Studio: Dry Run",
+        "icon": "$(play)"
+      },
+      {
+        "command": "lowcodeStudio.addVariable",
+        "title": "LowCode Studio: Add Variable",
+        "icon": "$(add)"
+      },
+      {
+        "command": "lowcodeStudio.refreshExplorer",
+        "title": "LowCode Studio: Refresh Explorer",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "lowcodeStudio.insertActivity",
+        "title": "LowCode Studio: Insert Activity"
+      },
+      {
+        "command": "lowcodeStudio.exportPseudocode",
+        "title": "LowCode Studio: Export Pseudocode"
+      },
+      {
+        "command": "lowcodeStudio.showGettingStarted",
+        "title": "LowCode Studio: Getting Started"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "lowcodeStudio.newProject",
+          "when": "view == lowcodeStudio.projects",
+          "group": "navigation"
+        },
+        {
+          "command": "lowcodeStudio.newWorkflow",
+          "when": "view == lowcodeStudio.projects",
+          "group": "navigation"
+        },
+        {
+          "command": "lowcodeStudio.refreshExplorer",
+          "when": "view == lowcodeStudio.projects",
+          "group": "navigation"
+        },
+        {
+          "command": "lowcodeStudio.addVariable",
+          "when": "view == lowcodeStudio.variables",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "lowcodeStudio.insertActivity",
+          "when": "view == lowcodeStudio.activities && viewItem == activity",
+          "group": "inline"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "lowcodeStudio.validateWorkflow",
+          "when": "resourceFilename =~ /\\.lcs\\.json$/",
+          "group": "navigation"
+        },
+        {
+          "command": "lowcodeStudio.dryRun",
+          "when": "resourceFilename =~ /\\.lcs\\.json$/",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "lowcodeStudio.insertActivity",
+          "when": "false"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "lowcodeStudio.newWorkflow",
+        "key": "ctrl+alt+n",
+        "mac": "cmd+alt+n"
+      },
+      {
+        "command": "lowcodeStudio.dryRun",
+        "key": "f5",
+        "when": "resourceFilename =~ /\\.lcs\\.json$/"
+      },
+      {
+        "command": "lowcodeStudio.validateWorkflow",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "resourceFilename =~ /\\.lcs\\.json$/"
+      }
+    ],
+    "languages": [
+      {
+        "id": "lowcode-studio",
+        "aliases": [
+          "LowCode Studio Workflow",
+          "lcs"
+        ],
+        "extensions": [
+          ".lcs.json"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "jsonValidation": [
+      {
+        "fileMatch": "*.lcs.json",
+        "url": "./schemas/workflow.schema.json"
+      }
+    ],
+    "configuration": {
+      "title": "LowCode Studio",
+      "properties": {
+        "lowcodeStudio.defaultWorkflowType": {
+          "type": "string",
+          "default": "Sequence",
+          "enum": [
+            "Sequence",
+            "Flowchart"
+          ],
+          "description": "Default workflow type for new workflows."
+        },
+        "lowcodeStudio.autoOpenDesigner": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open the visual designer when creating a new workflow."
+        },
+        "lowcodeStudio.showLineNumbers": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show step numbers on the designer canvas."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package --no-dependencies",
+    "lint": "tsc --noEmit",
+    "test": "npm run compile && node out/test/simulator.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.2.1",
+    "typescript": "^5.6.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/example/lowcode-studio"
+  },
+  "license": "MIT"
+}

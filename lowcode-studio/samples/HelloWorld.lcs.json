@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "1.0",
+  "name": "HelloWorld",
+  "description": "Sample LowCode Studio workflow",
+  "type": "Sequence",
+  "variables": [
+    {
+      "name": "counter",
+      "type": "Int32",
+      "defaultValue": 0
+    },
+    {
+      "name": "message",
+      "type": "String",
+      "defaultValue": "Ready"
+    }
+  ],
+  "arguments": [],
+  "activities": [
+    {
+      "id": "act_sample_1",
+      "type": "System.LogMessage",
+      "displayName": "Log Message",
+      "properties": {
+        "message": "\"Starting HelloWorld\"",
+        "level": "Info"
+      }
+    },
+    {
+      "id": "act_sample_2",
+      "type": "Programming.Assign",
+      "displayName": "Assign",
+      "properties": {
+        "to": "counter",
+        "value": "1"
+      }
+    },
+    {
+      "id": "act_sample_3",
+      "type": "ControlFlow.If",
+      "displayName": "If",
+      "properties": {
+        "condition": "true"
+      },
+      "children": [
+        {
+          "id": "act_sample_4",
+          "type": "System.LogMessage",
+          "displayName": "Log Then",
+          "properties": {
+            "message": "\"Condition is true\"",
+            "level": "Info"
+          }
+        }
+      ],
+      "elseChildren": [
+        {
+          "id": "act_sample_5",
+          "type": "System.LogMessage",
+          "displayName": "Log Else",
+          "properties": {
+            "message": "\"Condition is false\"",
+            "level": "Warn"
+          }
+        }
+      ]
+    },
+    {
+      "id": "act_sample_6",
+      "type": "Messaging.HttpRequest",
+      "displayName": "HTTP Request",
+      "properties": {
+        "method": "GET",
+        "url": "\"https://api.example.com/health\"",
+        "body": "",
+        "result": "response"
+      }
+    }
+  ],
+  "metadata": {
+    "createdAt": "2026-08-03T00:00:00.000Z",
+    "updatedAt": "2026-08-03T00:00:00.000Z",
+    "author": "LowCode Studio"
+  }
+}
