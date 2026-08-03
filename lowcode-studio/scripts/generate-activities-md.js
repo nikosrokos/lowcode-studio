@@ -58,13 +58,12 @@ for (const [category, items] of [...byCategory.entries()].sort((a, b) =>
   lines.push('| Activity | Type id | Container | Key properties |');
   lines.push('|---|---|---|---|');
   for (const a of items.sort((x, y) => x.displayName.localeCompare(y.displayName))) {
-    const props = (a.properties || [])
-      .map((p) => p.name)
-      .slice(0, 6)
-      .join(', ');
-    const more = (a.properties || []).length > 6 ? '…' : '';
+    const propNames = (a.properties || []).map((p) => p.name);
+    const props = propNames.slice(0, 6).join(', ');
+    const more = propNames.length > 6 ? '…' : '';
+    const propsCell = props ? `${props}${more}` : '—';
     lines.push(
-      `| ${a.displayName} | \`${a.type}\` | ${a.container ? 'Yes' : 'No'} | ${props}${more || '—'} |`
+      `| ${a.displayName} | \`${a.type}\` | ${a.container ? 'Yes' : 'No'} | ${propsCell} |`
     );
   }
   lines.push('');

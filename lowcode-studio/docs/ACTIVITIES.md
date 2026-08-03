@@ -17,13 +17,13 @@ UiPath package (typical): `UiPath.System.Activities (WF)`
 | Activity | Type id | Container | Key properties |
 |---|---|---|---|
 | Break | `ControlFlow.Break` | No | — |
-| Do While | `ControlFlow.DoWhile` | Yes | condition— |
-| For Each | `ControlFlow.ForEach` | Yes | item, values— |
-| If | `ControlFlow.If` | Yes | condition— |
-| Retry Scope | `ControlFlow.RetryScope` | Yes | numberOfRetries, retryIntervalMs— |
+| Do While | `ControlFlow.DoWhile` | Yes | condition |
+| For Each | `ControlFlow.ForEach` | Yes | item, values |
+| If | `ControlFlow.If` | Yes | condition |
+| Retry Scope | `ControlFlow.RetryScope` | Yes | numberOfRetries, retryIntervalMs |
 | Sequence | `ControlFlow.Sequence` | Yes | — |
-| Try Catch | `ControlFlow.TryCatch` | Yes | exceptionType— |
-| While | `ControlFlow.While` | Yes | condition— |
+| Try Catch | `ControlFlow.TryCatch` | Yes | exceptionType |
+| While | `ControlFlow.While` | Yes | condition |
 
 ### Data
 
@@ -31,9 +31,9 @@ UiPath package (typical): `UiPath.System.Activities`
 
 | Activity | Type id | Container | Key properties |
 |---|---|---|---|
-| Build Data Table | `Data.BuildDataTable` | No | columns, result— |
-| Read CSV | `Data.ReadCsv` | No | path, result, hasHeaders— |
-| Write CSV | `Data.WriteCsv` | No | path, data— |
+| Build Data Table | `Data.BuildDataTable` | No | columns, result |
+| Read CSV | `Data.ReadCsv` | No | path, result, hasHeaders |
+| Write CSV | `Data.WriteCsv` | No | path, data |
 
 ### Excel
 
@@ -41,10 +41,10 @@ UiPath package (typical): `UiPath.Excel.Activities`
 
 | Activity | Type id | Container | Key properties |
 |---|---|---|---|
-| Excel Read Cell | `Excel.ReadCell` | No | workbookPath, sheetName, cell, result— |
-| Excel Read Range | `Excel.ReadRange` | No | workbookPath, sheetName, range, result— |
-| Excel Write Cell | `Excel.WriteCell` | No | workbookPath, sheetName, cell, value— |
-| Excel Write Range | `Excel.WriteRange` | No | workbookPath, sheetName, data— |
+| Excel Read Cell | `Excel.ReadCell` | No | workbookPath, sheetName, cell, result |
+| Excel Read Range | `Excel.ReadRange` | No | workbookPath, sheetName, range, result |
+| Excel Write Cell | `Excel.WriteCell` | No | workbookPath, sheetName, cell, value |
+| Excel Write Range | `Excel.WriteRange` | No | workbookPath, sheetName, data |
 
 ### Flowchart
 
@@ -53,7 +53,7 @@ UiPath package (typical): `UiPath.System.Activities`
 | Activity | Type id | Container | Key properties |
 |---|---|---|---|
 | End | `Flowchart.End` | No | — |
-| Flow Decision | `Flowchart.FlowDecision` | No | condition— |
+| Flow Decision | `Flowchart.FlowDecision` | No | condition |
 | Start | `Flowchart.Start` | No | — |
 
 ### Messaging
@@ -62,8 +62,8 @@ UiPath package (typical): `UiPath.Mail.Activities / UiPath.WebAPI.Activities`
 
 | Activity | Type id | Container | Key properties |
 |---|---|---|---|
-| HTTP Request | `Messaging.HttpRequest` | No | method, url, body, result— |
-| Send Email | `Messaging.SendEmail` | No | to, subject, body— |
+| HTTP Request | `Messaging.HttpRequest` | No | method, url, body, result |
+| Send Email | `Messaging.SendEmail` | No | to, subject, body |
 
 ### Programming
 
@@ -71,7 +71,7 @@ UiPath package (typical): `UiPath.System.Activities`
 
 | Activity | Type id | Container | Key properties |
 |---|---|---|---|
-| Assign | `Programming.Assign` | No | to, value— |
+| Assign | `Programming.Assign` | No | to, value |
 
 ### Python
 
@@ -79,11 +79,11 @@ UiPath package (typical): `UiPath.Python.Activities`
 
 | Activity | Type id | Container | Key properties |
 |---|---|---|---|
-| Get Python Object | `Python.GetObject` | No | pythonObject, type, result— |
-| Invoke Python Method | `Python.InvokeMethod` | No | instance, name, inputParameters, result— |
-| Load Python Script | `Python.LoadScript` | No | file, code, result— |
-| Python Scope | `Python.PythonScope` | Yes | path, libraryPath, target, workingFolder, version— |
-| Run Python Script | `Python.RunScript` | No | file, code— |
+| Get Python Object | `Python.GetObject` | No | pythonObject, type, result |
+| Invoke Python Method | `Python.InvokeMethod` | No | instance, name, inputParameters, result |
+| Load Python Script | `Python.LoadScript` | No | file, code, result |
+| Python Scope | `Python.PythonScope` | Yes | path, libraryPath, target, workingFolder, version |
+| Run Python Script | `Python.RunScript` | No | file, code |
 
 ### REFramework
 
@@ -91,8 +91,8 @@ UiPath package (typical): `UiPath.System.Activities`
 
 | Activity | Type id | Container | Key properties |
 |---|---|---|---|
-| Invoke Workflow | `REFramework.InvokeWorkflow` | No | workflowPath, description— |
-| Set Transaction Status | `REFramework.SetTransactionStatus` | No | status, reason— |
+| Invoke Workflow | `REFramework.InvokeWorkflow` | No | workflowPath, description |
+| Set Transaction Status | `REFramework.SetTransactionStatus` | No | status, reason |
 
 ### System
 
@@ -100,11 +100,11 @@ UiPath package (typical): `UiPath.System.Activities`
 
 | Activity | Type id | Container | Key properties |
 |---|---|---|---|
-| Comment | `System.Comment` | No | text— |
-| Delay | `System.Delay` | No | durationMs— |
-| Log Message | `System.LogMessage` | No | message, level— |
-| Message Box | `System.MessageBox` | No | text, title— |
-| Write Line | `System.WriteLine` | No | text— |
+| Comment | `System.Comment` | No | text |
+| Delay | `System.Delay` | No | durationMs |
+| Log Message | `System.LogMessage` | No | message, level |
+| Message Box | `System.MessageBox` | No | text, title |
+| Write Line | `System.WriteLine` | No | text |
 
 ### UI Automation
 
@@ -112,15 +112,15 @@ UiPath package (typical): `UiPath.UIAutomation.Activities`
 
 | Activity | Type id | Container | Key properties |
 |---|---|---|---|
-| Check | `UI.Check` | No | selector, selectorModern, action— |
-| Click | `UI.Click` | No | selector, selectorModern, clickType, simulateClick— |
-| Element Exists | `UI.ElementExists` | No | selector, selectorModern, result, timeoutMs— |
-| Get Text | `UI.GetText` | No | selector, selectorModern, result— |
-| Hover | `UI.Hover` | No | selector, selectorModern— |
-| Open Application | `UI.OpenApplication` | No | pathOrUrl, arguments— |
-| Select Item | `UI.SelectItem` | No | selector, selectorModern, item— |
-| Take Screenshot | `UI.TakeScreenshot` | No | selector, filePath— |
-| Type Into | `UI.TypeInto` | No | selector, selectorModern, text, emptyField— |
+| Check | `UI.Check` | No | selector, selectorModern, action |
+| Click | `UI.Click` | No | selector, selectorModern, clickType, simulateClick |
+| Element Exists | `UI.ElementExists` | No | selector, selectorModern, result, timeoutMs |
+| Get Text | `UI.GetText` | No | selector, selectorModern, result |
+| Hover | `UI.Hover` | No | selector, selectorModern |
+| Open Application | `UI.OpenApplication` | No | pathOrUrl, arguments |
+| Select Item | `UI.SelectItem` | No | selector, selectorModern, item |
+| Take Screenshot | `UI.TakeScreenshot` | No | selector, filePath |
+| Type Into | `UI.TypeInto` | No | selector, selectorModern, text, emptyField |
 
 ## Python pack (`UiPath.Python.Activities`)
 
