@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Studio-like low-code RPA designer for VS Code and Cursor on Mac. Sequence + Flowchart designer, REFramework template, activity toolbox, and dry-run simulation.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"

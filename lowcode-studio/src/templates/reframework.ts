@@ -6,6 +6,7 @@ import {
   newId,
   stringifyWorkflow
 } from '../models/workflow';
+import { resolveUiPathDependencies } from '../interop/uipathDependencies';
 
 export interface GeneratedFile {
   relativePath: string;
@@ -37,7 +38,22 @@ export function generateREFrameworkProject(projectName: string): GeneratedFile[]
     relativePath: 'project.json',
     content:
       JSON.stringify(
-        createProjectManifest(projectName, mainName, allWorkflows, 'reframework'),
+        {
+          ...createProjectManifest(projectName, mainName, allWorkflows, 'reframework'),
+          uipathDependencies: resolveUiPathDependencies({
+            activityTypes: [
+              'System.LogMessage',
+              'Programming.Assign',
+              'ControlFlow.If',
+              'ControlFlow.TryCatch',
+              'UI.OpenApplication',
+              'Messaging.HttpRequest',
+              'REFramework.InvokeWorkflow',
+              'Flowchart.FlowDecision'
+            ],
+            includeBaseline: true
+          })
+        },
         null,
         2
       ) + '\n'

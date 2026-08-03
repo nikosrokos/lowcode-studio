@@ -124,8 +124,12 @@ No Orchestrator publish from this extension — keep publishing in Studio Web.
 
 1. **LowCode Studio: Export for Studio Web**
 2. Creates `YourProject.StudioWeb/` with Portable `project.json` + `.xaml`
-3. **Open Studio Web** (`https://studio.uipath.com`) and import/upload that folder (or use Git sync)
-4. Publish to Orchestrator from Studio Web when ready
+3. `project.json` includes **UiPath activity package dependencies** (System, UIAutomation, plus Mail/WebAPI/… when used)
+4. **Open Studio Web** (`https://studio.uipath.com`) and import/upload that folder (or use Git sync)
+5. Studio restores those packages automatically → fewer missing-dependency errors
+6. Publish to Orchestrator from Studio Web when ready
+
+If the project was imported from UiPath, original package versions are preserved in `uipathDependencies` and reused on export.
 
 ## Quick start (blank)
 

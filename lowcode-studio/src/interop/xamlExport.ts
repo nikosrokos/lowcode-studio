@@ -28,15 +28,16 @@ export function exportUiPathProjectJson(options: {
   description?: string;
   main: string;
   projectVersion?: string;
+  dependencies?: Record<string, string>;
 }): string {
   const main = options.main.endsWith('.xaml') ? options.main : `${options.main}.xaml`;
   const manifest = {
     name: options.name,
     description: options.description || `${options.name} exported from LowCode Studio`,
     main,
-    dependencies: {
-      'UiPath.System.Activities': '[24.10.7]',
-      'UiPath.UIAutomation.Activities': '[24.10.7]'
+    dependencies: options.dependencies || {
+      'UiPath.System.Activities': '[25.4.1]',
+      'UiPath.UIAutomation.Activities': '[25.4.1]'
     },
     schemaVersion: '4.0',
     studioVersion: '24.10.0.0',

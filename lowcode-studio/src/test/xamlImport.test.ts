@@ -4,6 +4,10 @@ import * as path from 'path';
 import { importXaml } from '../interop/xamlImport';
 import { exportWorkflowToXaml, exportUiPathProjectJson } from '../interop/xamlExport';
 import { validateWorkflow, dryRunWorkflow } from '../commands/simulator';
+import {
+  collectActivityTypes,
+  resolveUiPathDependencies
+} from '../interop/uipathDependencies';
 
 function run(): void {
   const fixture = path.join(__dirname, 'fixtures', 'sample.xaml');
@@ -37,13 +41,36 @@ function run(): void {
   assert.ok(exported.includes('<Sequence'));
   assert.ok(exported.includes('Variable'));
 
+  const deps = resolveUiPathDependencies({
+    activityTypes: collectActivityTypes([workflow]),
+    preserved: { 'UiPath.System.Activities': '24.10.7' },
+    includeBaseline: true
+  });
+  assert.ok(deps['UiPath.System.Activities']);
+  assert.ok(deps['UiPath.UIAutomation.Activities']);
+  assert.strictEqual(deps['UiPath.System.Activities'], '[24.10.7]');
+
+  // HTTP activity should pull WebAPI package
+  const withHttp = resolveUiPathDependencies({
+    activityTypes: ['Messaging.HttpRequest', 'Messaging.SendEmail'],
+    includeBaseline: true
+  });
+  assert.ok(withHttp['UiPath.WebAPI.Activities']);
+  assert.ok(withHttp['UiPath.Mail.Activities']);
+
   const projectJson = exportUiPathProjectJson({
     name: 'Demo',
-    main: 'Main.xaml'
+    main: 'Main.xaml',
+    dependencies: deps
   });
-  const parsed = JSON.parse(projectJson) as { targetFramework: string; main: string };
+  const parsed = JSON.parse(projectJson) as {
+    targetFramework: string;
+    main: string;
+    dependencies: Record<string, string>;
+  };
   assert.strictEqual(parsed.targetFramework, 'Portable');
   assert.strictEqual(parsed.main, 'Main.xaml');
+  assert.ok(parsed.dependencies['UiPath.System.Activities']);
 
   // Re-import exported XAML still parses
   const again = importXaml(exported, 'RoundTrip');
