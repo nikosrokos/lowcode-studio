@@ -407,6 +407,102 @@ function mapActivity(
     };
   }
 
+  if (localName === 'PythonScope') {
+    return {
+      id: newId(),
+      type: 'Python.PythonScope',
+      displayName,
+      properties: {
+        path: cleanExpr(raw['@_Path'] || extractArgument(raw, 'Path') || ''),
+        libraryPath: cleanExpr(raw['@_LibraryPath'] || extractArgument(raw, 'LibraryPath') || ''),
+        target: String(raw['@_Target'] || 'x64'),
+        workingFolder: cleanExpr(
+          raw['@_WorkingFolder'] || extractArgument(raw, 'WorkingFolder') || ''
+        ),
+        version: cleanExpr(raw['@_Version'] || '')
+      },
+      children: collectActivities(raw, warnings)
+    };
+  }
+
+  if (localName === 'LoadScript' || localName === 'LoadPythonScript') {
+    return {
+      id: newId(),
+      type: 'Python.LoadScript',
+      displayName,
+      properties: {
+        file: cleanExpr(raw['@_File'] || extractArgument(raw, 'File') || ''),
+        code: cleanExpr(raw['@_Code'] || extractArgument(raw, 'Code') || ''),
+        result: stripBrackets(
+          cleanExpr(raw['@_Result'] || extractArgument(raw, 'Result') || 'pythonScript')
+        )
+      }
+    };
+  }
+
+  if (localName === 'RunScript' || localName === 'RunPythonScript') {
+    return {
+      id: newId(),
+      type: 'Python.RunScript',
+      displayName,
+      properties: {
+        file: cleanExpr(raw['@_File'] || extractArgument(raw, 'File') || ''),
+        code: cleanExpr(raw['@_Code'] || extractArgument(raw, 'Code') || '')
+      }
+    };
+  }
+
+  if (
+    localName === 'InvokePythonMethod' ||
+    (localName === 'InvokeMethod' &&
+      (raw['@_Instance'] != null ||
+        extractArgument(raw, 'Instance') != null ||
+        raw['@_Name'] != null))
+  ) {
+    // Prefer Python InvokeMethod when Instance/Name present (UiPath.Python.Activities)
+    if (localName === 'InvokePythonMethod' || extractArgument(raw, 'Instance') != null || raw['@_Instance'] != null) {
+      return {
+        id: newId(),
+        type: 'Python.InvokeMethod',
+        displayName,
+        properties: {
+          instance: stripBrackets(
+            cleanExpr(raw['@_Instance'] || extractArgument(raw, 'Instance') || 'pythonScript')
+          ),
+          name: cleanExpr(raw['@_Name'] || extractArgument(raw, 'Name') || 'main'),
+          inputParameters: cleanExpr(
+            raw['@_InputParameters'] || extractArgument(raw, 'InputParameters') || '{}'
+          ),
+          result: stripBrackets(
+            cleanExpr(raw['@_Result'] || extractArgument(raw, 'Result') || 'pythonResult')
+          )
+        }
+      };
+    }
+  }
+
+  if (localName === 'GetPythonObject' || localName === 'GetObject') {
+    return {
+      id: newId(),
+      type: 'Python.GetObject',
+      displayName,
+      properties: {
+        pythonObject: stripBrackets(
+          cleanExpr(
+            raw['@_PythonObject'] ||
+              extractArgument(raw, 'PythonObject') ||
+              extractArgument(raw, 'Input') ||
+              'pythonResult'
+          )
+        ),
+        type: String(raw['@_Type'] || 'String').replace(/^.*\./, ''),
+        result: stripBrackets(
+          cleanExpr(raw['@_Result'] || extractArgument(raw, 'Result') || 'netValue')
+        )
+      }
+    };
+  }
+
   // Use Application/Browser — treat as open + nested body
   if (
     localName === 'UseApplicationBrowser' ||

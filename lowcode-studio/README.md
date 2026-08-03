@@ -1,16 +1,18 @@
 # LowCode Studio
 
-**Version 0.4.0** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.4.1** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally in your editor — with import/export paths to Studio Web.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.4.0-0ea5e9)
+![version](https://img.shields.io/badge/version-0.4.1-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
-## In action (v0.4.0)
+**Full activity list:** [docs/ACTIVITIES.md](docs/ACTIVITIES.md)
+
+## In action (v0.4.1)
 
 ### 1. Sequence designer + custom container colors
 
@@ -24,15 +26,17 @@ Built for UiPath practitioners who design, framework, develop, deploy, and test 
 
 ![REFramework flowchart in VS Code](docs/images/vscode-reframework-flowchart.png)
 
-## What’s in 0.4.0
+## What’s in 0.4.1
 
 - Visual **Sequence** + **Flowchart** designer (`.lcs.json`)
 - **Custom container colors** per activity
 - One-click **REFramework** template
 - **Import** UiPath project folders / `.nupkg` (XAML → `.lcs.json`)
 - **Richer XAML coverage** — Excel, Mail, MessageBox, WriteLine, DoWhile, RetryScope, Check/Hover/SelectItem/Screenshot, Use Application/Browser
-- **Selector round-trip** — classic `Selector` + modern `FullSelectorEncoding` preserved on import/export (`selector`, `selectorModern`, `selectorXml`)
-- **Export for Studio Web** with UiPath **activity package dependencies** in `project.json`
+- **Python pack** — `UiPath.Python.Activities` style: Python Scope, Load/Run Script, Invoke Method, Get Object
+- **Selector round-trip** — classic + modern encodings
+- **Export for Studio Web** with activity package dependencies (includes `UiPath.Python.Activities` when used)
+- Activity coverage catalog: [docs/ACTIVITIES.md](docs/ACTIVITIES.md)
 - Dry Run simulator (F5)
 - Works in VS Code, Cursor, and other forks
 
@@ -46,7 +50,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.4.0.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.4.1.vsix` → reload.
 
 ## Easy path (REFramework)
 
@@ -95,9 +99,12 @@ Select an activity → **Container color** (presets, picker, or `#RRGGBB`). Save
 | UI Automation | Open Application, Click, Type Into, Get Text, Element Exists, Check, Hover, Select Item, Take Screenshot |
 | Data | Read CSV, Write CSV, Build Data Table |
 | Excel | Read Range, Write Range, Read Cell, Write Cell |
+| Python | Python Scope, Load Python Script, Run Python Script, Invoke Python Method, Get Python Object |
 | Messaging | Send Email, HTTP Request |
 | Flowchart | Start, Flow Decision, End |
 | REFramework | Invoke Workflow, Set Transaction Status |
+
+See the full property-level list in [docs/ACTIVITIES.md](docs/ACTIVITIES.md).
 
 UI/messaging steps are design + dry-run stubs on Mac (no local robot runtime).
 
@@ -115,9 +122,10 @@ UI/messaging steps are design + dry-run stubs on Mac (no local robot runtime).
 
 ## Roadmap — next steps
 
-### Done in 0.4.0
+### Done
 - Richer XAML activity coverage (Excel, Mail, modern UI, RetryScope, …)
 - Selector round-trip (classic + modern encodings)
+- **Python activities** (`UiPath.Python.Activities` pack) + **ACTIVITIES.md** coverage catalog
 
 ### Near term
 1. **Import polish** — clearer placeholder UI for `Imported.*` activities + one-click “replace with…”
@@ -132,6 +140,7 @@ UI/messaging steps are design + dry-run stubs on Mac (no local robot runtime).
 ### Later (only if needed)
 7. Optional Orchestrator API publish from VS Code (today: publish stays in Studio Web — by design)
 8. Selector recorder helpers for Mac
+9. Optional real local Python runner for dry-run (today: simulated handlers only)
 
 ## License
 
