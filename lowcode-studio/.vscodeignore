@@ -3,6 +3,7 @@
 src/**
 .gitignore
 tsconfig.json
+esbuild.js
 **/*.ts
 **/*.map
 node_modules/**
@@ -10,5 +11,10 @@ node_modules/**
 samples/**
 .git/**
 out/test/**
+out/commands/**
+out/interop/**
+out/models/**
+out/providers/**
+out/templates/**
+out/webview/**
 docs/images/**
-**/*.map
