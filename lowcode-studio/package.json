@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Studio-like low-code RPA designer for VS Code and Cursor on Mac. Sequence + Flowchart designer, REFramework template, activity toolbox, and dry-run simulation.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -271,7 +271,7 @@
     "watch": "tsc -watch -p ./",
     "package": "npm run bundle && vsce package --no-dependencies",
     "lint": "tsc --noEmit",
-    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js"
+    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",

@@ -1,22 +1,20 @@
 # LowCode Studio for VS Code / Cursor
 
-Studio-like low-code RPA extension for Mac users who cannot run UiPath Studio Desktop.
+**v0.4.0** — Studio-like low-code RPA for Mac users without UiPath Studio Desktop.
 
 **Repo:** https://github.com/nikosrokos/lowcode-studio
 
-See [`lowcode-studio/README.md`](lowcode-studio/README.md) for full docs.
+Full docs: [`lowcode-studio/README.md`](lowcode-studio/README.md)
 
-## Highlights (v0.3)
+## In action
 
-- Sequence + **Flowchart** designer + custom container colors
-- One-click **REFramework** template
-- **Import** UiPath `.nupkg` / Studio folders
-- **Export for Studio Web** (simple path — publish from Studio Web)
-- Dry-run simulator (F5)
+![Sequence + colors](lowcode-studio/docs/images/vscode-sequence-colors.png)
 
-![Flowchart mode](lowcode-studio/docs/images/vscode-flowchart-mode.png)
+![Import / Studio Web export](lowcode-studio/docs/images/vscode-import-export-studioweb.png)
 
-## Install quickly
+![REFramework flowchart](lowcode-studio/docs/images/vscode-reframework-flowchart.png)
+
+## Install
 
 ```bash
 cd lowcode-studio
@@ -26,4 +24,19 @@ npm test
 npm run package
 ```
 
-Then: **Extensions: Install from VSIX…** → `lowcode-studio-0.3.0.vsix`.
+**Extensions: Install from VSIX…** → `lowcode-studio-0.4.0.vsix`
+
+## Highlights in 0.4.0
+
+- Richer XAML import/export (Excel, Mail, modern UI, RetryScope, …)
+- Selector round-trip (classic + modern encodings)
+- Studio Web export with activity package dependencies
+
+## Next steps (roadmap)
+
+1. Import polish for `Imported.*` placeholders  
+2. Studio Web Git sync guide  
+3. Config.xlsx bridge for classic REFramework  
+4. Package validation warnings  
+5. Deeper modern UI scopes  
+6. Marketplace publish  

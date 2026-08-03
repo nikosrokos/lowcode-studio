@@ -10,6 +10,10 @@ import {
 } from '../models/workflow';
 import { importXaml, ImportWarning } from './xamlImport';
 import { exportUiPathProjectJson, exportWorkflowToXaml } from './xamlExport';
+import {
+  collectActivityTypes,
+  resolveUiPathDependencies
+} from './uipathDependencies';
 
 export interface ImportedStudioProject {
   projectName: string;
@@ -18,12 +22,14 @@ export interface ImportedStudioProject {
   mainWorkflow: string;
   warnings: ImportWarning[];
   sourceKind: 'folder' | 'nupkg';
+  uipathDependencies: Record<string, string>;
 }
 
 export interface ExportedStudioWebProject {
   targetDir: string;
   mainXaml: string;
   files: string[];
+  dependencies: Record<string, string>;
 }
 
 export function isUiPathProjectDir(dir: string): boolean {
@@ -60,7 +66,11 @@ export function importUiPathProjectFolder(
 
   const manifest = JSON.parse(
     fs.readFileSync(path.join(sourceDir, 'project.json'), 'utf8')
-  ) as { name?: string; main?: string };
+  ) as {
+    name?: string;
+    main?: string;
+    dependencies?: Record<string, string>;
+  };
 
   const projectName = sanitizeName(manifest.name || path.basename(sourceDir));
   const targetDir = uniqueDir(destinationParent, projectName);
@@ -73,6 +83,7 @@ export function importUiPathProjectFolder(
 
   const warnings: ImportWarning[] = [];
   const workflows: string[] = [];
+  const importedDocs: WorkflowDocument[] = [];
   const mainXaml = manifest.main && manifest.main.endsWith('.xaml')
     ? manifest.main
     : path.basename(xamlFiles[0]);
@@ -83,6 +94,7 @@ export function importUiPathProjectFolder(
     const name = path.basename(lcsRel, '.lcs.json');
     const text = fs.readFileSync(abs, 'utf8');
     const imported = importXaml(text, name);
+    importedDocs.push(imported.workflow);
     warnings.push(
       ...imported.warnings.map((w) => ({
         message: `${rel}: ${w.message}`
@@ -104,6 +116,12 @@ export function importUiPathProjectFolder(
     }
   }
 
+  const uipathDependencies = resolveUiPathDependencies({
+    activityTypes: collectActivityTypes(importedDocs),
+    preserved: manifest.dependencies || {},
+    includeBaseline: true
+  });
+
   const mainWorkflow = mainXaml.replace(/\.xaml$/i, '.lcs.json');
   fs.writeFileSync(
     path.join(targetDir, 'project.json'),
@@ -111,6 +129,7 @@ export function importUiPathProjectFolder(
       {
         ...createProjectManifest(projectName, mainWorkflow, workflows, 'blank'),
         description: `${projectName} imported from UiPath Studio project`,
+        uipathDependencies,
         source: {
           kind: 'uipath-folder',
           originalMain: mainXaml
@@ -124,7 +143,7 @@ export function importUiPathProjectFolder(
 
   fs.writeFileSync(
     path.join(targetDir, 'IMPORT_NOTES.md'),
-    buildImportNotes(projectName, warnings, 'folder'),
+    buildImportNotes(projectName, warnings, 'folder', uipathDependencies),
     'utf8'
   );
 
@@ -134,7 +153,8 @@ export function importUiPathProjectFolder(
     workflows,
     mainWorkflow,
     warnings,
-    sourceKind: 'folder'
+    sourceKind: 'folder',
+    uipathDependencies
   };
 }
 
@@ -187,11 +207,11 @@ export function importUiPathNupkg(
         );
       }
       const imported = importUiPathProjectFolder(rootForXaml, destinationParent);
-      return { ...imported, sourceKind: 'nupkg' };
+      return { ...imported, sourceKind: 'nupkg' as const };
     }
 
     const imported = importUiPathProjectFolder(projectDir, destinationParent);
-    return { ...imported, sourceKind: 'nupkg' };
+    return { ...imported, sourceKind: 'nupkg' as const };
   } finally {
     try {
       fs.rmSync(tempDir, { recursive: true, force: true });
@@ -215,6 +235,7 @@ export function exportToStudioWebProject(
     main?: string;
     workflows?: string[];
     description?: string;
+    uipathDependencies?: Record<string, string>;
   };
 
   const projectName = sanitizeName(manifest.name || path.basename(lcsProjectDir));
@@ -232,12 +253,14 @@ export function exportToStudioWebProject(
         );
 
   const written: string[] = [];
+  const docs: WorkflowDocument[] = [];
   for (const rel of workflowRels) {
     const abs = path.join(lcsProjectDir, rel);
     if (!fs.existsSync(abs)) {
       continue;
     }
     const doc = parseWorkflow(fs.readFileSync(abs, 'utf8'));
+    docs.push(doc);
     const xamlRel = rel.replace(/\.lcs\.json$/i, '.xaml');
     const xamlAbs = path.join(outDir, xamlRel);
     fs.mkdirSync(path.dirname(xamlAbs), { recursive: true });
@@ -248,12 +271,19 @@ export function exportToStudioWebProject(
   const mainLcs = manifest.main || written[0]?.replace(/\.xaml$/i, '.lcs.json');
   const mainXaml = (mainLcs || 'Main.lcs.json').replace(/\.lcs\.json$/i, '.xaml');
 
+  const dependencies = resolveUiPathDependencies({
+    activityTypes: collectActivityTypes(docs),
+    preserved: manifest.uipathDependencies || {},
+    includeBaseline: true
+  });
+
   fs.writeFileSync(
     path.join(outDir, 'project.json'),
     exportUiPathProjectJson({
       name: projectName,
       description: manifest.description,
-      main: mainXaml
+      main: mainXaml,
+      dependencies
     }),
     'utf8'
   );
@@ -267,6 +297,10 @@ export function exportToStudioWebProject(
     written.push('Data/Config.json');
   }
 
+  const depList = Object.entries(dependencies)
+    .map(([name, ver]) => `- \`${name}\`: ${ver}`)
+    .join('\n');
+
   fs.writeFileSync(
     path.join(outDir, 'README_STUDIO_WEB.md'),
     `# ${projectName} — Studio Web export
@@ -277,10 +311,15 @@ Exported from **LowCode Studio** as a Portable UiPath project.
 
 1. Go to [UiPath Automation Cloud → Studio Web](https://studio.uipath.com)
 2. Create/open a solution and **import / upload** this project folder (or push it via Git if your tenant uses Git integration)
-3. Review activities marked as comments — those were best-effort placeholders
-4. Publish from Studio Web to Orchestrator when ready
+3. Studio restores activity packages from \`project.json\` dependencies
+4. Review activities marked as comments — those were best-effort placeholders
+5. Publish from Studio Web to Orchestrator when ready
 
 Main entry: \`${mainXaml}\`
+
+## Activity packages (dependencies)
+
+${depList}
 `,
     'utf8'
   );
@@ -289,7 +328,8 @@ Main entry: \`${mainXaml}\`
   return {
     targetDir: outDir,
     mainXaml,
-    files: written
+    files: written,
+    dependencies
   };
 }
 
@@ -373,8 +413,12 @@ function sanitizeName(name: string): string {
 function buildImportNotes(
   projectName: string,
   warnings: ImportWarning[],
-  kind: string
+  kind: string,
+  dependencies: Record<string, string> = {}
 ): string {
+  const deps = Object.entries(dependencies)
+    .map(([name, ver]) => `- \`${name}\`: ${ver}`)
+    .join('\n');
   return `# Import notes — ${projectName}
 
 Source: UiPath ${kind}
@@ -384,6 +428,12 @@ This project was converted to LowCode Studio \`.lcs.json\` workflows.
 ## Warnings (${warnings.length})
 
 ${warnings.length ? warnings.map((w) => `- ${w.message}`).join('\n') : '- None'}
+
+## Preserved / resolved UiPath activity packages
+
+${deps || '- (none)'}
+
+These are stored in \`project.json\` → \`uipathDependencies\` and written again on **Export for Studio Web**.
 
 ## Next steps
 

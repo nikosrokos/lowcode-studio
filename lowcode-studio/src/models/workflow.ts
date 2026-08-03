@@ -77,6 +77,8 @@ export interface ProjectManifest {
   workflows: string[];
   template?: ProjectTemplate;
   createdAt: string;
+  /** UiPath NuGet activity packages preserved from import / used on Studio Web export */
+  uipathDependencies?: Record<string, string>;
 }
 
 export function createEmptyWorkflow(

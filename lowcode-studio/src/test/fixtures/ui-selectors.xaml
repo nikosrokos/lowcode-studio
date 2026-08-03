@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Activity mc:Ignorable="sap sapc" x:Class="UiSelectors"
+  xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities"
+  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  xmlns:ui="http://schemas.uipath.com/workflow/activities"
+  xmlns:uia="http://schemas.uipath.com/workflow/activities/uipath.uiautomation.next"
+  xmlns:excel="http://schemas.uipath.com/workflow/activities/excel"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Sequence DisplayName="UiSelectors">
+    <uia:NClick DisplayName="Click Submit" Selector="&lt;webctrl id='btnSubmit' tag='BUTTON' /&gt;">
+      <Target>
+        <Target.Selector>
+          <InArgument x:TypeArguments="x:String">&lt;webctrl id='btnSubmit' tag='BUTTON' /&gt;</InArgument>
+        </Target.Selector>
+        <Target.FullSelectorEncoding>
+          <InArgument x:TypeArguments="x:String">modern-encoding-submit</InArgument>
+        </Target.FullSelectorEncoding>
+      </Target>
+    </uia:NClick>
+    <uia:NTypeInto DisplayName="Type Name" Text="[&quot;Ada&quot;]" Selector="&lt;webctrl id='txtName' tag='INPUT' /&gt;" />
+    <uia:NGetText DisplayName="Get Status" Selector="&lt;webctrl id='lblStatus' /&gt;" />
+    <uia:NHover DisplayName="Hover Menu" Selector="&lt;webctrl id='menu' /&gt;" />
+    <uia:NSelectItem DisplayName="Select Country" Item="[&quot;Greece&quot;]" Selector="&lt;webctrl id='cmbCountry' /&gt;" />
+    <ui:MessageBox DisplayName="Done" Text="[&quot;OK&quot;]" Caption="Test" />
+    <excel:ReadRange DisplayName="Read Excel" WorkbookPath="Data/Input/data.xlsx" SheetName="Sheet1" Range="A1:C10" />
+    <ui:RetryScope DisplayName="Retry Click" NumberOfRetries="2">
+      <ui:RetryScope.Activity>
+        <ActivityAction>
+          <Sequence>
+            <uia:NClick DisplayName="Retry Target" Selector="&lt;webctrl id='retry' /&gt;" />
+          </Sequence>
+        </ActivityAction>
+      </ui:RetryScope.Activity>
+    </ui:RetryScope>
+  </Sequence>
+</Activity>
