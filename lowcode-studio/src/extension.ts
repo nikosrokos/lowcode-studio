@@ -18,6 +18,7 @@ import { getActivityDefinition } from './models/activities';
 let editorProvider: WorkflowEditorProvider;
 let variablesProvider: VariablesTreeProvider;
 let projectProvider: ProjectTreeProvider;
+let outputChannel: vscode.OutputChannel;
 
 export function activate(context: vscode.ExtensionContext): void {
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -429,7 +430,10 @@ async function pickWorkflowUri(): Promise<vscode.Uri | undefined> {
 }
 
 function getOutput(): vscode.OutputChannel {
-  return vscode.window.createOutputChannel('LowCode Studio');
+  if (!outputChannel) {
+    outputChannel = vscode.window.createOutputChannel('LowCode Studio');
+  }
+  return outputChannel;
 }
 
 function showGettingStarted(): void {
