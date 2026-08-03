@@ -18,7 +18,7 @@ export function exportWorkflowToXaml(doc: WorkflowDocument): string {
       : renderSequence(doc.activities, doc.name, varsXml);
 
   return `<?xml version="1.0" encoding="utf-8"?>
-<Activity mc:Ignorable="sap sapc" x:Class="${escapeAttr(sanitizeClass(doc.name))}" sap:VirtualizedContainerService.HintSize="1200,800" sap2010:WorkflowViewState.IdRef="Activity1" xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation" xmlns:sap2010="http://schemas.microsoft.com/netfx/2010/xaml/activities/presentation" xmlns:scg="clr-namespace:System.Collections.Generic;assembly=System.Collections" xmlns:ui="http://schemas.uipath.com/workflow/activities" xmlns:uia="http://schemas.uipath.com/workflow/activities/uipath.uiautomation.next" xmlns:excel="http://schemas.uipath.com/workflow/activities/excel" xmlns:mail="http://schemas.uipath.com/workflow/activities/mail" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+<Activity mc:Ignorable="sap sapc" x:Class="${escapeAttr(sanitizeClass(doc.name))}" sap:VirtualizedContainerService.HintSize="1200,800" sap2010:WorkflowViewState.IdRef="Activity1" xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation" xmlns:sap2010="http://schemas.microsoft.com/netfx/2010/xaml/activities/presentation" xmlns:scg="clr-namespace:System.Collections.Generic;assembly=System.Collections" xmlns:ui="http://schemas.uipath.com/workflow/activities" xmlns:uia="http://schemas.uipath.com/workflow/activities/uipath.uiautomation.next" xmlns:excel="http://schemas.uipath.com/workflow/activities/excel" xmlns:mail="http://schemas.uipath.com/workflow/activities/mail" xmlns:python="http://schemas.uipath.com/workflow/activities/python" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 ${body}
 </Activity>
 `;
@@ -282,6 +282,10 @@ ${pad}</ui:RetryScope>`;
     return `${pad}<ui:HttpClient DisplayName="${escapeAttr(activity.displayName)}" Method="${escapeAttr(String(activity.properties.method || 'GET'))}" EndPoint="[${escapeAttr(String(activity.properties.url || '""'))}]" />`;
   }
 
+  if (activity.type.startsWith('Python.')) {
+    return renderPythonActivity(activity, pad, indent);
+  }
+
   if (activity.type === 'System.Comment' || activity.type.startsWith('Imported.') || activity.type.startsWith('Flowchart.')) {
     // Preserve selector on imported placeholders when present
     const sel = selectorAttribute(activity.properties);
@@ -298,11 +302,34 @@ ${pad}</ui:RetryScope>`;
             ? `excel:${info.localName}`
             : info.ns === 'mail'
               ? `mail:${info.localName}`
-              : info.localName;
+              : info.ns === 'python'
+                ? `python:${info.localName}`
+                : info.localName;
     return `${pad}<${tag} DisplayName="${escapeAttr(activity.displayName)}" />`;
   }
 
   return `${pad}<ui:Comment DisplayName="${escapeAttr(activity.displayName)}" Text="${escapeAttr('Exported placeholder for ' + activity.type)}" />`;
+}
+
+function renderPythonActivity(activity: ActivityNode, pad: string, indent: number): string {
+  switch (activity.type) {
+    case 'Python.PythonScope': {
+      const kids = (activity.children || []).map((c) => renderActivity(c, indent + 1)).join('\n');
+      return `${pad}<python:PythonScope DisplayName="${escapeAttr(activity.displayName)}" Path="${escapeAttr(String(activity.properties.path || ''))}" Target="${escapeAttr(String(activity.properties.target || 'x64'))}" WorkingFolder="${escapeAttr(String(activity.properties.workingFolder || ''))}" Version="${escapeAttr(String(activity.properties.version || ''))}">
+${kids}
+${pad}</python:PythonScope>`;
+    }
+    case 'Python.LoadScript':
+      return `${pad}<python:LoadScript DisplayName="${escapeAttr(activity.displayName)}" File="${escapeAttr(String(activity.properties.file || ''))}" Code="${escapeAttr(String(activity.properties.code || ''))}" />`;
+    case 'Python.RunScript':
+      return `${pad}<python:RunScript DisplayName="${escapeAttr(activity.displayName)}" File="${escapeAttr(String(activity.properties.file || ''))}" Code="${escapeAttr(String(activity.properties.code || ''))}" />`;
+    case 'Python.InvokeMethod':
+      return `${pad}<python:InvokeMethod DisplayName="${escapeAttr(activity.displayName)}" Name="${escapeAttr(String(activity.properties.name || 'main'))}" Instance="[${escapeAttr(String(activity.properties.instance || 'pythonScript'))}]" />`;
+    case 'Python.GetObject':
+      return `${pad}<python:GetObject DisplayName="${escapeAttr(activity.displayName)}" Type="{x:Type ${escapeAttr(String(activity.properties.type || 'String'))}}" />`;
+    default:
+      return `${pad}<ui:Comment DisplayName="${escapeAttr(activity.displayName)}" Text="Python placeholder" />`;
+  }
 }
 
 function renderUiActivity(activity: ActivityNode, pad: string, indent: number): string {

@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "1.0",
+  "name": "PythonHello",
+  "description": "Sample UiPath.Python.Activities-style scope",
+  "type": "Sequence",
+  "variables": [
+    { "name": "pythonScript", "type": "Object", "defaultValue": null },
+    { "name": "pythonResult", "type": "Object", "defaultValue": null },
+    { "name": "netValue", "type": "String", "defaultValue": "" }
+  ],
+  "arguments": [],
+  "activities": [
+    {
+      "id": "py_scope_1",
+      "type": "Python.PythonScope",
+      "displayName": "Python Scope",
+      "properties": {
+        "path": "",
+        "libraryPath": "",
+        "target": "x64",
+        "workingFolder": "",
+        "version": "Python 3.10"
+      },
+      "children": [
+        {
+          "id": "py_load_1",
+          "type": "Python.LoadScript",
+          "displayName": "Load Python Script",
+          "properties": {
+            "file": "scripts/hello.py",
+            "code": "",
+            "result": "pythonScript"
+          }
+        },
+        {
+          "id": "py_invoke_1",
+          "type": "Python.InvokeMethod",
+          "displayName": "Invoke Python Method",
+          "properties": {
+            "instance": "pythonScript",
+            "name": "main",
+            "inputParameters": "{}",
+            "result": "pythonResult"
+          }
+        },
+        {
+          "id": "py_get_1",
+          "type": "Python.GetObject",
+          "displayName": "Get Python Object",
+          "properties": {
+            "pythonObject": "pythonResult",
+            "type": "String",
+            "result": "netValue"
+          }
+        },
+        {
+          "id": "py_log_1",
+          "type": "System.LogMessage",
+          "displayName": "Log Message",
+          "properties": {
+            "message": "netValue",
+            "level": "Info"
+          }
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "createdAt": "2026-08-03T00:00:00.000Z",
+    "updatedAt": "2026-08-03T00:00:00.000Z"
+  }
+}

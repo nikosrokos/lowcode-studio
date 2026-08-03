@@ -10,6 +10,7 @@ export const DEFAULT_PACKAGE_VERSIONS: Record<string, string> = {
   'UiPath.Mail.Activities': '[2.2.2]',
   'UiPath.WebAPI.Activities': '[2.2.1]',
   'UiPath.Excel.Activities': '[2.24.3]',
+  'UiPath.Python.Activities': '[1.9.0]',
   'UiPath.Testing.Activities': '[24.10.0]'
 };
 
@@ -54,6 +55,11 @@ const ACTIVITY_TO_PACKAGES: Record<string, string[]> = {
   'Excel.WriteCell': ['UiPath.Excel.Activities'],
   'Messaging.SendEmail': ['UiPath.Mail.Activities'],
   'Messaging.HttpRequest': ['UiPath.WebAPI.Activities', 'UiPath.System.Activities'],
+  'Python.PythonScope': ['UiPath.Python.Activities'],
+  'Python.LoadScript': ['UiPath.Python.Activities'],
+  'Python.RunScript': ['UiPath.Python.Activities'],
+  'Python.InvokeMethod': ['UiPath.Python.Activities'],
+  'Python.GetObject': ['UiPath.Python.Activities'],
   'Flowchart.Start': ['UiPath.System.Activities'],
   'Flowchart.End': ['UiPath.System.Activities'],
   'Flowchart.FlowDecision': ['UiPath.System.Activities']

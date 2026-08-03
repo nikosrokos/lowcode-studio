@@ -4,10 +4,10 @@ export interface MappedActivity {
   lcsType: string;
   xamlLocalNames: string[];
   /** Optional XML namespace hint used when exporting */
-  xamlNamespace?: 'ui' | 'uia' | 'excel' | 'mail' | 'default';
+  xamlNamespace?: 'ui' | 'uia' | 'excel' | 'mail' | 'python' | 'default';
 }
 
-type Ns = 'ui' | 'uia' | 'excel' | 'mail' | 'default';
+type Ns = 'ui' | 'uia' | 'excel' | 'mail' | 'python' | 'default';
 
 const MAP: Array<{
   lcsType: string;
@@ -146,6 +146,32 @@ const MAP: Array<{
     lcsType: 'REFramework.InvokeWorkflow',
     xamlLocalNames: ['InvokeWorkflowFile'],
     xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Python.PythonScope',
+    xamlLocalNames: ['PythonScope'],
+    xamlNamespace: 'python'
+  },
+  {
+    lcsType: 'Python.LoadScript',
+    xamlLocalNames: ['LoadScript', 'LoadPythonScript'],
+    xamlNamespace: 'python'
+  },
+  {
+    lcsType: 'Python.RunScript',
+    xamlLocalNames: ['RunScript', 'RunPythonScript'],
+    xamlNamespace: 'python'
+  },
+  {
+    lcsType: 'Python.InvokeMethod',
+    // Prefer unambiguous name on export; import also accepts InvokeMethod when Instance is present
+    xamlLocalNames: ['InvokePythonMethod', 'InvokeMethod'],
+    xamlNamespace: 'python'
+  },
+  {
+    lcsType: 'Python.GetObject',
+    xamlLocalNames: ['GetPythonObject', 'GetObject'],
+    xamlNamespace: 'python'
   },
   {
     lcsType: 'Flowchart.FlowDecision',

@@ -198,6 +198,9 @@ function runChildren(
   } else if (activity.type === 'ControlFlow.RetryScope') {
     log.push(`${indent}RetryScope (1 attempt in dry-run)`);
     runList(activity.children, depth + 1);
+  } else if (activity.type === 'Python.PythonScope') {
+    log.push(`${indent}PythonScope body`);
+    runList(activity.children, depth + 1);
   } else if (activity.type === 'ControlFlow.TryCatch') {
     log.push(`${indent}Try`);
     runList(activity.children, depth + 1);
@@ -508,6 +511,48 @@ function executeStub(
     case 'ControlFlow.Break':
       log.push(`${indent}Break`);
       break;
+    case 'Python.PythonScope':
+      log.push(
+        `${indent}PythonScope path=${activity.properties.path || '(default)'} target=${activity.properties.target || 'x64'}`
+      );
+      break;
+    case 'Python.LoadScript': {
+      const result = String(activity.properties.result || 'pythonScript');
+      variables[result] = {
+        kind: 'PythonObject',
+        file: activity.properties.file,
+        code: activity.properties.code
+      };
+      log.push(`${indent}LoadPythonScript ${activity.properties.file || '(inline)'} -> ${result}`);
+      break;
+    }
+    case 'Python.RunScript':
+      log.push(
+        `${indent}RunPythonScript ${activity.properties.file || ''} ${activity.properties.code ? '(inline code)' : ''}`.trim()
+      );
+      break;
+    case 'Python.InvokeMethod': {
+      const result = String(activity.properties.result || 'pythonResult');
+      variables[result] = {
+        kind: 'PythonObject',
+        method: activity.properties.name,
+        instance: activity.properties.instance
+      };
+      log.push(
+        `${indent}InvokePythonMethod ${activity.properties.instance}.${activity.properties.name}() -> ${result}`
+      );
+      break;
+    }
+    case 'Python.GetObject': {
+      const result = String(activity.properties.result || 'netValue');
+      const t = String(activity.properties.type || 'String');
+      variables[result] =
+        t === 'Int32' || t === 'Double' ? 0 : t === 'Boolean' ? false : t === 'Array' ? [] : 'python-value';
+      log.push(
+        `${indent}GetPythonObject ${activity.properties.pythonObject} as ${t} -> ${result}`
+      );
+      break;
+    }
     case 'Programming.Assign': {
       const to = String(activity.properties.to);
       const value = resolveExpression(String(activity.properties.value ?? ''), variables);

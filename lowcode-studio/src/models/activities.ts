@@ -4,6 +4,7 @@ export type ActivityCategory =
   | 'UI Automation'
   | 'Data'
   | 'Excel'
+  | 'Python'
   | 'Programming'
   | 'Messaging'
   | 'Flowchart'
@@ -843,6 +844,172 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         label: 'Result',
         type: 'expression',
         defaultValue: 'response'
+      }
+    ]
+  },
+  {
+    type: 'Python.PythonScope',
+    displayName: 'Python Scope',
+    category: 'Python',
+    description: 'Initializes a Python environment (UiPath.Python.Activities). Child Python activities run inside this scope.',
+    icon: '$(symbol-misc)',
+    color: '#3776AB',
+    container: true,
+    properties: [
+      {
+        name: 'path',
+        label: 'Python Path',
+        type: 'string',
+        defaultValue: '',
+        description: 'Path to the Python installation folder.'
+      },
+      {
+        name: 'libraryPath',
+        label: 'Library Path',
+        type: 'string',
+        defaultValue: '',
+        description: 'libpython / python dll path when required.'
+      },
+      {
+        name: 'target',
+        label: 'Target',
+        type: 'enum',
+        options: ['x64', 'x86'],
+        defaultValue: 'x64'
+      },
+      {
+        name: 'workingFolder',
+        label: 'Working Folder',
+        type: 'string',
+        defaultValue: ''
+      },
+      {
+        name: 'version',
+        label: 'Version',
+        type: 'string',
+        defaultValue: 'Python 3.10'
+      }
+    ]
+  },
+  {
+    type: 'Python.LoadScript',
+    displayName: 'Load Python Script',
+    category: 'Python',
+    description: 'Loads a .py file (or inline code) into a PythonObject handler. Use inside Python Scope.',
+    icon: '$(file-code)',
+    color: '#3776AB',
+    properties: [
+      {
+        name: 'file',
+        label: 'File',
+        type: 'string',
+        defaultValue: 'scripts/main.py',
+        description: 'Path to the .py script.'
+      },
+      {
+        name: 'code',
+        label: 'Code',
+        type: 'multiline',
+        defaultValue: '',
+        description: 'Optional inline Python code (alternative to File).'
+      },
+      {
+        name: 'result',
+        label: 'Result (PythonObject)',
+        type: 'expression',
+        defaultValue: 'pythonScript',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Python.RunScript',
+    displayName: 'Run Python Script',
+    category: 'Python',
+    description: 'Runs a Python script file or inline code inside Python Scope.',
+    icon: '$(play)',
+    color: '#3776AB',
+    properties: [
+      {
+        name: 'file',
+        label: 'File',
+        type: 'string',
+        defaultValue: 'scripts/run.py'
+      },
+      {
+        name: 'code',
+        label: 'Code',
+        type: 'multiline',
+        defaultValue: 'print("Hello from Python")'
+      }
+    ]
+  },
+  {
+    type: 'Python.InvokeMethod',
+    displayName: 'Invoke Python Method',
+    category: 'Python',
+    description: 'Invokes a method from a loaded Python script. Use inside Python Scope.',
+    icon: '$(symbol-method)',
+    color: '#3776AB',
+    properties: [
+      {
+        name: 'instance',
+        label: 'Instance (PythonObject)',
+        type: 'expression',
+        defaultValue: 'pythonScript',
+        required: true
+      },
+      {
+        name: 'name',
+        label: 'Method Name',
+        type: 'string',
+        defaultValue: 'main',
+        required: true
+      },
+      {
+        name: 'inputParameters',
+        label: 'Input Parameters',
+        type: 'expression',
+        defaultValue: '{}',
+        description: 'JSON-like map or expression of arguments passed to the method.'
+      },
+      {
+        name: 'result',
+        label: 'Result (PythonObject)',
+        type: 'expression',
+        defaultValue: 'pythonResult',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Python.GetObject',
+    displayName: 'Get Python Object',
+    category: 'Python',
+    description: 'Converts a PythonObject to a .NET / workflow type. Use inside Python Scope.',
+    icon: '$(symbol-variable)',
+    color: '#3776AB',
+    properties: [
+      {
+        name: 'pythonObject',
+        label: 'Python Object',
+        type: 'expression',
+        defaultValue: 'pythonResult',
+        required: true
+      },
+      {
+        name: 'type',
+        label: 'Type',
+        type: 'enum',
+        options: ['String', 'Int32', 'Boolean', 'Double', 'Object', 'Array'],
+        defaultValue: 'String'
+      },
+      {
+        name: 'result',
+        label: 'Result',
+        type: 'expression',
+        defaultValue: 'netValue',
+        required: true
       }
     ]
   },

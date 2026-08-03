@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Activity mc:Ignorable="sap sapc" x:Class="PythonDemo"
+  xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities"
+  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  xmlns:python="http://schemas.uipath.com/workflow/activities/python"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Sequence DisplayName="PythonDemo">
+    <python:PythonScope DisplayName="Python Scope" Path="/usr/bin/python3" Target="x64" Version="Python 3.10">
+      <python:LoadScript DisplayName="Load Script" File="scripts/hello.py" />
+      <python:InvokeMethod DisplayName="Invoke main" Name="main" Instance="[pythonScript]" />
+      <python:GetObject DisplayName="Get result" />
+      <python:RunScript DisplayName="Run inline" Code="print('hi')" />
+    </python:PythonScope>
+  </Sequence>
+</Activity>
