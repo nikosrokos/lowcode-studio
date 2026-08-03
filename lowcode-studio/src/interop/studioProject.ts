@@ -1,0 +1,395 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import AdmZip from 'adm-zip';
+import {
+  createProjectManifest,
+  parseWorkflow,
+  stringifyWorkflow,
+  WorkflowDocument
+} from '../models/workflow';
+import { importXaml, ImportWarning } from './xamlImport';
+import { exportUiPathProjectJson, exportWorkflowToXaml } from './xamlExport';
+
+export interface ImportedStudioProject {
+  projectName: string;
+  targetDir: string;
+  workflows: string[];
+  mainWorkflow: string;
+  warnings: ImportWarning[];
+  sourceKind: 'folder' | 'nupkg';
+}
+
+export interface ExportedStudioWebProject {
+  targetDir: string;
+  mainXaml: string;
+  files: string[];
+}
+
+export function isUiPathProjectDir(dir: string): boolean {
+  const manifestPath = path.join(dir, 'project.json');
+  if (!fs.existsSync(manifestPath)) {
+    return false;
+  }
+  try {
+    const json = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
+      main?: string;
+      schemaVersion?: string | number;
+      dependencies?: unknown;
+    };
+    // UiPath projects have dependencies / main .xaml; LCS has schemaVersion "1.0" and .lcs.json
+    if (typeof json.main === 'string' && json.main.endsWith('.xaml')) {
+      return true;
+    }
+    if (json.dependencies && typeof json.dependencies === 'object') {
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export function importUiPathProjectFolder(
+  sourceDir: string,
+  destinationParent: string
+): ImportedStudioProject {
+  if (!isUiPathProjectDir(sourceDir)) {
+    throw new Error('Selected folder does not look like a UiPath Studio project (project.json + .xaml).');
+  }
+
+  const manifest = JSON.parse(
+    fs.readFileSync(path.join(sourceDir, 'project.json'), 'utf8')
+  ) as { name?: string; main?: string };
+
+  const projectName = sanitizeName(manifest.name || path.basename(sourceDir));
+  const targetDir = uniqueDir(destinationParent, projectName);
+  fs.mkdirSync(targetDir, { recursive: true });
+
+  const xamlFiles = listFiles(sourceDir, (f) => f.endsWith('.xaml'));
+  if (!xamlFiles.length) {
+    throw new Error('No .xaml workflows found in the UiPath project.');
+  }
+
+  const warnings: ImportWarning[] = [];
+  const workflows: string[] = [];
+  const mainXaml = manifest.main && manifest.main.endsWith('.xaml')
+    ? manifest.main
+    : path.basename(xamlFiles[0]);
+
+  for (const abs of xamlFiles) {
+    const rel = path.relative(sourceDir, abs).replace(/\\/g, '/');
+    const lcsRel = rel.replace(/\.xaml$/i, '.lcs.json');
+    const name = path.basename(lcsRel, '.lcs.json');
+    const text = fs.readFileSync(abs, 'utf8');
+    const imported = importXaml(text, name);
+    warnings.push(
+      ...imported.warnings.map((w) => ({
+        message: `${rel}: ${w.message}`
+      }))
+    );
+    const outPath = path.join(targetDir, lcsRel);
+    fs.mkdirSync(path.dirname(outPath), { recursive: true });
+    fs.writeFileSync(outPath, stringifyWorkflow(imported.workflow), 'utf8');
+    workflows.push(lcsRel);
+  }
+
+  // Copy helpful non-workflow assets
+  for (const rel of ['Data/Config.xlsx', 'Data/Config.json', 'README.md', '.gitignore']) {
+    const src = path.join(sourceDir, rel);
+    if (fs.existsSync(src) && fs.statSync(src).isFile()) {
+      const dest = path.join(targetDir, rel.replace(/Config\.xlsx$/i, 'Config.imported.xlsx'));
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.copyFileSync(src, dest);
+    }
+  }
+
+  const mainWorkflow = mainXaml.replace(/\.xaml$/i, '.lcs.json');
+  fs.writeFileSync(
+    path.join(targetDir, 'project.json'),
+    JSON.stringify(
+      {
+        ...createProjectManifest(projectName, mainWorkflow, workflows, 'blank'),
+        description: `${projectName} imported from UiPath Studio project`,
+        source: {
+          kind: 'uipath-folder',
+          originalMain: mainXaml
+        }
+      },
+      null,
+      2
+    ) + '\n',
+    'utf8'
+  );
+
+  fs.writeFileSync(
+    path.join(targetDir, 'IMPORT_NOTES.md'),
+    buildImportNotes(projectName, warnings, 'folder'),
+    'utf8'
+  );
+
+  return {
+    projectName,
+    targetDir,
+    workflows,
+    mainWorkflow,
+    warnings,
+    sourceKind: 'folder'
+  };
+}
+
+export function importUiPathNupkg(
+  nupkgPath: string,
+  destinationParent: string
+): ImportedStudioProject {
+  if (!fs.existsSync(nupkgPath)) {
+    throw new Error(`Package not found: ${nupkgPath}`);
+  }
+
+  const zip = new AdmZip(nupkgPath);
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lcs-nupkg-'));
+  try {
+    zip.extractAllTo(tempDir, true);
+
+    // NuGet layout: lib/net*/**, content/**, or flat project files
+    const projectDir =
+      findProjectDir(tempDir) ||
+      findProjectDir(path.join(tempDir, 'content')) ||
+      findProjectDir(path.join(tempDir, 'lib')) ||
+      tempDir;
+
+    // Sometimes sources are under contentFiles or a nested folder
+    if (!isUiPathProjectDir(projectDir)) {
+      const xamls = listFiles(tempDir, (f) => f.endsWith('.xaml'));
+      if (!xamls.length) {
+        throw new Error(
+          'This .nupkg has no .xaml sources. Republish from Studio with "Include Sources", or import the original project folder.'
+        );
+      }
+      // Synthesize a project.json if missing
+      const rootForXaml = path.dirname(xamls[0]);
+      if (!fs.existsSync(path.join(rootForXaml, 'project.json'))) {
+        const name = sanitizeName(path.basename(nupkgPath, '.nupkg').replace(/\.\d+\.\d+.*/, ''));
+        fs.writeFileSync(
+          path.join(rootForXaml, 'project.json'),
+          JSON.stringify(
+            {
+              name,
+              main: path.basename(xamls[0]),
+              dependencies: {},
+              schemaVersion: '4.0',
+              targetFramework: 'Portable'
+            },
+            null,
+            2
+          ),
+          'utf8'
+        );
+      }
+      const imported = importUiPathProjectFolder(rootForXaml, destinationParent);
+      return { ...imported, sourceKind: 'nupkg' };
+    }
+
+    const imported = importUiPathProjectFolder(projectDir, destinationParent);
+    return { ...imported, sourceKind: 'nupkg' };
+  } finally {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {
+      // ignore cleanup errors
+    }
+  }
+}
+
+export function exportToStudioWebProject(
+  lcsProjectDir: string,
+  destinationParent?: string
+): ExportedStudioWebProject {
+  const manifestPath = path.join(lcsProjectDir, 'project.json');
+  if (!fs.existsSync(manifestPath)) {
+    throw new Error('Open/select a LowCode Studio project folder (with project.json).');
+  }
+
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
+    name?: string;
+    main?: string;
+    workflows?: string[];
+    description?: string;
+  };
+
+  const projectName = sanitizeName(manifest.name || path.basename(lcsProjectDir));
+  const outDir = uniqueDir(
+    destinationParent || path.join(lcsProjectDir, '..'),
+    `${projectName}.StudioWeb`
+  );
+  fs.mkdirSync(outDir, { recursive: true });
+
+  const workflowRels =
+    manifest.workflows?.length
+      ? manifest.workflows
+      : listFiles(lcsProjectDir, (f) => f.endsWith('.lcs.json')).map((f) =>
+          path.relative(lcsProjectDir, f).replace(/\\/g, '/')
+        );
+
+  const written: string[] = [];
+  for (const rel of workflowRels) {
+    const abs = path.join(lcsProjectDir, rel);
+    if (!fs.existsSync(abs)) {
+      continue;
+    }
+    const doc = parseWorkflow(fs.readFileSync(abs, 'utf8'));
+    const xamlRel = rel.replace(/\.lcs\.json$/i, '.xaml');
+    const xamlAbs = path.join(outDir, xamlRel);
+    fs.mkdirSync(path.dirname(xamlAbs), { recursive: true });
+    fs.writeFileSync(xamlAbs, exportWorkflowToXaml(doc), 'utf8');
+    written.push(xamlRel);
+  }
+
+  const mainLcs = manifest.main || written[0]?.replace(/\.xaml$/i, '.lcs.json');
+  const mainXaml = (mainLcs || 'Main.lcs.json').replace(/\.lcs\.json$/i, '.xaml');
+
+  fs.writeFileSync(
+    path.join(outDir, 'project.json'),
+    exportUiPathProjectJson({
+      name: projectName,
+      description: manifest.description,
+      main: mainXaml
+    }),
+    'utf8'
+  );
+  written.push('project.json');
+
+  // Copy Config.json if present (Studio Web can use it as a resource)
+  const config = path.join(lcsProjectDir, 'Data', 'Config.json');
+  if (fs.existsSync(config)) {
+    fs.mkdirSync(path.join(outDir, 'Data'), { recursive: true });
+    fs.copyFileSync(config, path.join(outDir, 'Data', 'Config.json'));
+    written.push('Data/Config.json');
+  }
+
+  fs.writeFileSync(
+    path.join(outDir, 'README_STUDIO_WEB.md'),
+    `# ${projectName} — Studio Web export
+
+Exported from **LowCode Studio** as a Portable UiPath project.
+
+## Open in Studio Web
+
+1. Go to [UiPath Automation Cloud → Studio Web](https://studio.uipath.com)
+2. Create/open a solution and **import / upload** this project folder (or push it via Git if your tenant uses Git integration)
+3. Review activities marked as comments — those were best-effort placeholders
+4. Publish from Studio Web to Orchestrator when ready
+
+Main entry: \`${mainXaml}\`
+`,
+    'utf8'
+  );
+  written.push('README_STUDIO_WEB.md');
+
+  return {
+    targetDir: outDir,
+    mainXaml,
+    files: written
+  };
+}
+
+export function exportSingleWorkflowToXamlFile(
+  doc: WorkflowDocument,
+  destinationFile: string
+): void {
+  fs.mkdirSync(path.dirname(destinationFile), { recursive: true });
+  fs.writeFileSync(destinationFile, exportWorkflowToXaml(doc), 'utf8');
+}
+
+function findProjectDir(root: string): string | undefined {
+  if (!fs.existsSync(root)) {
+    return undefined;
+  }
+  if (isUiPathProjectDir(root)) {
+    return root;
+  }
+  const stack = [root];
+  while (stack.length) {
+    const current = stack.pop()!;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+      const full = path.join(current, entry.name);
+      if (isUiPathProjectDir(full)) {
+        return full;
+      }
+      stack.push(full);
+    }
+  }
+  return undefined;
+}
+
+function listFiles(root: string, predicate: (file: string) => boolean): string[] {
+  const results: string[] = [];
+  const stack = [root];
+  while (stack.length) {
+    const current = stack.pop()!;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'bin' || entry.name === 'obj') {
+          continue;
+        }
+        stack.push(full);
+      } else if (entry.isFile() && predicate(full)) {
+        results.push(full);
+      }
+    }
+  }
+  return results.sort();
+}
+
+function uniqueDir(parent: string, name: string): string {
+  let candidate = path.join(parent, name);
+  let i = 1;
+  while (fs.existsSync(candidate)) {
+    candidate = path.join(parent, `${name}_${i++}`);
+  }
+  return candidate;
+}
+
+function sanitizeName(name: string): string {
+  return name.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_').trim() || 'ImportedProject';
+}
+
+function buildImportNotes(
+  projectName: string,
+  warnings: ImportWarning[],
+  kind: string
+): string {
+  return `# Import notes — ${projectName}
+
+Source: UiPath ${kind}
+
+This project was converted to LowCode Studio \`.lcs.json\` workflows.
+
+## Warnings (${warnings.length})
+
+${warnings.length ? warnings.map((w) => `- ${w.message}`).join('\n') : '- None'}
+
+## Next steps
+
+1. Open the main \`.lcs.json\` in the designer
+2. Replace any \`Imported.*\` placeholder activities
+3. Dry Run (F5)
+4. When ready for Studio Web: **LowCode Studio: Export for Studio Web**
+`;
+}

@@ -15,6 +15,11 @@ import {
 import { dryRunWorkflow, toPseudocode, validateWorkflow } from './commands/simulator';
 import { getActivityDefinition } from './models/activities';
 import { generateREFrameworkProject } from './templates/reframework';
+import {
+  exportToStudioWebProject,
+  importUiPathNupkg,
+  importUiPathProjectFolder
+} from './interop/studioProject';
 
 let editorProvider: WorkflowEditorProvider;
 let variablesProvider: VariablesTreeProvider;
@@ -201,6 +206,18 @@ export function activate(context: vscode.ExtensionContext): void {
       );
       const opened = await vscode.workspace.openTextDocument(outUri);
       await vscode.window.showTextDocument(opened);
+    }),
+    vscode.commands.registerCommand('lowcodeStudio.importUiPathProject', () =>
+      importUiPathProjectCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.importUiPathPackage', () =>
+      importUiPathPackageCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.exportStudioWeb', () =>
+      exportStudioWebCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.openStudioWeb', () => {
+      void vscode.env.openExternal(vscode.Uri.parse('https://studio.uipath.com'));
     }),
     vscode.commands.registerCommand('lowcodeStudio.showGettingStarted', () => {
       showGettingStarted();
@@ -398,6 +415,140 @@ async function newWorkflow(): Promise<void> {
   );
 }
 
+async function importUiPathProjectCommand(): Promise<void> {
+  const workspace = vscode.workspace.workspaceFolders?.[0];
+  if (!workspace) {
+    vscode.window.showErrorMessage('Open a workspace folder first.');
+    return;
+  }
+  const picked = await vscode.window.showOpenDialog({
+    canSelectFiles: false,
+    canSelectFolders: true,
+    canSelectMany: false,
+    openLabel: 'Import UiPath project folder'
+  });
+  if (!picked?.[0]) {
+    return;
+  }
+  try {
+    const result = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Importing UiPath project…'
+      },
+      async () => importUiPathProjectFolder(picked[0].fsPath, workspace.uri.fsPath)
+    );
+    projectProvider.refresh();
+    const mainUri = vscode.Uri.file(path.join(result.targetDir, result.mainWorkflow));
+    await vscode.commands.executeCommand(
+      'vscode.openWith',
+      mainUri,
+      WorkflowEditorProvider.viewType
+    );
+    const channel = getOutput();
+    channel.appendLine(`Imported UiPath folder → ${result.targetDir}`);
+    for (const w of result.warnings.slice(0, 50)) {
+      channel.appendLine(`⚠ ${w.message}`);
+    }
+    vscode.window.showInformationMessage(
+      `Imported "${result.projectName}" (${result.workflows.length} workflows). Review IMPORT_NOTES.md for warnings.`
+    );
+  } catch (err) {
+    vscode.window.showErrorMessage(
+      err instanceof Error ? err.message : 'Import failed'
+    );
+  }
+}
+
+async function importUiPathPackageCommand(): Promise<void> {
+  const workspace = vscode.workspace.workspaceFolders?.[0];
+  if (!workspace) {
+    vscode.window.showErrorMessage('Open a workspace folder first.');
+    return;
+  }
+  const picked = await vscode.window.showOpenDialog({
+    canSelectFiles: true,
+    canSelectFolders: false,
+    canSelectMany: false,
+    filters: { 'UiPath Package': ['nupkg'] },
+    openLabel: 'Import .nupkg'
+  });
+  if (!picked?.[0]) {
+    return;
+  }
+  try {
+    const result = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Importing UiPath package…'
+      },
+      async () => importUiPathNupkg(picked[0].fsPath, workspace.uri.fsPath)
+    );
+    projectProvider.refresh();
+    const mainUri = vscode.Uri.file(path.join(result.targetDir, result.mainWorkflow));
+    await vscode.commands.executeCommand(
+      'vscode.openWith',
+      mainUri,
+      WorkflowEditorProvider.viewType
+    );
+    const channel = getOutput();
+    channel.appendLine(`Imported UiPath package → ${result.targetDir}`);
+    for (const w of result.warnings.slice(0, 50)) {
+      channel.appendLine(`⚠ ${w.message}`);
+    }
+    vscode.window.showInformationMessage(
+      `Imported package "${result.projectName}". Open IMPORT_NOTES.md if activities need cleanup.`
+    );
+  } catch (err) {
+    vscode.window.showErrorMessage(
+      err instanceof Error ? err.message : 'Package import failed'
+    );
+  }
+}
+
+async function exportStudioWebCommand(): Promise<void> {
+  const workspace = vscode.workspace.workspaceFolders?.[0];
+  if (!workspace) {
+    vscode.window.showErrorMessage('Open a workspace folder first.');
+    return;
+  }
+
+  const projectJson = findNearestProject(workspace.uri.fsPath);
+  let projectDir = projectJson ? path.dirname(projectJson) : undefined;
+
+  if (!projectDir) {
+    const picked = await vscode.window.showOpenDialog({
+      canSelectFiles: false,
+      canSelectFolders: true,
+      canSelectMany: false,
+      openLabel: 'Select LowCode Studio project folder'
+    });
+    if (!picked?.[0]) {
+      return;
+    }
+    projectDir = picked[0].fsPath;
+  }
+
+  try {
+    const result = exportToStudioWebProject(projectDir);
+    const open = await vscode.window.showInformationMessage(
+      `Exported Studio Web project to ${path.basename(result.targetDir)}`,
+      'Open Folder',
+      'Open Studio Web'
+    );
+    if (open === 'Open Folder') {
+      await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(result.targetDir));
+    }
+    if (open === 'Open Studio Web') {
+      await vscode.env.openExternal(vscode.Uri.parse('https://studio.uipath.com'));
+    }
+  } catch (err) {
+    vscode.window.showErrorMessage(
+      err instanceof Error ? err.message : 'Export failed'
+    );
+  }
+}
+
 function findNearestProject(root: string): string | undefined {
   const stack = [root];
   while (stack.length) {
@@ -503,7 +654,13 @@ A **Studio-like low-code designer** for VS Code and Cursor — built for Mac use
 4. Edit \`Data/Config.json\` for retries / endpoints
 5. Press **F5** to dry-run Main
 
+**Import UiPath:** \`Import UiPath Package (.nupkg)\` or \`Import UiPath Project Folder\`
+
+**Studio Web:** \`Export for Studio Web\` then open [studio.uipath.com](https://studio.uipath.com)
+
 Or use **New Project → Blank** and pick Sequence or Flowchart.
+
+Tip: select any activity → **Container color** to customize sequence/flowchart colors.
 
 ## About UiPath Maestro
 

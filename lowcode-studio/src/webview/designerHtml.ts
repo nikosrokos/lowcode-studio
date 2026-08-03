@@ -434,7 +434,7 @@ export function getDesignerHtml(
 
     function renderNode(node, stepNo) {
       const def = findDef(node.type);
-      const color = def?.color || '#64748B';
+      const color = node.color || def?.color || '#64748B';
       const wrap = document.createElement('div');
       const card = document.createElement('div');
       card.className = 'card' + (state.selectedId === node.id ? ' selected' : '');
@@ -564,7 +564,7 @@ export function getDesignerHtml(
           (isEnd ? ' end' : '');
         el.style.left = (node.x || 40) + 'px';
         el.style.top = (node.y || 40) + 'px';
-        el.style.borderColor = def?.color || undefined;
+        el.style.borderColor = node.color || def?.color || undefined;
         if (isDecision) {
           el.innerHTML = '<div class="inner"><div class="title">' + escapeHtml(node.displayName) + '</div><div class="summary">' + escapeHtml(summary(node)) + '</div></div><div class="port" title="Drag to connect"></div>';
         } else {
@@ -696,6 +696,17 @@ export function getDesignerHtml(
       const def = findDef(node.type);
       let html = '<div class="field"><label>Display Name</label><input id="prop_displayName" value="' + escapeAttr(node.displayName) + '" /></div>';
       html += '<div class="field"><label>Type</label><input value="' + escapeAttr(node.type) + '" disabled /></div>';
+      const currentColor = node.color || def?.color || '#64748B';
+      const presets = ['#3B82F6','#8B5CF6','#F59E0B','#10B981','#EF4444','#0EA5E9','#EC4899','#64748B','#22C55E','#A855F7'];
+      html += '<div class="field"><label>Container color</label>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">' +
+        presets.map(c => '<button type="button" class="icon-btn" data-color="' + c + '" title="' + c + '" style="background:' + c + ';border-color:transparent;width:22px;height:22px;"></button>').join('') +
+        '</div>' +
+        '<div style="display:flex;gap:8px;align-items:center;">' +
+        '<input type="color" id="prop_color" value="' + escapeAttr(currentColor) + '" style="width:48px;height:32px;padding:0;border:none;background:transparent;" />' +
+        '<input id="prop_color_hex" value="' + escapeAttr(currentColor) + '" placeholder="#RRGGBB" />' +
+        '<button class="btn" id="btnResetColor" type="button">Reset</button>' +
+        '</div></div>';
       for (const p of (def?.properties || [])) {
         const val = node.properties?.[p.name] ?? '';
         html += '<div class="field"><label>' + escapeHtml(p.label) + (p.required ? ' *' : '') + '</label>';
@@ -721,6 +732,26 @@ export function getDesignerHtml(
       document.getElementById('prop_displayName').addEventListener('change', (e) => {
         node.displayName = e.target.value || node.displayName;
         persist(true);
+      });
+      const applyColor = (value) => {
+        if (!value || !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value)) return;
+        node.color = value;
+        const hex = document.getElementById('prop_color_hex');
+        const picker = document.getElementById('prop_color');
+        if (hex) hex.value = value;
+        if (picker) picker.value = value.length === 4
+          ? '#' + value.slice(1).split('').map(ch => ch + ch).join('')
+          : value;
+        persist(true);
+      };
+      document.getElementById('prop_color')?.addEventListener('input', (e) => applyColor(e.target.value));
+      document.getElementById('prop_color_hex')?.addEventListener('change', (e) => applyColor(e.target.value.trim()));
+      document.getElementById('btnResetColor')?.addEventListener('click', () => {
+        delete node.color;
+        persist(true);
+      });
+      els.props.querySelectorAll('[data-color]').forEach(btn => {
+        btn.addEventListener('click', () => applyColor(btn.getAttribute('data-color')));
       });
       els.props.querySelectorAll('[data-prop]').forEach(input => {
         const apply = () => {
