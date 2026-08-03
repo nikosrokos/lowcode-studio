@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ACTIVITY_CATALOG } from '../models/activities';
+import { getActivityCatalog } from '../models/activities';
 import {
   parseWorkflow,
   stringifyWorkflow,
@@ -190,7 +190,7 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
 
   private getHtml(webview: vscode.Webview, workflow: WorkflowDocument): string {
     const nonce = getNonce();
-    return getDesignerHtml(nonce, webview.cspSource, workflow, ACTIVITY_CATALOG);
+    return getDesignerHtml(nonce, webview.cspSource, workflow, getActivityCatalog());
   }
 
   private getErrorHtml(message: string): string {

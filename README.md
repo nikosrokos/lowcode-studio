@@ -1,6 +1,6 @@
 # LowCode Studio for VS Code / Cursor
 
-**v0.4.1** — Studio-like low-code RPA for Mac users without UiPath Studio Desktop.
+**v0.5.0** — Studio-like low-code RPA for Mac users without UiPath Studio Desktop.
 
 **Repo:** https://github.com/nikosrokos/lowcode-studio
 
@@ -24,16 +24,18 @@ npm test
 npm run package
 ```
 
-**Extensions: Install from VSIX…** → `lowcode-studio-0.4.1.vsix`
+**Extensions: Install from VSIX…** → `lowcode-studio-0.5.0.vsix`
 
 Activity coverage catalog: [`lowcode-studio/docs/ACTIVITIES.md`](lowcode-studio/docs/ACTIVITIES.md)
 
-## Highlights in 0.4.1
+## Highlights in 0.5.0
 
+- **Custom activity registration** — project (`activities.custom.json`) or user library
+- **REFramework scenario dry-runs** — `Data/Config.json` + `Data/Test/scenarios.json`
 - Richer XAML import/export (Excel, Mail, modern UI, RetryScope, …)
 - **Python activities** (`UiPath.Python.Activities`): Scope, Load/Run Script, Invoke Method, Get Object
 - Selector round-trip (classic + modern encodings)
-- Studio Web export with activity package dependencies
+- Studio Web export with activity package dependencies (incl. custom NuGet)
 
 ## Next steps (roadmap)
 
@@ -43,4 +45,3 @@ Activity coverage catalog: [`lowcode-studio/docs/ACTIVITIES.md`](lowcode-studio/
 4. Package validation warnings  
 5. Deeper modern UI scopes  
 6. Marketplace publish  
-

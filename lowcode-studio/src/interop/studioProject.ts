@@ -14,6 +14,10 @@ import {
   collectActivityTypes,
   resolveUiPathDependencies
 } from './uipathDependencies';
+import {
+  collectCustomNugetPackages,
+  loadProjectCustomActivities
+} from '../models/customActivities';
 
 export interface ImportedStudioProject {
   projectName: string;
@@ -271,10 +275,13 @@ export function exportToStudioWebProject(
   const mainLcs = manifest.main || written[0]?.replace(/\.xaml$/i, '.lcs.json');
   const mainXaml = (mainLcs || 'Main.lcs.json').replace(/\.lcs\.json$/i, '.xaml');
 
+  const activityTypes = collectActivityTypes(docs);
+  const customActivities = loadProjectCustomActivities(lcsProjectDir);
   const dependencies = resolveUiPathDependencies({
-    activityTypes: collectActivityTypes(docs),
+    activityTypes,
     preserved: manifest.uipathDependencies || {},
-    includeBaseline: true
+    includeBaseline: true,
+    extraPackages: collectCustomNugetPackages(customActivities, activityTypes)
   });
 
   fs.writeFileSync(

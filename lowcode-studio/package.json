@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Studio-like low-code RPA designer for VS Code and Cursor on Mac. Sequence + Flowchart designer, REFramework template, activity toolbox, and dry-run simulation.",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -97,6 +97,20 @@
         "icon": "$(play)"
       },
       {
+        "command": "lowcodeStudio.dryRunScenario",
+        "title": "LowCode Studio: Dry Run REFramework Scenario",
+        "icon": "$(beaker)"
+      },
+      {
+        "command": "lowcodeStudio.registerCustomActivity",
+        "title": "LowCode Studio: Register Custom Activity",
+        "icon": "$(extensions)"
+      },
+      {
+        "command": "lowcodeStudio.manageCustomActivities",
+        "title": "LowCode Studio: Manage Custom Activities"
+      },
+      {
         "command": "lowcodeStudio.addVariable",
         "title": "LowCode Studio: Add Variable",
         "icon": "$(add)"
@@ -174,6 +188,16 @@
           "command": "lowcodeStudio.addVariable",
           "when": "view == lowcodeStudio.variables",
           "group": "navigation"
+        },
+        {
+          "command": "lowcodeStudio.registerCustomActivity",
+          "when": "view == lowcodeStudio.activities",
+          "group": "navigation"
+        },
+        {
+          "command": "lowcodeStudio.manageCustomActivities",
+          "when": "view == lowcodeStudio.activities",
+          "group": "navigation"
         }
       ],
       "view/item/context": [
@@ -191,6 +215,11 @@
         },
         {
           "command": "lowcodeStudio.dryRun",
+          "when": "resourceFilename =~ /\\.lcs\\.json$/",
+          "group": "navigation"
+        },
+        {
+          "command": "lowcodeStudio.dryRunScenario",
           "when": "resourceFilename =~ /\\.lcs\\.json$/",
           "group": "navigation"
         }
@@ -272,7 +301,7 @@
     "package": "npm run bundle && vsce package --no-dependencies",
     "lint": "tsc --noEmit",
     "docs:activities": "npm run compile && node scripts/generate-activities-md.js",
-    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && npm run docs:activities"
+    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && npm run docs:activities"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",

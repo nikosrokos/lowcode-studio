@@ -4,6 +4,7 @@ import {
   WorkflowVariable
 } from '../models/workflow';
 import { getActivityDefinition } from '../models/activities';
+import { CustomActivityDefinition } from '../models/customActivities';
 
 export interface ValidationIssue {
   severity: 'error' | 'warning';
@@ -25,6 +26,11 @@ export interface DryRunResult {
   steps: DryRunStep[];
   variables: Record<string, unknown>;
   log: string[];
+}
+
+export interface DryRunOptions {
+  /** Seed / override variables before execution (Config, MaxTransactions, …) */
+  initialVariables?: Record<string, unknown>;
 }
 
 export function validateWorkflow(doc: WorkflowDocument): ValidationIssue[] {
@@ -111,14 +117,25 @@ export function validateWorkflow(doc: WorkflowDocument): ValidationIssue[] {
   return issues;
 }
 
-export function dryRunWorkflow(doc: WorkflowDocument): DryRunResult {
+export function dryRunWorkflow(
+  doc: WorkflowDocument,
+  options: DryRunOptions = {}
+): DryRunResult {
   const variables: Record<string, unknown> = {};
   for (const v of doc.variables) {
     variables[v.name] = v.defaultValue ?? defaultForType(v.type);
   }
+  if (options.initialVariables) {
+    Object.assign(variables, options.initialVariables);
+  }
 
   const steps: DryRunStep[] = [];
   const log: string[] = [`Starting dry-run for "${doc.name}" (${doc.type})`];
+  if (options.initialVariables && Object.keys(options.initialVariables).length) {
+    log.push(
+      `Seeded variables: ${Object.keys(options.initialVariables).sort().join(', ')}`
+    );
+  }
   let index = 1;
   let ok = true;
 
@@ -666,8 +683,22 @@ function executeStub(
       variables.TransactionResult = activity.properties.status;
       log.push(`${indent}SetTransactionStatus ${activity.properties.status}`);
       break;
-    default:
-      log.push(`${indent}${activity.displayName}`);
+    default: {
+      const def = getActivityDefinition(activity.type) as CustomActivityDefinition | undefined;
+      if (def?.dryRun) {
+        const stubLog =
+          def.dryRun.log || `${activity.displayName} (custom simulated)`;
+        log.push(`${indent}${stubLog}`);
+        for (const [name, expr] of Object.entries(def.dryRun.assign || {})) {
+          variables[name] = resolveExpression(String(expr), variables);
+          log.push(`${indent}  → ${name} = ${JSON.stringify(variables[name])}`);
+        }
+      } else if (activity.type.startsWith('Custom.') || activity.type.startsWith('Imported.')) {
+        log.push(`${indent}${activity.displayName} (simulated stub)`);
+      } else {
+        log.push(`${indent}${activity.displayName}`);
+      }
+    }
   }
 }
 

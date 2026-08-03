@@ -10,6 +10,8 @@ function run(): void {
   assert.ok(paths.includes('Main.lcs.json'));
   assert.ok(paths.includes('Framework/Process.lcs.json'));
   assert.ok(paths.includes('Data/Config.json'));
+  assert.ok(paths.includes('Data/Test/scenarios.json'));
+  assert.ok(paths.includes('activities.custom.json'));
   assert.ok(paths.includes('project.json'));
 
   const main = parseWorkflow(files.find((f) => f.relativePath === 'Main.lcs.json')!.content);

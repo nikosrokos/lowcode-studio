@@ -24,7 +24,8 @@ const packageHints = {
   Python: 'UiPath.Python.Activities',
   Messaging: 'UiPath.Mail.Activities / UiPath.WebAPI.Activities',
   Flowchart: 'UiPath.System.Activities',
-  REFramework: 'UiPath.System.Activities'
+  REFramework: 'UiPath.System.Activities',
+  Custom: 'Project/user activities.custom.json (+ optional NuGet)'
 };
 
 const byCategory = new Map();

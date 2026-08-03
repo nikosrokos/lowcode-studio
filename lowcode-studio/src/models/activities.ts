@@ -8,7 +8,8 @@ export type ActivityCategory =
   | 'Programming'
   | 'Messaging'
   | 'Flowchart'
-  | 'REFramework';
+  | 'REFramework'
+  | 'Custom';
 
 export interface ActivityPropertyDef {
   name: string;
@@ -1097,8 +1098,31 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
   }
 ];
 
+/** Runtime overlay from project + user custom activity registrations. */
+let customOverlay: ActivityDefinition[] = [];
+
+export function setCustomActivityOverlay(defs: ActivityDefinition[]): void {
+  customOverlay = defs.map((d) => ({ ...d }));
+}
+
+export function getCustomActivityOverlay(): ActivityDefinition[] {
+  return [...customOverlay];
+}
+
+/** Built-in + registered custom activities (custom wins on type collision). */
+export function getActivityCatalog(): ActivityDefinition[] {
+  const map = new Map<string, ActivityDefinition>();
+  for (const a of ACTIVITY_CATALOG) {
+    map.set(a.type, a);
+  }
+  for (const a of customOverlay) {
+    map.set(a.type, a);
+  }
+  return [...map.values()];
+}
+
 export function getActivityDefinition(type: string): ActivityDefinition | undefined {
-  return ACTIVITY_CATALOG.find((a) => a.type === type);
+  return customOverlay.find((a) => a.type === type) || ACTIVITY_CATALOG.find((a) => a.type === type);
 }
 
 export function createActivityFromDefinition(def: ActivityDefinition) {
@@ -1119,7 +1143,7 @@ export function createActivityFromDefinition(def: ActivityDefinition) {
 
 export function groupActivitiesByCategory(): Map<ActivityCategory, ActivityDefinition[]> {
   const map = new Map<ActivityCategory, ActivityDefinition[]>();
-  for (const activity of ACTIVITY_CATALOG) {
+  for (const activity of getActivityCatalog()) {
     const list = map.get(activity.category) || [];
     list.push(activity);
     map.set(activity.category, list);
