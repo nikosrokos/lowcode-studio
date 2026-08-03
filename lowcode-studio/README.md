@@ -1,18 +1,18 @@
 # LowCode Studio
 
-**Version 0.4.1** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.5.0** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally in your editor — with import/export paths to Studio Web.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.4.1-0ea5e9)
+![version](https://img.shields.io/badge/version-0.5.0-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
 **Full activity list:** [docs/ACTIVITIES.md](docs/ACTIVITIES.md)
 
-## In action (v0.4.1)
+## In action (v0.5.0)
 
 ### 1. Sequence designer + custom container colors
 
@@ -26,18 +26,19 @@ Built for UiPath practitioners who design, framework, develop, deploy, and test 
 
 ![REFramework flowchart in VS Code](docs/images/vscode-reframework-flowchart.png)
 
-## What’s in 0.4.1
+## What’s in 0.5.0
 
 - Visual **Sequence** + **Flowchart** designer (`.lcs.json`)
 - **Custom container colors** per activity
-- One-click **REFramework** template
+- One-click **REFramework** template with **scenario dry-runs** (`Data/Test/scenarios.json`)
+- **Register Custom Activity** — project (`activities.custom.json`) or user library
 - **Import** UiPath project folders / `.nupkg` (XAML → `.lcs.json`)
 - **Richer XAML coverage** — Excel, Mail, MessageBox, WriteLine, DoWhile, RetryScope, Check/Hover/SelectItem/Screenshot, Use Application/Browser
 - **Python pack** — `UiPath.Python.Activities` style: Python Scope, Load/Run Script, Invoke Method, Get Object
 - **Selector round-trip** — classic + modern encodings
-- **Export for Studio Web** with activity package dependencies (includes `UiPath.Python.Activities` when used)
+- **Export for Studio Web** with activity package dependencies (includes custom NuGet packages when registered)
 - Activity coverage catalog: [docs/ACTIVITIES.md](docs/ACTIVITIES.md)
-- Dry Run simulator (F5)
+- Dry Run simulator (F5) + **Dry Run REFramework Scenario**
 - Works in VS Code, Cursor, and other forks
 
 ## Install
@@ -50,7 +51,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.4.1.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.5.0.vsix` → reload.
 
 ## Easy path (REFramework)
 
@@ -58,7 +59,7 @@ In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.
 2. Open `Main.lcs.json` (flowchart)
 3. Edit `Framework/Process.lcs.json` for business logic
 4. Tune `Data/Config.json`
-5. Press **F5** to dry-run
+5. Press **F5** to dry-run Main, or run **Dry Run REFramework Scenario**
 
 ```
 MyREFramework/
@@ -71,7 +72,23 @@ MyREFramework/
     ...
   Data/
     Config.json
+    Test/scenarios.json    ← simulated tests (variables + expects)
+  activities.custom.json   ← project custom activities
 ```
+
+### Simulated tests (Config + scenarios)
+
+Yes — for REFramework on Mac, use **variables/config files + simulated scenarios**, not a robot:
+
+| Piece | Purpose |
+|---|---|
+| `Data/Config.json` | Shared settings (`MaxTransactions`, retries, endpoints) |
+| `Data/Test/scenarios.json` | Named dry-runs with seeded variables + assertions |
+| **Dry Run REFramework Scenario** | Pick a scenario (or All) and see PASS/FAIL in Output |
+
+### Custom activities
+
+**Register Custom Activity** → choose **This project** (`activities.custom.json`, team-shared) or **All my projects** (user library on this machine). They appear in the Activities toolbox, get dry-run stubs, and contribute NuGet package refs on Studio Web export.
 
 ## Import → design on Mac → Studio Web
 
@@ -118,6 +135,8 @@ UI/messaging steps are design + dry-run stubs on Mac (no local robot runtime).
 | New Workflow | Cmd+Alt+N |
 | Validate Workflow | Cmd+Shift+V |
 | Dry Run | F5 |
+| Dry Run REFramework Scenario | — |
+| Register / Manage Custom Activities | — |
 | Getting Started | — |
 
 ## Roadmap — next steps
@@ -126,6 +145,7 @@ UI/messaging steps are design + dry-run stubs on Mac (no local robot runtime).
 - Richer XAML activity coverage (Excel, Mail, modern UI, RetryScope, …)
 - Selector round-trip (classic + modern encodings)
 - **Python activities** (`UiPath.Python.Activities` pack) + **ACTIVITIES.md** coverage catalog
+- **Custom activity registration** (project + user) + **REFramework scenario dry-runs**
 
 ### Near term
 1. **Import polish** — clearer placeholder UI for `Imported.*` activities + one-click “replace with…”

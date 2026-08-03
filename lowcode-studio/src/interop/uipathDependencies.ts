@@ -93,6 +93,8 @@ export function resolveUiPathDependencies(options: {
   preserved?: Record<string, string>;
   includeBaseline?: boolean;
   versions?: Record<string, string>;
+  /** Extra NuGet packages from custom activity registrations */
+  extraPackages?: Record<string, string>;
 }): Record<string, string> {
   const versions = { ...DEFAULT_PACKAGE_VERSIONS, ...(options.versions || {}) };
   const packages = new Set<string>();
@@ -119,9 +121,15 @@ export function resolveUiPathDependencies(options: {
 
   // Preserve imported versions first (Studio already validated them)
   for (const [name, ver] of Object.entries(options.preserved || {})) {
-    if (name.startsWith('UiPath.') || name.includes('Activities')) {
+    if (name.startsWith('UiPath.') || name.includes('Activities') || name.includes('.')) {
       result[name] = normalizeVersion(ver);
     }
+  }
+
+  // Custom activity NuGet packages
+  for (const [name, ver] of Object.entries(options.extraPackages || {})) {
+    result[name] = normalizeVersion(ver);
+    packages.add(name);
   }
 
   // Ensure required packages exist (fill defaults when missing)

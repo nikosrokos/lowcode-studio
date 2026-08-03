@@ -103,6 +103,24 @@ export function generateREFrameworkProject(projectName: string): GeneratedFile[]
   });
 
   files.push({
+    relativePath: 'Data/Test/scenarios.json',
+    content: JSON.stringify(defaultTestScenarios(projectName), null, 2) + '\n'
+  });
+
+  files.push({
+    relativePath: 'activities.custom.json',
+    content:
+      JSON.stringify(
+        {
+          schemaVersion: '1.0',
+          activities: []
+        },
+        null,
+        2
+      ) + '\n'
+  });
+
+  files.push({
     relativePath: 'Data/Input/.gitkeep',
     content: ''
   });
@@ -488,6 +506,60 @@ function defaultConfig(projectName: string) {
   };
 }
 
+function defaultTestScenarios(projectName: string) {
+  return {
+    schemaVersion: '1.0',
+    scenarios: [
+      {
+        name: 'happy-path',
+        description: `Process 3 items then end (${projectName})`,
+        variables: {
+          MaxTransactions: 3,
+          MaxRetryNumber: 2,
+          TransactionNumber: 1,
+          RetryNumber: 0
+        },
+        expect: {
+          ok: true,
+          variables: { TransactionItem: null },
+          logIncludes: ['InvokeWorkflow', 'no more items', 'CloseAllApplications'],
+          minSteps: 5
+        }
+      },
+      {
+        name: 'no-transactions',
+        description: 'Empty queue — skip Process',
+        variables: {
+          MaxTransactions: 0,
+          TransactionNumber: 1,
+          TransactionItem: null
+        },
+        expect: {
+          ok: true,
+          logIncludes: ['CloseAllApplications'],
+          variables: { TransactionItem: null }
+        }
+      },
+      {
+        name: 'single-item',
+        description: 'One transaction then stop',
+        configOverrides: {
+          Settings: { MaxTransactions: 1 }
+        },
+        variables: {
+          MaxTransactions: 1,
+          TransactionNumber: 1
+        },
+        expect: {
+          ok: true,
+          logIncludes: ['Process completed', 'CloseAllApplications'],
+          minSteps: 4
+        }
+      }
+    ]
+  };
+}
+
 function reframeworkReadme(projectName: string): string {
   return `# ${projectName} (REFramework)
 
@@ -509,7 +581,9 @@ ${projectName}/
     TakeScreenshot.lcs.json
   Data/
     Config.json                 ← settings (xlsx-free for Mac)
+    Test/scenarios.json         ← simulated dry-run tests
     Input/ Output/ Temp/
+  activities.custom.json        ← project custom activities
 \`\`\`
 
 ## How to use (easy path)
@@ -519,6 +593,18 @@ ${projectName}/
 3. Put business steps in **Framework/Process.lcs.json**.
 4. Adjust **GetTransactionData** for your queue / input source.
 5. Press **F5** (Dry Run) on Main to simulate the transaction loop.
+6. Run **LowCode Studio: Dry Run REFramework Scenario** for named tests in \`Data/Test/scenarios.json\`.
+
+## Simulated tests (recommended)
+
+Use **Config.json + scenario variables + expect assertions** — not a real robot:
+
+| File | Role |
+|---|---|
+| \`Data/Config.json\` | Shared settings (retries, MaxTransactions, endpoints) |
+| \`Data/Test/scenarios.json\` | Named dry-runs with variable seeds + assertions |
+
+Edit a scenario, then run **Dry Run REFramework Scenario** and pick it (or All).
 
 ## Flowchart transitions
 

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import {
-  ACTIVITY_CATALOG,
   ActivityDefinition,
+  getActivityCatalog,
   groupActivitiesByCategory
 } from '../models/activities';
 
@@ -33,16 +33,18 @@ export class ActivityTreeProvider implements vscode.TreeDataProvider<ActivityTre
     }
 
     if (element.contextValue === 'category') {
-      return ACTIVITY_CATALOG.filter((a) => a.category === element.category).map(
-        (activity) =>
-          new ActivityTreeItem(
-            activity.displayName,
-            activity.category,
-            vscode.TreeItemCollapsibleState.None,
-            'activity',
-            activity
-          )
-      );
+      return getActivityCatalog()
+        .filter((a) => a.category === element.category)
+        .map(
+          (activity) =>
+            new ActivityTreeItem(
+              activity.displayName,
+              activity.category,
+              vscode.TreeItemCollapsibleState.None,
+              'activity',
+              activity
+            )
+        );
     }
 
     return [];

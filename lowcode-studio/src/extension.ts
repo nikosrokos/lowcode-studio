@@ -13,7 +13,25 @@ import {
   WorkflowDocument
 } from './models/workflow';
 import { dryRunWorkflow, toPseudocode, validateWorkflow } from './commands/simulator';
-import { getActivityDefinition } from './models/activities';
+import {
+  formatScenarioReport,
+  loadScenariosFile,
+  runAllScenarios,
+  runScenario
+} from './commands/refDryRun';
+import {
+  getActivityDefinition,
+  setCustomActivityOverlay
+} from './models/activities';
+import {
+  createCustomActivityDraft,
+  CUSTOM_ACTIVITIES_FILENAME,
+  loadProjectCustomActivities,
+  saveProjectCustomActivities,
+  upsertCustomActivity,
+  USER_CUSTOM_ACTIVITIES_KEY,
+  CustomActivityDefinition
+} from './models/customActivities';
 import { generateREFrameworkProject } from './templates/reframework';
 import {
   exportToStudioWebProject,
@@ -24,14 +42,18 @@ import {
 let editorProvider: WorkflowEditorProvider;
 let variablesProvider: VariablesTreeProvider;
 let projectProvider: ProjectTreeProvider;
+let activityProvider: ActivityTreeProvider;
 let outputChannel: vscode.OutputChannel;
+let extensionContext: vscode.ExtensionContext;
 
 export function activate(context: vscode.ExtensionContext): void {
+  extensionContext = context;
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
   variablesProvider = new VariablesTreeProvider();
   projectProvider = new ProjectTreeProvider(workspaceRoot);
-  const activityProvider = new ActivityTreeProvider();
+  activityProvider = new ActivityTreeProvider();
+  refreshCustomActivityOverlay();
 
   context.subscriptions.push(
     vscode.window.createTreeView('lowcodeStudio.projects', {
@@ -124,6 +146,15 @@ export function activate(context: vscode.ExtensionContext): void {
           : 'Dry run finished with errors.'
       );
     }),
+    vscode.commands.registerCommand('lowcodeStudio.dryRunScenario', () =>
+      dryRunScenarioCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.registerCustomActivity', () =>
+      registerCustomActivityCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.manageCustomActivities', () =>
+      manageCustomActivitiesCommand()
+    ),
     vscode.commands.registerCommand('lowcodeStudio.addVariable', async () => {
       const uri = vscode.window.activeTextEditor?.document.uri;
       const target =
@@ -228,6 +259,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidSaveTextDocument((doc) => {
       if (doc.fileName.endsWith('.lcs.json') || path.basename(doc.fileName) === 'project.json') {
         projectProvider.refresh();
+      }
+      if (path.basename(doc.fileName) === CUSTOM_ACTIVITIES_FILENAME) {
+        refreshCustomActivityOverlay();
       }
     })
   );
@@ -584,6 +618,269 @@ function findNearestProject(root: string): string | undefined {
   return undefined;
 }
 
+function getUserCustomActivities(): CustomActivityDefinition[] {
+  return (
+    extensionContext.globalState.get<CustomActivityDefinition[]>(USER_CUSTOM_ACTIVITIES_KEY) ||
+    []
+  );
+}
+
+async function setUserCustomActivities(list: CustomActivityDefinition[]): Promise<void> {
+  await extensionContext.globalState.update(USER_CUSTOM_ACTIVITIES_KEY, list);
+}
+
+function refreshCustomActivityOverlay(): void {
+  const workspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const projectJson = workspace ? findNearestProject(workspace) : undefined;
+  const projectCustoms = projectJson
+    ? loadProjectCustomActivities(path.dirname(projectJson))
+    : [];
+  const userCustoms = getUserCustomActivities();
+  // Project wins on type collision
+  const map = new Map<string, CustomActivityDefinition>();
+  for (const a of userCustoms) {
+    map.set(a.type, { ...a, source: 'user' });
+  }
+  for (const a of projectCustoms) {
+    map.set(a.type, { ...a, source: 'project' });
+  }
+  setCustomActivityOverlay([...map.values()]);
+  activityProvider?.refresh();
+}
+
+async function registerCustomActivityCommand(): Promise<void> {
+  const type = await vscode.window.showInputBox({
+    prompt: 'Activity type (Namespace.Name)',
+    value: 'Custom.MyLib.DoWork',
+    validateInput: (v) =>
+      /^[A-Za-z_][\w]*(\.[A-Za-z_][\w]*)+$/.test(v)
+        ? undefined
+        : 'Use Namespace.Activity form'
+  });
+  if (!type) {
+    return;
+  }
+  const displayName = await vscode.window.showInputBox({
+    prompt: 'Display name',
+    value: type.split('.').pop() || type
+  });
+  if (!displayName) {
+    return;
+  }
+  const description = await vscode.window.showInputBox({
+    prompt: 'Description (optional)',
+    value: 'Custom activity for dry-run + Studio export'
+  });
+  const nugetPackage = await vscode.window.showInputBox({
+    prompt: 'NuGet package id (optional, for Studio Web export)',
+    value: ''
+  });
+  const nugetVersion = nugetPackage
+    ? await vscode.window.showInputBox({
+        prompt: 'NuGet version',
+        value: '1.0.0'
+      })
+    : undefined;
+
+  const scope = await vscode.window.showQuickPick(
+    [
+      {
+        label: 'This project',
+        description: `Save to ${CUSTOM_ACTIVITIES_FILENAME} (shared with team)`,
+        value: 'project' as const
+      },
+      {
+        label: 'All my projects',
+        description: 'Save to user library on this machine',
+        value: 'user' as const
+      }
+    ],
+    { placeHolder: 'Where should this activity be stored?' }
+  );
+  if (!scope) {
+    return;
+  }
+
+  let draft: CustomActivityDefinition;
+  try {
+    draft = createCustomActivityDraft({
+      type,
+      displayName,
+      description: description || undefined,
+      nugetPackage: nugetPackage || undefined,
+      nugetVersion: nugetVersion || undefined,
+      source: scope.value
+    });
+  } catch (err) {
+    vscode.window.showErrorMessage(err instanceof Error ? err.message : String(err));
+    return;
+  }
+
+  if (scope.value === 'project') {
+    const workspace = vscode.workspace.workspaceFolders?.[0];
+    if (!workspace) {
+      vscode.window.showErrorMessage('Open a workspace folder first.');
+      return;
+    }
+    const projectJson = findNearestProject(workspace.uri.fsPath);
+    if (!projectJson) {
+      vscode.window.showErrorMessage('No LowCode Studio project.json found.');
+      return;
+    }
+    const projectDir = path.dirname(projectJson);
+    const list = upsertCustomActivity(loadProjectCustomActivities(projectDir), draft);
+    saveProjectCustomActivities(projectDir, list);
+    vscode.window.showInformationMessage(
+      `Saved ${draft.type} to project ${CUSTOM_ACTIVITIES_FILENAME}`
+    );
+  } else {
+    const list = upsertCustomActivity(getUserCustomActivities(), draft);
+    await setUserCustomActivities(list);
+    vscode.window.showInformationMessage(`Saved ${draft.type} to your user activity library`);
+  }
+
+  refreshCustomActivityOverlay();
+}
+
+async function manageCustomActivitiesCommand(): Promise<void> {
+  const workspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const projectJson = workspace ? findNearestProject(workspace) : undefined;
+  const projectDir = projectJson ? path.dirname(projectJson) : undefined;
+  const projectList = projectDir ? loadProjectCustomActivities(projectDir) : [];
+  const userList = getUserCustomActivities();
+
+  const items = [
+    ...projectList.map((a) => ({
+      label: a.displayName,
+      description: `${a.type} · project`,
+      detail: a.description,
+      activity: a,
+      scope: 'project' as const
+    })),
+    ...userList.map((a) => ({
+      label: a.displayName,
+      description: `${a.type} · user library`,
+      detail: a.description,
+      activity: a,
+      scope: 'user' as const
+    }))
+  ];
+
+  if (!items.length) {
+    const create = await vscode.window.showInformationMessage(
+      'No custom activities registered yet.',
+      'Register one'
+    );
+    if (create) {
+      await registerCustomActivityCommand();
+    }
+    return;
+  }
+
+  const picked = await vscode.window.showQuickPick(items, {
+    placeHolder: 'Custom activities — select to remove, or Esc to cancel'
+  });
+  if (!picked) {
+    return;
+  }
+
+  const action = await vscode.window.showQuickPick(
+    [
+      { label: 'Insert into open designer', value: 'insert' },
+      { label: 'Remove registration', value: 'remove' }
+    ],
+    { placeHolder: picked.activity.type }
+  );
+  if (!action) {
+    return;
+  }
+
+  if (action.value === 'insert') {
+    editorProvider.insertActivity(picked.activity.type);
+    return;
+  }
+
+  if (picked.scope === 'project' && projectDir) {
+    saveProjectCustomActivities(
+      projectDir,
+      projectList.filter((a) => a.type !== picked.activity.type)
+    );
+  } else {
+    await setUserCustomActivities(userList.filter((a) => a.type !== picked.activity.type));
+  }
+  refreshCustomActivityOverlay();
+  vscode.window.showInformationMessage(`Removed ${picked.activity.type}`);
+}
+
+async function dryRunScenarioCommand(): Promise<void> {
+  const workspace = vscode.workspace.workspaceFolders?.[0];
+  if (!workspace) {
+    vscode.window.showErrorMessage('Open a workspace folder first.');
+    return;
+  }
+  const projectJson = findNearestProject(workspace.uri.fsPath);
+  if (!projectJson) {
+    vscode.window.showErrorMessage('No LowCode Studio project found.');
+    return;
+  }
+  const projectDir = path.dirname(projectJson);
+  const mainPath = path.join(projectDir, 'Main.lcs.json');
+  if (!fs.existsSync(mainPath)) {
+    vscode.window.showErrorMessage('REFramework Main.lcs.json not found in project.');
+    return;
+  }
+
+  let scenarios = loadScenariosFile(projectDir).scenarios;
+  if (!scenarios.length) {
+    const results = runAllScenarios(projectDir);
+    scenarios = results.map((r) => r.scenario);
+  }
+
+  const pick = await vscode.window.showQuickPick(
+    [
+      { label: 'All scenarios', description: 'Run every test in Data/Test/scenarios.json', value: '__all__' },
+      ...scenarios.map((s) => ({
+        label: s.name,
+        description: s.description || '',
+        value: s.name
+      }))
+    ],
+    { placeHolder: 'Choose a REFramework dry-run scenario' }
+  );
+  if (!pick) {
+    return;
+  }
+
+  const results =
+    pick.value === '__all__'
+      ? runAllScenarios(projectDir)
+      : [runScenario(projectDir, scenarios.find((s) => s.name === pick.value)!)];
+
+  const channel = getOutput();
+  channel.clear();
+  channel.appendLine(formatScenarioReport(results));
+  channel.appendLine('─'.repeat(48));
+  for (const r of results) {
+    channel.appendLine(`--- Log: ${r.scenario.name} ---`);
+    for (const line of r.dryRun.log) {
+      channel.appendLine(line);
+    }
+    channel.appendLine('');
+  }
+  channel.show(true);
+
+  const passed = results.filter((r) => r.passed).length;
+  if (passed === results.length) {
+    vscode.window.showInformationMessage(
+      `REFramework scenarios: ${passed}/${results.length} passed`
+    );
+  } else {
+    vscode.window.showWarningMessage(
+      `REFramework scenarios: ${passed}/${results.length} passed — see LowCode Studio output`
+    );
+  }
+}
+
 async function getActiveWorkflowDocument(): Promise<WorkflowDocument | undefined> {
   const fromProvider = editorProvider?.activeWorkflow;
   if (fromProvider) {
@@ -652,7 +949,9 @@ A **Studio-like low-code designer** for VS Code and Cursor — built for Mac use
 2. Open \`Main.lcs.json\` — flowchart of the framework states
 3. Edit \`Framework/Process.lcs.json\` for business logic
 4. Edit \`Data/Config.json\` for retries / endpoints
-5. Press **F5** to dry-run Main
+5. Press **F5** to dry-run Main, or **Dry Run REFramework Scenario** for \`Data/Test/scenarios.json\`
+
+**Custom activities:** \`Register Custom Activity\` → This project (\`activities.custom.json\`) or All my projects (user library)
 
 **Import UiPath:** \`Import UiPath Package (.nupkg)\` or \`Import UiPath Project Folder\`
 
