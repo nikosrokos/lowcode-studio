@@ -7,6 +7,7 @@ import {
   newId
 } from '../models/workflow';
 import { lcsTypeFromXamlName, unknownActivityType } from './activityMap';
+import { applySelectorProps, extractSelectorProps } from './selectorRoundTrip';
 
 export interface ImportWarning {
   message: string;
@@ -276,17 +277,62 @@ function mapActivity(
     };
   }
 
-  if (localName === 'While') {
+  if (localName === 'While' || localName === 'DoWhile') {
     return {
       id: newId(),
-      type: 'ControlFlow.While',
+      type: localName === 'DoWhile' ? 'ControlFlow.DoWhile' : 'ControlFlow.While',
       displayName,
       properties: {
         condition: cleanExpr(raw['@_Condition'] ?? extractArgument(raw, 'Condition') ?? 'true')
       },
-      children: collectActivities(raw['Body'] || raw['While.Body'] || raw, warnings).filter(
-        (a) => a.type !== 'ControlFlow.While'
+      children: collectActivities(raw['Body'] || raw[`${localName}.Body`] || raw, warnings).filter(
+        (a) => a.type !== 'ControlFlow.While' && a.type !== 'ControlFlow.DoWhile'
       )
+    };
+  }
+
+  if (localName === 'RetryScope') {
+    return {
+      id: newId(),
+      type: 'ControlFlow.RetryScope',
+      displayName,
+      properties: {
+        numberOfRetries: Number(raw['@_NumberOfRetries'] ?? 3),
+        retryIntervalMs: parseDurationMs(String(raw['@_RetryInterval'] || '00:00:01'))
+      },
+      children: collectActivities(raw['Activity'] || raw['RetryScope.Activity'] || raw, warnings)
+    };
+  }
+
+  if (localName === 'Break') {
+    return {
+      id: newId(),
+      type: 'ControlFlow.Break',
+      displayName,
+      properties: {}
+    };
+  }
+
+  if (localName === 'MessageBox') {
+    return {
+      id: newId(),
+      type: 'System.MessageBox',
+      displayName,
+      properties: {
+        text: cleanExpr(raw['@_Text'] ?? extractArgument(raw, 'Text') ?? '"Hello"'),
+        title: cleanExpr(raw['@_Caption'] ?? raw['@_Title'] ?? 'LowCode Studio')
+      }
+    };
+  }
+
+  if (localName === 'WriteLine') {
+    return {
+      id: newId(),
+      type: 'System.WriteLine',
+      displayName,
+      properties: {
+        text: cleanExpr(raw['@_Text'] ?? extractArgument(raw, 'Text') ?? '""')
+      }
     };
   }
 
@@ -361,26 +407,72 @@ function mapActivity(
     };
   }
 
-  if (mapped) {
+  // Use Application/Browser — treat as open + nested body
+  if (
+    localName === 'UseApplicationBrowser' ||
+    localName === 'NApplicationCard' ||
+    localName === 'OpenBrowser'
+  ) {
+    const kids = collectActivities(
+      raw['Body'] || raw['UseApplicationBrowser.Body'] || raw['NApplicationCard.Body'] || raw,
+      warnings
+    );
     return {
+      id: newId(),
+      type: 'UI.OpenApplication',
+      displayName,
+      properties: applySelectorProps(
+        {
+          pathOrUrl: cleanExpr(
+            raw['@_Url'] ||
+              raw['@_FilePath'] ||
+              extractArgument(raw, 'Url') ||
+              extractArgument(raw, 'FilePath') ||
+              'https://example.com'
+          )
+        },
+        extractSelectorProps(raw)
+      ),
+      children: kids.length ? kids : undefined
+    };
+  }
+
+  if (mapped) {
+    const props = applySelectorProps(pickCommonProps(localName, raw, mapped), extractSelectorProps(raw));
+    const node: ActivityNode = {
       id: newId(),
       type: mapped,
       displayName,
-      properties: pickCommonProps(localName, raw)
+      properties: props
     };
+    // Containers that may carry body children
+    if (mapped === 'ControlFlow.RetryScope' || mapped === 'UI.OpenApplication') {
+      const kids = collectActivities(
+        raw['Body'] || raw['Activity'] || raw,
+        warnings
+      );
+      if (kids.length) {
+        node.children = kids;
+      }
+    }
+    return node;
   }
 
   warnings.push({
     message: `Unknown activity "${localName}" (${displayName}) imported as placeholder.`
   });
+  const placeholderProps = applySelectorProps(
+    {
+      originalType: localName,
+      hint: 'Best-effort import — configure or replace this step.'
+    },
+    extractSelectorProps(raw)
+  );
   return {
     id: newId(),
     type: unknownActivityType(localName),
     displayName: `${displayName} (imported)`,
-    properties: {
-      originalType: localName,
-      hint: 'Best-effort import — configure or replace this step.'
-    }
+    properties: placeholderProps
   };
 }
 
@@ -465,25 +557,98 @@ function importFlowchart(
   return { activities, connections, startActivityId: start.id };
 }
 
-function pickCommonProps(localName: string, raw: Record<string, unknown>): Record<string, unknown> {
+function pickCommonProps(
+  localName: string,
+  raw: Record<string, unknown>,
+  mapped?: string
+): Record<string, unknown> {
   const props: Record<string, unknown> = {};
-  const selector = raw['@_Selector'] || extractArgument(raw, 'Selector');
   const text = raw['@_Text'] || extractArgument(raw, 'Text');
-  const url = raw['@_Url'] || raw['@_FilePath'] || raw['@_Path'] || extractArgument(raw, 'Url');
-  if (selector) {
-    props.selector = cleanExpr(selector);
-  }
+  const url =
+    raw['@_Url'] ||
+    raw['@_FilePath'] ||
+    raw['@_Path'] ||
+    raw['@_WorkbookPath'] ||
+    extractArgument(raw, 'Url') ||
+    extractArgument(raw, 'FilePath') ||
+    extractArgument(raw, 'WorkbookPath');
+  const item = raw['@_Item'] || extractArgument(raw, 'Item');
+  const result =
+    raw['@_Result'] ||
+    extractArgument(raw, 'Result') ||
+    extractArgument(raw, 'DataTable');
+
   if (text) {
     props.text = cleanExpr(text);
   }
+  if (item) {
+    props.item = cleanExpr(item);
+  }
   if (url) {
-    props.pathOrUrl = cleanExpr(url);
+    if (mapped?.startsWith('Excel.')) {
+      props.workbookPath = cleanExpr(url);
+    } else if (mapped === 'UI.OpenApplication') {
+      props.pathOrUrl = cleanExpr(url);
+    } else {
+      props.pathOrUrl = cleanExpr(url);
+    }
   }
-  if (localName.toLowerCase().includes('http')) {
+
+  if (mapped?.startsWith('Excel.')) {
+    props.sheetName = cleanExpr(raw['@_SheetName'] || extractArgument(raw, 'SheetName') || 'Sheet1');
+    props.range = cleanExpr(raw['@_Range'] || extractArgument(raw, 'Range') || '');
+    props.cell = cleanExpr(raw['@_Cell'] || extractArgument(raw, 'Cell') || 'A1');
+    if (result) {
+      props.result = stripBrackets(cleanExpr(result));
+    }
+    if (mapped === 'Excel.WriteRange') {
+      props.data = stripBrackets(
+        cleanExpr(raw['@_DataTable'] || extractArgument(raw, 'DataTable') || 'dt')
+      );
+    }
+    if (mapped === 'Excel.WriteCell') {
+      props.value = cleanExpr(raw['@_Value'] || extractArgument(raw, 'Value') || '""');
+    }
+  }
+
+  if (mapped === 'UI.GetText' || mapped === 'UI.ElementExists') {
+    props.result = stripBrackets(
+      cleanExpr(result || (mapped === 'UI.ElementExists' ? 'exists' : 'extractedText'))
+    );
+  }
+
+  if (mapped === 'UI.Check') {
+    props.action = String(raw['@_Action'] || raw['@_Checked'] || 'Check');
+  }
+
+  if (mapped === 'UI.TakeScreenshot') {
+    props.filePath = cleanExpr(
+      raw['@_FileName'] || raw['@_FilePath'] || extractArgument(raw, 'FileName') || 'Data/Temp/screenshot.png'
+    );
+  }
+
+  if (mapped === 'Messaging.SendEmail') {
+    props.to = cleanExpr(raw['@_To'] || extractArgument(raw, 'To') || 'user@example.com');
+    props.subject = cleanExpr(raw['@_Subject'] || extractArgument(raw, 'Subject') || '""');
+    props.body = cleanExpr(raw['@_Body'] || extractArgument(raw, 'Body') || '');
+  }
+
+  if (localName.toLowerCase().includes('http') || mapped === 'Messaging.HttpRequest') {
     props.method = String(raw['@_Method'] || 'GET');
-    props.url = cleanExpr(url || '"https://api.example.com"');
-    props.result = 'response';
+    props.url = cleanExpr(url || raw['@_EndPoint'] || '"https://api.example.com"');
+    props.result = stripBrackets(cleanExpr(result || 'response'));
+    props.body = cleanExpr(raw['@_Body'] || extractArgument(raw, 'Body') || '');
   }
+
+  if (mapped === 'UI.Click') {
+    props.clickType = String(raw['@_ClickType'] || 'Single').replace('ClickType.', '');
+    props.simulateClick = String(raw['@_SimulateClick'] ?? 'true') !== 'False';
+  }
+
+  if (mapped === 'UI.TypeInto') {
+    props.emptyField = String(raw['@_EmptyField'] ?? 'true') !== 'False';
+  }
+
   if (!Object.keys(props).length) {
     props.note = 'Imported from ' + localName;
   }

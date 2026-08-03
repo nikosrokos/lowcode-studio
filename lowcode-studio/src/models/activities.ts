@@ -3,6 +3,7 @@ export type ActivityCategory =
   | 'Control Flow'
   | 'UI Automation'
   | 'Data'
+  | 'Excel'
   | 'Programming'
   | 'Messaging'
   | 'Flowchart'
@@ -89,6 +90,46 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     ]
   },
   {
+    type: 'System.MessageBox',
+    displayName: 'Message Box',
+    category: 'System',
+    description: 'Shows a message box (simulated in dry-run).',
+    icon: '$(comment-discussion)',
+    color: '#3B82F6',
+    properties: [
+      {
+        name: 'text',
+        label: 'Text',
+        type: 'expression',
+        defaultValue: '"Hello"',
+        required: true
+      },
+      {
+        name: 'title',
+        label: 'Title',
+        type: 'string',
+        defaultValue: 'LowCode Studio'
+      }
+    ]
+  },
+  {
+    type: 'System.WriteLine',
+    displayName: 'Write Line',
+    category: 'System',
+    description: 'Writes a line to the output panel / console.',
+    icon: '$(terminal)',
+    color: '#3B82F6',
+    properties: [
+      {
+        name: 'text',
+        label: 'Text',
+        type: 'expression',
+        defaultValue: '"Line"',
+        required: true
+      }
+    ]
+  },
+  {
     type: 'Programming.Assign',
     displayName: 'Assign',
     category: 'Programming',
@@ -148,6 +189,56 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         required: true
       }
     ]
+  },
+  {
+    type: 'ControlFlow.DoWhile',
+    displayName: 'Do While',
+    category: 'Control Flow',
+    description: 'Runs body once, then repeats while condition is true.',
+    icon: '$(sync)',
+    color: '#F59E0B',
+    container: true,
+    properties: [
+      {
+        name: 'condition',
+        label: 'Condition',
+        type: 'expression',
+        defaultValue: 'true',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'ControlFlow.RetryScope',
+    displayName: 'Retry Scope',
+    category: 'Control Flow',
+    description: 'Retries child activities on failure.',
+    icon: '$(debug-restart)',
+    color: '#EF4444',
+    container: true,
+    properties: [
+      {
+        name: 'numberOfRetries',
+        label: 'Number Of Retries',
+        type: 'number',
+        defaultValue: 3
+      },
+      {
+        name: 'retryIntervalMs',
+        label: 'Retry Interval (ms)',
+        type: 'number',
+        defaultValue: 1000
+      }
+    ]
+  },
+  {
+    type: 'ControlFlow.Break',
+    displayName: 'Break',
+    category: 'Control Flow',
+    description: 'Exits the nearest loop.',
+    icon: '$(debug-pause)',
+    color: '#F59E0B',
+    properties: []
   },
   {
     type: 'ControlFlow.ForEach',
@@ -241,6 +332,13 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         required: true
       },
       {
+        name: 'selectorModern',
+        label: 'Modern Selector',
+        type: 'multiline',
+        defaultValue: '',
+        description: 'Preserved FullSelectorEncoding from Studio (round-trip).'
+      },
+      {
         name: 'clickType',
         label: 'Click Type',
         type: 'enum',
@@ -269,6 +367,13 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         type: 'multiline',
         defaultValue: '<target id=\"input\" />',
         required: true
+      },
+      {
+        name: 'selectorModern',
+        label: 'Modern Selector',
+        type: 'multiline',
+        defaultValue: '',
+        description: 'Preserved FullSelectorEncoding from Studio (round-trip).'
       },
       {
         name: 'text',
@@ -301,6 +406,13 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         required: true
       },
       {
+        name: 'selectorModern',
+        label: 'Modern Selector',
+        type: 'multiline',
+        defaultValue: '',
+        description: 'Preserved FullSelectorEncoding from Studio (round-trip).'
+      },
+      {
         name: 'result',
         label: 'Result',
         type: 'expression',
@@ -325,6 +437,12 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         required: true
       },
       {
+        name: 'selectorModern',
+        label: 'Modern Selector',
+        type: 'multiline',
+        defaultValue: ''
+      },
+      {
         name: 'result',
         label: 'Result',
         type: 'expression',
@@ -336,6 +454,111 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         label: 'Timeout (ms)',
         type: 'number',
         defaultValue: 3000
+      }
+    ]
+  },
+  {
+    type: 'UI.Check',
+    displayName: 'Check',
+    category: 'UI Automation',
+    description: 'Checks or unchecks a checkbox / radio.',
+    icon: '$(check)',
+    color: '#10B981',
+    properties: [
+      {
+        name: 'selector',
+        label: 'Selector',
+        type: 'multiline',
+        defaultValue: '<target id=\"chkAgree\" />',
+        required: true
+      },
+      {
+        name: 'selectorModern',
+        label: 'Modern Selector',
+        type: 'multiline',
+        defaultValue: ''
+      },
+      {
+        name: 'action',
+        label: 'Action',
+        type: 'enum',
+        options: ['Check', 'Uncheck', 'Toggle'],
+        defaultValue: 'Check'
+      }
+    ]
+  },
+  {
+    type: 'UI.Hover',
+    displayName: 'Hover',
+    category: 'UI Automation',
+    description: 'Hovers the mouse over a UI element.',
+    icon: '$(inspect)',
+    color: '#10B981',
+    properties: [
+      {
+        name: 'selector',
+        label: 'Selector',
+        type: 'multiline',
+        defaultValue: '<target id=\"menu\" />',
+        required: true
+      },
+      {
+        name: 'selectorModern',
+        label: 'Modern Selector',
+        type: 'multiline',
+        defaultValue: ''
+      }
+    ]
+  },
+  {
+    type: 'UI.SelectItem',
+    displayName: 'Select Item',
+    category: 'UI Automation',
+    description: 'Selects an item from a drop-down / list.',
+    icon: '$(list-selection)',
+    color: '#10B981',
+    properties: [
+      {
+        name: 'selector',
+        label: 'Selector',
+        type: 'multiline',
+        defaultValue: '<target id=\"cmbCountry\" />',
+        required: true
+      },
+      {
+        name: 'selectorModern',
+        label: 'Modern Selector',
+        type: 'multiline',
+        defaultValue: ''
+      },
+      {
+        name: 'item',
+        label: 'Item',
+        type: 'expression',
+        defaultValue: '"Option"',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'UI.TakeScreenshot',
+    displayName: 'Take Screenshot',
+    category: 'UI Automation',
+    description: 'Captures a screenshot (simulated in dry-run).',
+    icon: '$(device-camera)',
+    color: '#10B981',
+    properties: [
+      {
+        name: 'selector',
+        label: 'Selector (optional)',
+        type: 'multiline',
+        defaultValue: ''
+      },
+      {
+        name: 'filePath',
+        label: 'File Path',
+        type: 'string',
+        defaultValue: 'Data/Temp/screenshot.png'
       }
     ]
   },
@@ -413,6 +636,146 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         label: 'Result',
         type: 'expression',
         defaultValue: 'dt',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Excel.ReadRange',
+    displayName: 'Excel Read Range',
+    category: 'Excel',
+    description: 'Reads a range from an Excel workbook.',
+    icon: '$(table)',
+    color: '#16A34A',
+    properties: [
+      {
+        name: 'workbookPath',
+        label: 'Workbook Path',
+        type: 'string',
+        defaultValue: 'Data/Input/data.xlsx',
+        required: true
+      },
+      {
+        name: 'sheetName',
+        label: 'Sheet Name',
+        type: 'string',
+        defaultValue: 'Sheet1'
+      },
+      {
+        name: 'range',
+        label: 'Range',
+        type: 'string',
+        defaultValue: ''
+      },
+      {
+        name: 'result',
+        label: 'Result',
+        type: 'expression',
+        defaultValue: 'dt',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Excel.WriteRange',
+    displayName: 'Excel Write Range',
+    category: 'Excel',
+    description: 'Writes a data table to an Excel range.',
+    icon: '$(save)',
+    color: '#16A34A',
+    properties: [
+      {
+        name: 'workbookPath',
+        label: 'Workbook Path',
+        type: 'string',
+        defaultValue: 'Data/Output/out.xlsx',
+        required: true
+      },
+      {
+        name: 'sheetName',
+        label: 'Sheet Name',
+        type: 'string',
+        defaultValue: 'Sheet1'
+      },
+      {
+        name: 'data',
+        label: 'Data',
+        type: 'expression',
+        defaultValue: 'dt',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Excel.ReadCell',
+    displayName: 'Excel Read Cell',
+    category: 'Excel',
+    description: 'Reads a single Excel cell.',
+    icon: '$(symbol-key)',
+    color: '#16A34A',
+    properties: [
+      {
+        name: 'workbookPath',
+        label: 'Workbook Path',
+        type: 'string',
+        defaultValue: 'Data/Input/data.xlsx',
+        required: true
+      },
+      {
+        name: 'sheetName',
+        label: 'Sheet Name',
+        type: 'string',
+        defaultValue: 'Sheet1'
+      },
+      {
+        name: 'cell',
+        label: 'Cell',
+        type: 'string',
+        defaultValue: 'A1',
+        required: true
+      },
+      {
+        name: 'result',
+        label: 'Result',
+        type: 'expression',
+        defaultValue: 'cellValue',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Excel.WriteCell',
+    displayName: 'Excel Write Cell',
+    category: 'Excel',
+    description: 'Writes a value to an Excel cell.',
+    icon: '$(edit)',
+    color: '#16A34A',
+    properties: [
+      {
+        name: 'workbookPath',
+        label: 'Workbook Path',
+        type: 'string',
+        defaultValue: 'Data/Output/out.xlsx',
+        required: true
+      },
+      {
+        name: 'sheetName',
+        label: 'Sheet Name',
+        type: 'string',
+        defaultValue: 'Sheet1'
+      },
+      {
+        name: 'cell',
+        label: 'Cell',
+        type: 'string',
+        defaultValue: 'A1',
+        required: true
+      },
+      {
+        name: 'value',
+        label: 'Value',
+        type: 'expression',
+        defaultValue: '""',
         required: true
       }
     ]

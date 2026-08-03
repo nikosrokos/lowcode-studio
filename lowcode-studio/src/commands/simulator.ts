@@ -192,8 +192,11 @@ function runChildren(
     if (values.length > 5) {
       log.push(`${indent}... truncated remaining ${values.length - 5} iterations in dry-run`);
     }
-  } else if (activity.type === 'ControlFlow.While') {
-    log.push(`${indent}While simulated for 1 iteration`);
+  } else if (activity.type === 'ControlFlow.While' || activity.type === 'ControlFlow.DoWhile') {
+    log.push(`${indent}${activity.type === 'ControlFlow.DoWhile' ? 'DoWhile' : 'While'} simulated for 1 iteration`);
+    runList(activity.children, depth + 1);
+  } else if (activity.type === 'ControlFlow.RetryScope') {
+    log.push(`${indent}RetryScope (1 attempt in dry-run)`);
     runList(activity.children, depth + 1);
   } else if (activity.type === 'ControlFlow.TryCatch') {
     log.push(`${indent}Try`);
@@ -465,6 +468,45 @@ function executeStub(
       break;
     case 'System.Comment':
       log.push(`${indent}// ${activity.properties.text}`);
+      break;
+    case 'System.MessageBox':
+      log.push(`${indent}MessageBox ${activity.properties.title}: ${activity.properties.text}`);
+      break;
+    case 'System.WriteLine':
+      log.push(`${indent}WriteLine ${activity.properties.text}`);
+      break;
+    case 'UI.Check':
+      log.push(`${indent}Check ${activity.properties.action} selector=${JSON.stringify(activity.properties.selector)}`);
+      break;
+    case 'UI.Hover':
+      log.push(`${indent}Hover selector=${JSON.stringify(activity.properties.selector)}`);
+      break;
+    case 'UI.SelectItem':
+      log.push(`${indent}SelectItem ${activity.properties.item}`);
+      break;
+    case 'UI.TakeScreenshot':
+      log.push(`${indent}TakeScreenshot -> ${activity.properties.filePath}`);
+      break;
+    case 'Excel.ReadRange': {
+      const result = String(activity.properties.result || 'dt');
+      variables[result] = { columns: ['A', 'B'], rows: [['1', '2']] };
+      log.push(`${indent}Excel.ReadRange ${activity.properties.workbookPath} -> ${result}`);
+      break;
+    }
+    case 'Excel.WriteRange':
+      log.push(`${indent}Excel.WriteRange ${activity.properties.workbookPath}`);
+      break;
+    case 'Excel.ReadCell': {
+      const result = String(activity.properties.result || 'cellValue');
+      variables[result] = 'cell';
+      log.push(`${indent}Excel.ReadCell ${activity.properties.cell} -> ${result}`);
+      break;
+    }
+    case 'Excel.WriteCell':
+      log.push(`${indent}Excel.WriteCell ${activity.properties.cell}=${activity.properties.value}`);
+      break;
+    case 'ControlFlow.Break':
+      log.push(`${indent}Break`);
       break;
     case 'Programming.Assign': {
       const to = String(activity.properties.to);

@@ -3,7 +3,8 @@ import {
   WorkflowDocument,
   WorkflowVariable
 } from '../models/workflow';
-import { xamlInfoForLcsType } from './activityMap';
+import { isUiActivity, xamlInfoForLcsType } from './activityMap';
+import { emitTargetXaml, selectorAttribute } from './selectorRoundTrip';
 
 /**
  * Best-effort XAML export for Studio Web / Studio Desktop (Portable-friendly subset).
@@ -17,7 +18,7 @@ export function exportWorkflowToXaml(doc: WorkflowDocument): string {
       : renderSequence(doc.activities, doc.name, varsXml);
 
   return `<?xml version="1.0" encoding="utf-8"?>
-<Activity mc:Ignorable="sap sapc" x:Class="${escapeAttr(sanitizeClass(doc.name))}" sap:VirtualizedContainerService.HintSize="1200,800" sap2010:WorkflowViewState.IdRef="Activity1" xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation" xmlns:sap2010="http://schemas.microsoft.com/netfx/2010/xaml/activities/presentation" xmlns:scg="clr-namespace:System.Collections.Generic;assembly=System.Collections" xmlns:ui="http://schemas.uipath.com/workflow/activities" xmlns:uia="http://schemas.uipath.com/workflow/activities/uipath.uiautomation.next" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+<Activity mc:Ignorable="sap sapc" x:Class="${escapeAttr(sanitizeClass(doc.name))}" sap:VirtualizedContainerService.HintSize="1200,800" sap2010:WorkflowViewState.IdRef="Activity1" xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation" xmlns:sap2010="http://schemas.microsoft.com/netfx/2010/xaml/activities/presentation" xmlns:scg="clr-namespace:System.Collections.Generic;assembly=System.Collections" xmlns:ui="http://schemas.uipath.com/workflow/activities" xmlns:uia="http://schemas.uipath.com/workflow/activities/uipath.uiautomation.next" xmlns:excel="http://schemas.uipath.com/workflow/activities/excel" xmlns:mail="http://schemas.uipath.com/workflow/activities/mail" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 ${body}
 </Activity>
 `;
@@ -231,26 +232,161 @@ ${pad}</Assign>`;
     return `${pad}<ui:InvokeWorkflowFile DisplayName="${escapeAttr(activity.displayName)}" WorkflowFileName="${escapeAttr(path)}" />`;
   }
 
-  if (activity.type === 'UI.Click') {
-    return `${pad}<uia:NClick DisplayName="${escapeAttr(activity.displayName)}" />`;
+  if (activity.type === 'System.MessageBox') {
+    return `${pad}<ui:MessageBox DisplayName="${escapeAttr(activity.displayName)}" Text="[${escapeAttr(String(activity.properties.text ?? '""'))}]" Caption="${escapeAttr(String(activity.properties.title || 'LowCode Studio'))}" />`;
   }
-  if (activity.type === 'UI.TypeInto') {
-    return `${pad}<uia:NTypeInto DisplayName="${escapeAttr(activity.displayName)}" Text="[${escapeAttr(String(activity.properties.text ?? '""'))}]" />`;
+
+  if (activity.type === 'System.WriteLine') {
+    return `${pad}<WriteLine DisplayName="${escapeAttr(activity.displayName)}" Text="[${escapeAttr(String(activity.properties.text ?? '""'))}]" />`;
   }
+
+  if (activity.type === 'ControlFlow.DoWhile') {
+    const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
+    return `${pad}<DoWhile Condition="[${escapeAttr(String(activity.properties.condition ?? 'True'))}]" DisplayName="${escapeAttr(activity.displayName)}">
+${pad}  <Sequence>
+${kids}
+${pad}  </Sequence>
+${pad}</DoWhile>`;
+  }
+
+  if (activity.type === 'ControlFlow.RetryScope') {
+    const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
+    return `${pad}<ui:RetryScope DisplayName="${escapeAttr(activity.displayName)}" NumberOfRetries="${Number(activity.properties.numberOfRetries ?? 3)}">
+${pad}  <ui:RetryScope.Activity>
+${pad}    <ActivityAction>
+${pad}      <Sequence>
+${kids}
+${pad}      </Sequence>
+${pad}    </ActivityAction>
+${pad}  </ui:RetryScope.Activity>
+${pad}</ui:RetryScope>`;
+  }
+
+  if (activity.type === 'ControlFlow.Break') {
+    return `${pad}<Break DisplayName="${escapeAttr(activity.displayName)}" />`;
+  }
+
+  if (isUiActivity(activity.type)) {
+    return renderUiActivity(activity, pad, indent);
+  }
+
+  if (activity.type.startsWith('Excel.')) {
+    return renderExcelActivity(activity, pad);
+  }
+
+  if (activity.type === 'Messaging.SendEmail') {
+    return `${pad}<mail:SendMail DisplayName="${escapeAttr(activity.displayName)}" To="${escapeAttr(String(activity.properties.to || ''))}" Subject="[${escapeAttr(String(activity.properties.subject ?? '""'))}]" Body="${escapeAttr(String(activity.properties.body || ''))}" />`;
+  }
+
   if (activity.type === 'Messaging.HttpRequest') {
-    return `${pad}<ui:LogMessage DisplayName="${escapeAttr(activity.displayName)}" Level="TraceLevel.Info" Message="[&quot;HTTP ${escapeAttr(String(activity.properties.method || 'GET'))} ${escapeAttr(String(activity.properties.url || ''))} (exported stub)&quot;]" />`;
+    return `${pad}<ui:HttpClient DisplayName="${escapeAttr(activity.displayName)}" Method="${escapeAttr(String(activity.properties.method || 'GET'))}" EndPoint="[${escapeAttr(String(activity.properties.url || '""'))}]" />`;
   }
 
   if (activity.type === 'System.Comment' || activity.type.startsWith('Imported.') || activity.type.startsWith('Flowchart.')) {
-    return `${pad}<ui:Comment DisplayName="${escapeAttr(activity.displayName)}" Text="${escapeAttr(String(activity.properties.text || activity.type))}" />`;
+    // Preserve selector on imported placeholders when present
+    const sel = selectorAttribute(activity.properties);
+    return `${pad}<ui:Comment DisplayName="${escapeAttr(activity.displayName)}" Text="${escapeAttr(String(activity.properties.text || activity.properties.hint || activity.type))}"${sel} />`;
   }
 
   if (info) {
-    const tag = info.ns === 'ui' ? `ui:${info.localName}` : info.ns === 'uia' ? `uia:${info.localName}` : info.localName;
+    const tag =
+      info.ns === 'ui'
+        ? `ui:${info.localName}`
+        : info.ns === 'uia'
+          ? `uia:${info.localName}`
+          : info.ns === 'excel'
+            ? `excel:${info.localName}`
+            : info.ns === 'mail'
+              ? `mail:${info.localName}`
+              : info.localName;
     return `${pad}<${tag} DisplayName="${escapeAttr(activity.displayName)}" />`;
   }
 
   return `${pad}<ui:Comment DisplayName="${escapeAttr(activity.displayName)}" Text="${escapeAttr('Exported placeholder for ' + activity.type)}" />`;
+}
+
+function renderUiActivity(activity: ActivityNode, pad: string, indent: number): string {
+  const selAttr = selectorAttribute(activity.properties);
+  const target = emitTargetXaml(activity.properties, pad + '  ');
+  const open =
+    activity.type === 'UI.Click'
+      ? 'uia:NClick'
+      : activity.type === 'UI.TypeInto'
+        ? 'uia:NTypeInto'
+        : activity.type === 'UI.GetText'
+          ? 'uia:NGetText'
+          : activity.type === 'UI.ElementExists'
+            ? 'uia:ElementExists'
+            : activity.type === 'UI.Check'
+              ? 'uia:NCheck'
+              : activity.type === 'UI.Hover'
+                ? 'uia:NHover'
+                : activity.type === 'UI.SelectItem'
+                  ? 'uia:NSelectItem'
+                  : activity.type === 'UI.TakeScreenshot'
+                    ? 'uia:NTakeScreenshot'
+                    : activity.type === 'UI.OpenApplication'
+                      ? 'uia:NOpenApplication'
+                      : 'uia:NClick';
+
+  const extra: string[] = [];
+  if (activity.type === 'UI.TypeInto') {
+    extra.push(`Text="[${escapeAttr(String(activity.properties.text ?? '""'))}]"`);
+  }
+  if (activity.type === 'UI.SelectItem') {
+    extra.push(`Item="[${escapeAttr(String(activity.properties.item ?? '""'))}]"`);
+  }
+  if (activity.type === 'UI.OpenApplication') {
+    extra.push(`Url="${escapeAttr(String(activity.properties.pathOrUrl || ''))}"`);
+  }
+  if (activity.type === 'UI.TakeScreenshot') {
+    extra.push(`FileName="${escapeAttr(String(activity.properties.filePath || 'screenshot.png'))}"`);
+  }
+  if (activity.type === 'UI.Check') {
+    extra.push(`Action="${escapeAttr(String(activity.properties.action || 'Check'))}"`);
+  }
+
+  const attrs = [
+    `DisplayName="${escapeAttr(activity.displayName)}"`,
+    selAttr.trim(),
+    ...extra
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  if (!target) {
+    return `${pad}<${open} ${attrs} />`;
+  }
+
+  const kids = (activity.children || []).map((c) => renderActivity(c, indent + 1)).join('\n');
+  if (kids) {
+    return `${pad}<${open} ${attrs}>
+${target}
+${kids}
+${pad}</${open}>`;
+  }
+  return `${pad}<${open} ${attrs}>
+${target}
+${pad}</${open}>`;
+}
+
+function renderExcelActivity(activity: ActivityNode, pad: string): string {
+  const path = escapeAttr(String(activity.properties.workbookPath || 'data.xlsx'));
+  const sheet = escapeAttr(String(activity.properties.sheetName || 'Sheet1'));
+  const range = escapeAttr(String(activity.properties.range || ''));
+  const cell = escapeAttr(String(activity.properties.cell || 'A1'));
+  switch (activity.type) {
+    case 'Excel.ReadRange':
+      return `${pad}<excel:ReadRange DisplayName="${escapeAttr(activity.displayName)}" WorkbookPath="${path}" SheetName="${sheet}" Range="${range}" />`;
+    case 'Excel.WriteRange':
+      return `${pad}<excel:WriteRange DisplayName="${escapeAttr(activity.displayName)}" WorkbookPath="${path}" SheetName="${sheet}" DataTable="[${escapeAttr(String(activity.properties.data || 'dt'))}]" />`;
+    case 'Excel.ReadCell':
+      return `${pad}<excel:ReadCell DisplayName="${escapeAttr(activity.displayName)}" WorkbookPath="${path}" SheetName="${sheet}" Cell="${cell}" />`;
+    case 'Excel.WriteCell':
+      return `${pad}<excel:WriteCell DisplayName="${escapeAttr(activity.displayName)}" WorkbookPath="${path}" SheetName="${sheet}" Cell="${cell}" Value="[${escapeAttr(String(activity.properties.value ?? '""'))}]" />`;
+    default:
+      return `${pad}<ui:Comment DisplayName="${escapeAttr(activity.displayName)}" Text="Excel placeholder" />`;
+  }
 }
 
 function typeToXaml(type: string): string {

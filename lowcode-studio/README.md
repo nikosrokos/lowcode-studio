@@ -1,16 +1,16 @@
 # LowCode Studio
 
-**Version 0.3.1** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.4.0** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally in your editor — with import/export paths to Studio Web.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.3.1-0ea5e9)
+![version](https://img.shields.io/badge/version-0.4.0-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
-## In action (v0.3.1)
+## In action (v0.4.0)
 
 ### 1. Sequence designer + custom container colors
 
@@ -24,12 +24,14 @@ Built for UiPath practitioners who design, framework, develop, deploy, and test 
 
 ![REFramework flowchart in VS Code](docs/images/vscode-reframework-flowchart.png)
 
-## What’s in 0.3.1
+## What’s in 0.4.0
 
 - Visual **Sequence** + **Flowchart** designer (`.lcs.json`)
 - **Custom container colors** per activity
 - One-click **REFramework** template
 - **Import** UiPath project folders / `.nupkg` (XAML → `.lcs.json`)
+- **Richer XAML coverage** — Excel, Mail, MessageBox, WriteLine, DoWhile, RetryScope, Check/Hover/SelectItem/Screenshot, Use Application/Browser
+- **Selector round-trip** — classic `Selector` + modern `FullSelectorEncoding` preserved on import/export (`selector`, `selectorModern`, `selectorXml`)
 - **Export for Studio Web** with UiPath **activity package dependencies** in `project.json`
 - Dry Run simulator (F5)
 - Works in VS Code, Cursor, and other forks
@@ -44,7 +46,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.3.1.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.4.0.vsix` → reload.
 
 ## Easy path (REFramework)
 
@@ -87,11 +89,12 @@ Select an activity → **Container color** (presets, picker, or `#RRGGBB`). Save
 
 | Category | Activities |
 |---|---|
-| System | Log Message, Delay, Comment |
+| System | Log Message, Delay, Comment, Message Box, Write Line |
 | Programming | Assign |
-| Control Flow | If, While, For Each, Try Catch, Sequence |
-| UI Automation | Open Application, Click, Type Into, Get Text, Element Exists |
+| Control Flow | If, While, Do While, For Each, Try Catch, Sequence, Retry Scope, Break |
+| UI Automation | Open Application, Click, Type Into, Get Text, Element Exists, Check, Hover, Select Item, Take Screenshot |
 | Data | Read CSV, Write CSV, Build Data Table |
+| Excel | Read Range, Write Range, Read Cell, Write Cell |
 | Messaging | Send Email, HTTP Request |
 | Flowchart | Start, Flow Decision, End |
 | REFramework | Invoke Workflow, Set Transaction Status |
@@ -112,20 +115,23 @@ UI/messaging steps are design + dry-run stubs on Mac (no local robot runtime).
 
 ## Roadmap — next steps
 
+### Done in 0.4.0
+- Richer XAML activity coverage (Excel, Mail, modern UI, RetryScope, …)
+- Selector round-trip (classic + modern encodings)
+
 ### Near term
-1. **Richer XAML coverage** — more activity mappings on import/export (Excel, mail modern, Use Application/Browser)
-2. **Selector round-trip** — keep selectors intact when moving Click/Type Into between LCS and Studio Web
-3. **Import polish** — clearer placeholder UI for `Imported.*` activities + one-click “replace with…”
+1. **Import polish** — clearer placeholder UI for `Imported.*` activities + one-click “replace with…”
+2. **Git-friendly Studio Web sync docs** — short guide for tenants using Git with Studio Web
+3. **Config.xlsx bridge** — optional convert/export for classic REFramework Excel config
 
 ### Next
-4. **Git-friendly Studio Web sync docs** — short guide for tenants using Git with Studio Web
-5. **Config.xlsx bridge** — optional convert/export for classic REFramework Excel config
-6. **Validation against Studio packages** — warn when an activity needs a package not listed in dependencies
+4. **Validation against Studio packages** — warn when an activity needs a package not listed in dependencies
+5. **Deeper modern UI** — Use Application/Browser scope variables, anchors, CV activities (best-effort)
+6. **Marketplace publish** of the VSIX
 
 ### Later (only if needed)
 7. Optional Orchestrator API publish from VS Code (today: publish stays in Studio Web — by design)
 8. Selector recorder helpers for Mac
-9. Marketplace publish of the VSIX
 
 ## License
 

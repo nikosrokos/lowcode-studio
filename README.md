@@ -1,6 +1,6 @@
 # LowCode Studio for VS Code / Cursor
 
-**v0.3.1** — Studio-like low-code RPA for Mac users without UiPath Studio Desktop.
+**v0.4.0** — Studio-like low-code RPA for Mac users without UiPath Studio Desktop.
 
 **Repo:** https://github.com/nikosrokos/lowcode-studio
 
@@ -24,13 +24,19 @@ npm test
 npm run package
 ```
 
-**Extensions: Install from VSIX…** → `lowcode-studio-0.3.1.vsix`
+**Extensions: Install from VSIX…** → `lowcode-studio-0.4.0.vsix`
+
+## Highlights in 0.4.0
+
+- Richer XAML import/export (Excel, Mail, modern UI, RetryScope, …)
+- Selector round-trip (classic + modern encodings)
+- Studio Web export with activity package dependencies
 
 ## Next steps (roadmap)
 
-1. Richer XAML activity coverage  
-2. Selector round-trip for UI activities  
-3. Import polish for unknown activities  
-4. Studio Web Git sync guide  
-5. Config.xlsx bridge for classic REFramework  
-6. Optional Orchestrator publish later (only if needed)
+1. Import polish for `Imported.*` placeholders  
+2. Studio Web Git sync guide  
+3. Config.xlsx bridge for classic REFramework  
+4. Package validation warnings  
+5. Deeper modern UI scopes  
+6. Marketplace publish  
