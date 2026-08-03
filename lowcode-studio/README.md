@@ -1,18 +1,18 @@
 # LowCode Studio
 
-**Version 0.5.0** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.5.1** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally in your editor — with import/export paths to Studio Web.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.5.0-0ea5e9)
+![version](https://img.shields.io/badge/version-0.5.1-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
 **Full activity list:** [docs/ACTIVITIES.md](docs/ACTIVITIES.md)
 
-## In action (v0.5.0)
+## In action (v0.5.1)
 
 ### 1. Sequence designer + custom container colors
 
@@ -26,18 +26,27 @@ Built for UiPath practitioners who design, framework, develop, deploy, and test 
 
 ![REFramework flowchart in VS Code](docs/images/vscode-reframework-flowchart.png)
 
-## What’s in 0.5.0
+### 4. REFramework scenario testing (Config + scenarios)
+
+![REFramework scenario dry-run testing](docs/images/vscode-reframework-testing.png)
+
+### 5. REFramework Process with Invoke Code & top activities
+
+![REFramework Process with Invoke Code](docs/images/vscode-reframework-process-activities.png)
+
+## What’s in 0.5.1
 
 - Visual **Sequence** + **Flowchart** designer (`.lcs.json`)
 - **Custom container colors** per activity
 - One-click **REFramework** template with **scenario dry-runs** (`Data/Test/scenarios.json`)
 - **Register Custom Activity** — project (`activities.custom.json`) or user library
 - **Import** UiPath project folders / `.nupkg` (XAML → `.lcs.json`)
+- **Top-use activities** — Invoke Code, Multiple Assign, Switch, Throw, Terminate Workflow, Add/Filter/ForEach Row DataTable, Get Attribute, Wait Element, Deserialize/Serialize JSON
 - **Richer XAML coverage** — Excel, Mail, MessageBox, WriteLine, DoWhile, RetryScope, Check/Hover/SelectItem/Screenshot, Use Application/Browser
 - **Python pack** — `UiPath.Python.Activities` style: Python Scope, Load/Run Script, Invoke Method, Get Object
 - **Selector round-trip** — classic + modern encodings
 - **Export for Studio Web** with activity package dependencies (includes custom NuGet packages when registered)
-- Activity coverage catalog: [docs/ACTIVITIES.md](docs/ACTIVITIES.md)
+- Activity coverage catalog: [docs/ACTIVITIES.md](docs/ACTIVITIES.md) (**57** activities)
 - Dry Run simulator (F5) + **Dry Run REFramework Scenario**
 - Works in VS Code, Cursor, and other forks
 
@@ -51,7 +60,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.5.0.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.5.1.vsix` → reload.
 
 ## Easy path (REFramework)
 
@@ -110,20 +119,21 @@ Select an activity → **Container color** (presets, picker, or `#RRGGBB`). Save
 
 | Category | Activities |
 |---|---|
-| System | Log Message, Delay, Comment, Message Box, Write Line |
-| Programming | Assign |
-| Control Flow | If, While, Do While, For Each, Try Catch, Sequence, Retry Scope, Break |
-| UI Automation | Open Application, Click, Type Into, Get Text, Element Exists, Check, Hover, Select Item, Take Screenshot |
-| Data | Read CSV, Write CSV, Build Data Table |
+| System | Log Message, Delay, Comment, Message Box, Write Line, **Throw**, **Terminate Workflow** |
+| Programming | Assign, **Multiple Assign**, **Invoke Code** |
+| Control Flow | If, While, Do While, For Each, Try Catch, Sequence, Retry Scope, Break, **Switch** |
+| UI Automation | Open Application, Click, Type Into, Get Text, Element Exists, Check, Hover, Select Item, Take Screenshot, **Get Attribute**, **Wait Element** |
+| Data | Read/Write CSV, Build Data Table, **Add Data Row/Column**, **Filter Data Table**, **For Each Row**, **Clear/Output Data Table** |
 | Excel | Read Range, Write Range, Read Cell, Write Cell |
 | Python | Python Scope, Load Python Script, Run Python Script, Invoke Python Method, Get Python Object |
-| Messaging | Send Email, HTTP Request |
+| Messaging | Send Email, HTTP Request, **Deserialize JSON**, **Serialize JSON** |
 | Flowchart | Start, Flow Decision, End |
 | REFramework | Invoke Workflow, Set Transaction Status |
+| Custom | Project / user registered activities |
 
 See the full property-level list in [docs/ACTIVITIES.md](docs/ACTIVITIES.md).
 
-UI/messaging steps are design + dry-run stubs on Mac (no local robot runtime).
+**Invoke Code** and UI/messaging steps are design + dry-run stubs on Mac (code is not executed locally — real run stays in Studio/Robot).
 
 ## Commands
 
@@ -146,6 +156,7 @@ UI/messaging steps are design + dry-run stubs on Mac (no local robot runtime).
 - Selector round-trip (classic + modern encodings)
 - **Python activities** (`UiPath.Python.Activities` pack) + **ACTIVITIES.md** coverage catalog
 - **Custom activity registration** (project + user) + **REFramework scenario dry-runs**
+- **Invoke Code + top-use activities** (Multiple Assign, DataTable helpers, JSON, Get Attribute, Switch, Throw, …)
 
 ### Near term
 1. **Import polish** — clearer placeholder UI for `Imported.*` activities + one-click “replace with…”

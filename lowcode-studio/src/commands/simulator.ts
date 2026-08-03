@@ -209,6 +209,28 @@ function runChildren(
     if (values.length > 5) {
       log.push(`${indent}... truncated remaining ${values.length - 5} iterations in dry-run`);
     }
+  } else if (activity.type === 'Data.ForEachRow') {
+    const tableName = String(activity.properties?.dataTable ?? 'dt');
+    const rowName = String(activity.properties?.row ?? 'row');
+    const table = resolveExpression(tableName, variables);
+    const rows = asArray(
+      table && typeof table === 'object' && Array.isArray((table as { rows?: unknown[] }).rows)
+        ? (table as { rows: unknown[] }).rows
+        : table
+    );
+    log.push(`${indent}For Each Row ${rowName} in ${tableName} (${rows.length} rows)`);
+    for (const row of rows.slice(0, 5)) {
+      variables[rowName] = row;
+      runList(activity.children, depth + 1);
+    }
+    if (rows.length > 5) {
+      log.push(`${indent}... truncated remaining ${rows.length - 5} rows in dry-run`);
+    }
+  } else if (activity.type === 'ControlFlow.Switch') {
+    const expr = String(activity.properties?.expression ?? 'status');
+    const value = resolveExpression(expr, variables);
+    log.push(`${indent}Switch (${expr}) => ${JSON.stringify(value)} (running Default body)`);
+    runList(activity.children, depth + 1);
   } else if (activity.type === 'ControlFlow.While' || activity.type === 'ControlFlow.DoWhile') {
     log.push(`${indent}${activity.type === 'ControlFlow.DoWhile' ? 'DoWhile' : 'While'} simulated for 1 iteration`);
     runList(activity.children, depth + 1);
@@ -575,6 +597,150 @@ function executeStub(
       const value = resolveExpression(String(activity.properties.value ?? ''), variables);
       variables[to] = value;
       log.push(`${indent}Assign ${to} = ${JSON.stringify(value)}`);
+      break;
+    }
+    case 'Programming.MultipleAssign': {
+      const lines = String(activity.properties.assignments || '')
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean);
+      log.push(`${indent}MultipleAssign (${lines.length} pairs)`);
+      for (const line of lines) {
+        const eq = line.indexOf('=');
+        if (eq < 0) {
+          continue;
+        }
+        const to = line.slice(0, eq).trim();
+        const value = resolveExpression(line.slice(eq + 1).trim(), variables);
+        variables[to] = value;
+        log.push(`${indent}  ${to} = ${JSON.stringify(value)}`);
+      }
+      break;
+    }
+    case 'Programming.InvokeCode': {
+      const lang = String(activity.properties.language || 'CSharp');
+      const code = String(activity.properties.code || '');
+      log.push(
+        `${indent}InvokeCode [${lang}] (${code.split('\n').length} lines, simulated — not executed)`
+      );
+      break;
+    }
+    case 'System.Throw': {
+      const message = resolveExpression(String(activity.properties.message ?? '"Error"'), variables);
+      throw new Error(
+        `${activity.properties.exceptionType || 'System.Exception'}: ${String(message)}`
+      );
+    }
+    case 'System.TerminateWorkflow': {
+      const reason = resolveExpression(
+        String(activity.properties.reason ?? '"Terminated"'),
+        variables
+      );
+      log.push(`${indent}TerminateWorkflow: ${String(reason)}`);
+      throw new Error(`Workflow terminated: ${String(reason)}`);
+    }
+    case 'Data.AddDataRow': {
+      const tableName = String(activity.properties.dataTable || 'dt');
+      const table = (variables[tableName] || { columns: [], rows: [] }) as {
+        columns: string[];
+        rows: unknown[][];
+      };
+      const rowVal = resolveExpression(String(activity.properties.arrayRow ?? '[]'), variables);
+      const row = Array.isArray(rowVal) ? rowVal : [rowVal];
+      table.rows = [...(table.rows || []), row as unknown[]];
+      variables[tableName] = table;
+      log.push(`${indent}AddDataRow -> ${tableName} (${table.rows.length} rows)`);
+      break;
+    }
+    case 'Data.AddDataColumn': {
+      const tableName = String(activity.properties.dataTable || 'dt');
+      const table = (variables[tableName] || { columns: [], rows: [] }) as {
+        columns: string[];
+        rows: unknown[][];
+      };
+      const col = String(activity.properties.columnName || 'NewColumn');
+      table.columns = [...new Set([...(table.columns || []), col])];
+      variables[tableName] = table;
+      log.push(`${indent}AddDataColumn ${col} -> ${tableName}`);
+      break;
+    }
+    case 'Data.FilterDataTable': {
+      const tableName = String(activity.properties.dataTable || 'dt');
+      const resultName = String(activity.properties.result || 'filteredDt');
+      const col = String(activity.properties.columnName || '');
+      const expected = resolveExpression(String(activity.properties.value ?? ''), variables);
+      const table = (variables[tableName] || { columns: [], rows: [] }) as {
+        columns: string[];
+        rows: unknown[][];
+      };
+      const colIndex = (table.columns || []).indexOf(col);
+      const rows =
+        colIndex < 0
+          ? table.rows || []
+          : (table.rows || []).filter((r) => String(r[colIndex]) === String(expected));
+      variables[resultName] = { columns: table.columns || [], rows };
+      log.push(
+        `${indent}FilterDataTable ${tableName} where ${col}==${JSON.stringify(expected)} -> ${resultName} (${rows.length} rows)`
+      );
+      break;
+    }
+    case 'Data.ClearDataTable': {
+      const tableName = String(activity.properties.dataTable || 'dt');
+      const table = (variables[tableName] || { columns: [], rows: [] }) as {
+        columns: string[];
+        rows: unknown[];
+      };
+      table.rows = [];
+      variables[tableName] = table;
+      log.push(`${indent}ClearDataTable ${tableName}`);
+      break;
+    }
+    case 'Data.OutputDataTable': {
+      const tableName = String(activity.properties.dataTable || 'dt');
+      const resultName = String(activity.properties.result || 'tableText');
+      const table = variables[tableName] as { columns?: string[]; rows?: unknown[][] } | undefined;
+      const header = (table?.columns || []).join(',');
+      const body = (table?.rows || []).map((r) => r.join(',')).join('\n');
+      variables[resultName] = [header, body].filter(Boolean).join('\n');
+      log.push(`${indent}OutputDataTable ${tableName} -> ${resultName}`);
+      break;
+    }
+    case 'Data.ForEachRow':
+      log.push(`${indent}ForEachRow ${activity.properties.dataTable}`);
+      break;
+    case 'ControlFlow.Switch':
+      log.push(`${indent}Switch ${activity.properties.expression}`);
+      break;
+    case 'UI.GetAttribute': {
+      const result = String(activity.properties.result || 'attributeValue');
+      variables[result] = `sample-${activity.properties.attribute || 'aaname'}`;
+      log.push(
+        `${indent}GetAttribute ${activity.properties.attribute} -> ${result}`
+      );
+      break;
+    }
+    case 'UI.WaitElement':
+      log.push(
+        `${indent}WaitElement ${activity.properties.action || 'Appear'} timeout=${activity.properties.timeoutMs || 30000}ms (simulated)`
+      );
+      break;
+    case 'Messaging.DeserializeJson': {
+      const result = String(activity.properties.result || 'jsonObj');
+      const raw = resolveExpression(String(activity.properties.jsonString ?? '{}'), variables);
+      try {
+        variables[result] =
+          typeof raw === 'string' ? JSON.parse(raw) : raw && typeof raw === 'object' ? raw : {};
+      } catch {
+        variables[result] = {};
+      }
+      log.push(`${indent}DeserializeJson -> ${result}`);
+      break;
+    }
+    case 'Messaging.SerializeJson': {
+      const result = String(activity.properties.result || 'jsonText');
+      const value = resolveExpression(String(activity.properties.value ?? ''), variables);
+      variables[result] = JSON.stringify(value ?? null);
+      log.push(`${indent}SerializeJson -> ${result}`);
       break;
     }
     case 'UI.OpenApplication':

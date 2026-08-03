@@ -214,6 +214,97 @@ ${pad}  </Assign.Value>
 ${pad}</Assign>`;
   }
 
+  if (activity.type === 'Programming.MultipleAssign') {
+    const lines = String(activity.properties.assignments || '')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    const assigns = lines
+      .map((line) => {
+        const eq = line.indexOf('=');
+        const to = eq >= 0 ? line.slice(0, eq).trim() : line;
+        const value = eq >= 0 ? line.slice(eq + 1).trim() : '""';
+        return `${pad}  <Assign>
+${pad}    <Assign.To><OutArgument x:TypeArguments="x:Object">[${escapeAttr(to)}]</OutArgument></Assign.To>
+${pad}    <Assign.Value><InArgument x:TypeArguments="x:Object">[${escapeAttr(value)}]</InArgument></Assign.Value>
+${pad}  </Assign>`;
+      })
+      .join('\n');
+    return `${pad}<ui:MultipleAssign DisplayName="${escapeAttr(activity.displayName)}">
+${pad}  <ui:MultipleAssign.Assignments>
+${assigns || `${pad}  <Assign />`}
+${pad}  </ui:MultipleAssign.Assignments>
+${pad}</ui:MultipleAssign>`;
+  }
+
+  if (activity.type === 'Programming.InvokeCode') {
+    const lang = String(activity.properties.language || 'CSharp');
+    return `${pad}<ui:InvokeCode DisplayName="${escapeAttr(activity.displayName)}" Language="${escapeAttr(lang)}" Code="${escapeAttr(String(activity.properties.code || ''))}" />`;
+  }
+
+  if (activity.type === 'System.Throw') {
+    return `${pad}<Throw DisplayName="${escapeAttr(activity.displayName)}" Exception="[${escapeAttr(String(activity.properties.message ?? '\"Error\"'))}]" />`;
+  }
+
+  if (activity.type === 'System.TerminateWorkflow') {
+    return `${pad}<ui:TerminateWorkflow DisplayName="${escapeAttr(activity.displayName)}" Reason="[${escapeAttr(String(activity.properties.reason ?? '\"Terminated\"'))}]" />`;
+  }
+
+  if (activity.type === 'ControlFlow.Switch') {
+    const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
+    return `${pad}<Switch x:TypeArguments="x:String" Expression="[${escapeAttr(String(activity.properties.expression ?? 'status'))}]" DisplayName="${escapeAttr(activity.displayName)}">
+${pad}  <Switch.Default>
+${pad}    <Sequence>
+${kids}
+${pad}    </Sequence>
+${pad}  </Switch.Default>
+${pad}</Switch>`;
+  }
+
+  if (activity.type === 'Data.ForEachRow') {
+    const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
+    return `${pad}<ui:ForEachRow DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" DisplayName="${escapeAttr(activity.displayName)}">
+${pad}  <ui:ForEachRow.Body>
+${pad}    <ActivityAction x:TypeArguments="s:DataRow" xmlns:s="clr-namespace:System.Data;assembly=System.Data.Common">
+${pad}      <ActivityAction.Argument>
+${pad}        <DelegateInArgument x:TypeArguments="s:DataRow" Name="${escapeAttr(String(activity.properties.row || 'row'))}" />
+${pad}      </ActivityAction.Argument>
+${pad}      <Sequence>
+${kids}
+${pad}      </Sequence>
+${pad}    </ActivityAction>
+${pad}  </ui:ForEachRow.Body>
+${pad}</ui:ForEachRow>`;
+  }
+
+  if (activity.type === 'Data.AddDataRow') {
+    return `${pad}<ui:AddDataRow DisplayName="${escapeAttr(activity.displayName)}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" ArrayRow="[${escapeAttr(String(activity.properties.arrayRow || '[]'))}]" />`;
+  }
+
+  if (activity.type === 'Data.AddDataColumn') {
+    return `${pad}<ui:AddDataColumn DisplayName="${escapeAttr(activity.displayName)}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" ColumnName="${escapeAttr(String(activity.properties.columnName || 'NewColumn'))}" />`;
+  }
+
+  if (activity.type === 'Data.FilterDataTable') {
+    return `${pad}<ui:FilterDataTable DisplayName="${escapeAttr(activity.displayName)}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" FilterRowsDataTable="[${escapeAttr(String(activity.properties.result || 'filteredDt'))}]" />`;
+  }
+
+  if (activity.type === 'Data.ClearDataTable') {
+    return `${pad}<ui:ClearDataTable DisplayName="${escapeAttr(activity.displayName)}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" />`;
+  }
+
+  if (activity.type === 'Data.OutputDataTable') {
+    return `${pad}<ui:OutputDataTable DisplayName="${escapeAttr(activity.displayName)}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" Text="[${escapeAttr(String(activity.properties.result || 'tableText'))}]" />`;
+  }
+
+  if (activity.type === 'Messaging.DeserializeJson') {
+    return `${pad}<ui:DeserializeJson DisplayName="${escapeAttr(activity.displayName)}" JsonString="[${escapeAttr(String(activity.properties.jsonString ?? '\"{}\"'))}]" />`;
+  }
+
+  if (activity.type === 'Messaging.SerializeJson') {
+    return `${pad}<ui:SerializeJson DisplayName="${escapeAttr(activity.displayName)}" JsonObject="[${escapeAttr(String(activity.properties.value || 'jsonObj'))}]" />`;
+  }
+
   if (activity.type === 'System.LogMessage') {
     return `${pad}<ui:LogMessage DisplayName="${escapeAttr(activity.displayName)}" Level="TraceLevel.${escapeAttr(String(activity.properties.level || 'Info'))}" Message="[${escapeAttr(String(activity.properties.message ?? '""'))}]" />`;
   }
@@ -372,6 +463,21 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
   if (activity.type === 'UI.Check') {
     extra.push(`Action="${escapeAttr(String(activity.properties.action || 'Check'))}"`);
   }
+  if (activity.type === 'UI.GetAttribute') {
+    extra.push(`Attribute="${escapeAttr(String(activity.properties.attribute || 'aaname'))}"`);
+  }
+  if (activity.type === 'UI.WaitElement') {
+    extra.push(`TimeoutMS="${Number(activity.properties.timeoutMs ?? 30000)}"`);
+  }
+
+  const openTag =
+    activity.type === 'UI.GetAttribute'
+      ? 'uia:NGetAttribute'
+      : activity.type === 'UI.WaitElement'
+        ? activity.properties.action === 'Vanish'
+          ? 'uia:WaitElementVanish'
+          : 'uia:OnElementAppear'
+        : open;
 
   const attrs = [
     `DisplayName="${escapeAttr(activity.displayName)}"`,
@@ -382,19 +488,19 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
     .join(' ');
 
   if (!target) {
-    return `${pad}<${open} ${attrs} />`;
+    return `${pad}<${openTag} ${attrs} />`;
   }
 
   const kids = (activity.children || []).map((c) => renderActivity(c, indent + 1)).join('\n');
   if (kids) {
-    return `${pad}<${open} ${attrs}>
+    return `${pad}<${openTag} ${attrs}>
 ${target}
 ${kids}
-${pad}</${open}>`;
+${pad}</${openTag}>`;
   }
-  return `${pad}<${open} ${attrs}>
+  return `${pad}<${openTag} ${attrs}>
 ${target}
-${pad}</${open}>`;
+${pad}</${openTag}>`;
 }
 
 function renderExcelActivity(activity: ActivityNode, pad: string): string {

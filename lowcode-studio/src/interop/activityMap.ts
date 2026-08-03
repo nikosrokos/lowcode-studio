@@ -28,6 +28,26 @@ const MAP: Array<{
     xamlNamespace: 'default'
   },
   { lcsType: 'Programming.Assign', xamlLocalNames: ['Assign'], xamlNamespace: 'default' },
+  {
+    lcsType: 'Programming.MultipleAssign',
+    xamlLocalNames: ['MultipleAssign'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Programming.InvokeCode',
+    xamlLocalNames: ['InvokeCode'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'System.Throw',
+    xamlLocalNames: ['Throw'],
+    xamlNamespace: 'default'
+  },
+  {
+    lcsType: 'System.TerminateWorkflow',
+    xamlLocalNames: ['TerminateWorkflow'],
+    xamlNamespace: 'ui'
+  },
   { lcsType: 'ControlFlow.If', xamlLocalNames: ['If'], xamlNamespace: 'default' },
   { lcsType: 'ControlFlow.While', xamlLocalNames: ['While'], xamlNamespace: 'default' },
   {
@@ -38,6 +58,11 @@ const MAP: Array<{
   { lcsType: 'ControlFlow.ForEach', xamlLocalNames: ['ForEach'], xamlNamespace: 'default' },
   { lcsType: 'ControlFlow.TryCatch', xamlLocalNames: ['TryCatch'], xamlNamespace: 'default' },
   { lcsType: 'ControlFlow.Sequence', xamlLocalNames: ['Sequence'], xamlNamespace: 'default' },
+  {
+    lcsType: 'ControlFlow.Switch',
+    xamlLocalNames: ['Switch'],
+    xamlNamespace: 'default'
+  },
   {
     lcsType: 'ControlFlow.RetryScope',
     xamlLocalNames: ['RetryScope'],
@@ -99,11 +124,56 @@ const MAP: Array<{
     ],
     xamlNamespace: 'uia'
   },
+  {
+    lcsType: 'UI.GetAttribute',
+    xamlLocalNames: ['GetAttribute', 'NGetAttribute'],
+    xamlNamespace: 'uia'
+  },
+  {
+    lcsType: 'UI.WaitElement',
+    xamlLocalNames: [
+      'WaitElementVanish',
+      'OnElementAppear',
+      'WaitUiElementAppear',
+      'WaitElement'
+    ],
+    xamlNamespace: 'uia'
+  },
   { lcsType: 'Data.ReadCsv', xamlLocalNames: ['ReadCsvFile', 'ReadCSV'], xamlNamespace: 'ui' },
   { lcsType: 'Data.WriteCsv', xamlLocalNames: ['WriteCsvFile', 'WriteCSV'], xamlNamespace: 'ui' },
   {
     lcsType: 'Data.BuildDataTable',
     xamlLocalNames: ['BuildDataTable'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Data.AddDataRow',
+    xamlLocalNames: ['AddDataRow'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Data.AddDataColumn',
+    xamlLocalNames: ['AddDataColumn'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Data.FilterDataTable',
+    xamlLocalNames: ['FilterDataTable'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Data.ForEachRow',
+    xamlLocalNames: ['ForEachRow', 'ForEachRowX'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Data.ClearDataTable',
+    xamlLocalNames: ['ClearDataTable'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Data.OutputDataTable',
+    xamlLocalNames: ['OutputDataTable'],
     xamlNamespace: 'ui'
   },
   {
@@ -140,6 +210,16 @@ const MAP: Array<{
   {
     lcsType: 'Messaging.HttpRequest',
     xamlLocalNames: ['HttpClient', 'HTTPRequest', 'HttpRequest', 'DeserializedHttpRequest'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Messaging.DeserializeJson',
+    xamlLocalNames: ['DeserializeJson', 'DeserializeJsonActivity'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Messaging.SerializeJson',
+    xamlLocalNames: ['SerializeJson', 'SerializeJsonActivity'],
     xamlNamespace: 'ui'
   },
   {

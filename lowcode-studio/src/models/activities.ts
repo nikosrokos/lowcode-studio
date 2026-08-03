@@ -156,6 +156,97 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     ]
   },
   {
+    type: 'Programming.MultipleAssign',
+    displayName: 'Multiple Assign',
+    category: 'Programming',
+    description: 'Assigns values to multiple variables in one step (one pair per line: name = value).',
+    icon: '$(symbol-namespace)',
+    color: '#8B5CF6',
+    properties: [
+      {
+        name: 'assignments',
+        label: 'Assignments',
+        type: 'multiline',
+        defaultValue: 'counter = 0\nstatus = "Ready"',
+        required: true,
+        description: 'One assignment per line: variable = expression'
+      }
+    ]
+  },
+  {
+    type: 'Programming.InvokeCode',
+    displayName: 'Invoke Code',
+    category: 'Programming',
+    description: 'Runs VB.NET or C# code (simulated in dry-run; real execution in Studio/Robot).',
+    icon: '$(code)',
+    color: '#8B5CF6',
+    properties: [
+      {
+        name: 'code',
+        label: 'Code',
+        type: 'multiline',
+        defaultValue: 'Console.WriteLine("Hello from Invoke Code");',
+        required: true
+      },
+      {
+        name: 'language',
+        label: 'Language',
+        type: 'enum',
+        options: ['VBNet', 'CSharp'],
+        defaultValue: 'CSharp'
+      },
+      {
+        name: 'arguments',
+        label: 'Arguments',
+        type: 'multiline',
+        defaultValue: '',
+        description: 'Optional In/Out argument names (comma or line separated)'
+      }
+    ]
+  },
+  {
+    type: 'System.Throw',
+    displayName: 'Throw',
+    category: 'System',
+    description: 'Throws an exception (BusinessRuleException / SystemException style).',
+    icon: '$(error)',
+    color: '#EF4444',
+    properties: [
+      {
+        name: 'exceptionType',
+        label: 'Exception Type',
+        type: 'enum',
+        options: ['System.Exception', 'BusinessRuleException', 'SystemException'],
+        defaultValue: 'System.Exception',
+        required: true
+      },
+      {
+        name: 'message',
+        label: 'Message',
+        type: 'expression',
+        defaultValue: '"An error occurred"',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'System.TerminateWorkflow',
+    displayName: 'Terminate Workflow',
+    category: 'System',
+    description: 'Stops the workflow with a reason (End Process style).',
+    icon: '$(debug-stop)',
+    color: '#EF4444',
+    properties: [
+      {
+        name: 'reason',
+        label: 'Reason',
+        type: 'expression',
+        defaultValue: '"Terminated"',
+        required: true
+      }
+    ]
+  },
+  {
     type: 'ControlFlow.If',
     displayName: 'If',
     category: 'Control Flow',
@@ -294,6 +385,31 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     color: '#0EA5E9',
     container: true,
     properties: []
+  },
+  {
+    type: 'ControlFlow.Switch',
+    displayName: 'Switch',
+    category: 'Control Flow',
+    description: 'Branches on an expression value (cases listed as comma-separated labels).',
+    icon: '$(type-hierarchy-sub)',
+    color: '#F59E0B',
+    container: true,
+    properties: [
+      {
+        name: 'expression',
+        label: 'Expression',
+        type: 'expression',
+        defaultValue: 'status',
+        required: true
+      },
+      {
+        name: 'cases',
+        label: 'Cases',
+        type: 'string',
+        defaultValue: 'Success,Failed,Default',
+        description: 'Comma-separated case labels (Default is the fallback)'
+      }
+    ]
   },
   {
     type: 'UI.OpenApplication',
@@ -565,6 +681,79 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     ]
   },
   {
+    type: 'UI.GetAttribute',
+    displayName: 'Get Attribute',
+    category: 'UI Automation',
+    description: 'Reads a UI element attribute into a variable.',
+    icon: '$(symbol-property)',
+    color: '#10B981',
+    properties: [
+      {
+        name: 'selector',
+        label: 'Selector',
+        type: 'multiline',
+        defaultValue: '<html app=\'chrome.exe\' />',
+        required: true
+      },
+      {
+        name: 'selectorModern',
+        label: 'Modern Selector (JSON)',
+        type: 'multiline',
+        defaultValue: ''
+      },
+      {
+        name: 'attribute',
+        label: 'Attribute',
+        type: 'string',
+        defaultValue: 'aaname',
+        required: true
+      },
+      {
+        name: 'result',
+        label: 'Result',
+        type: 'expression',
+        defaultValue: 'attributeValue',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'UI.WaitElement',
+    displayName: 'Wait Element',
+    category: 'UI Automation',
+    description: 'Waits for an element to appear or vanish (simulated delay in dry-run).',
+    icon: '$(watch)',
+    color: '#10B981',
+    properties: [
+      {
+        name: 'selector',
+        label: 'Selector',
+        type: 'multiline',
+        defaultValue: '<html app=\'chrome.exe\' />',
+        required: true
+      },
+      {
+        name: 'selectorModern',
+        label: 'Modern Selector (JSON)',
+        type: 'multiline',
+        defaultValue: ''
+      },
+      {
+        name: 'action',
+        label: 'Wait For',
+        type: 'enum',
+        options: ['Appear', 'Vanish'],
+        defaultValue: 'Appear'
+      },
+      {
+        name: 'timeoutMs',
+        label: 'Timeout (ms)',
+        type: 'number',
+        defaultValue: 30000
+      }
+    ]
+  },
+  {
     type: 'Data.ReadCsv',
     displayName: 'Read CSV',
     category: 'Data',
@@ -638,6 +827,166 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         label: 'Result',
         type: 'expression',
         defaultValue: 'dt',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Data.AddDataRow',
+    displayName: 'Add Data Row',
+    category: 'Data',
+    description: 'Appends a row (array values) to a DataTable.',
+    icon: '$(add)',
+    color: '#06B6D4',
+    properties: [
+      {
+        name: 'dataTable',
+        label: 'DataTable',
+        type: 'expression',
+        defaultValue: 'dt',
+        required: true
+      },
+      {
+        name: 'arrayRow',
+        label: 'Array Row',
+        type: 'expression',
+        defaultValue: '["A", "1", "New"]',
+        required: true,
+        description: 'JSON array or expression of row values'
+      }
+    ]
+  },
+  {
+    type: 'Data.AddDataColumn',
+    displayName: 'Add Data Column',
+    category: 'Data',
+    description: 'Adds a column to a DataTable.',
+    icon: '$(diff-added)',
+    color: '#06B6D4',
+    properties: [
+      {
+        name: 'dataTable',
+        label: 'DataTable',
+        type: 'expression',
+        defaultValue: 'dt',
+        required: true
+      },
+      {
+        name: 'columnName',
+        label: 'Column Name',
+        type: 'string',
+        defaultValue: 'NewColumn',
+        required: true
+      },
+      {
+        name: 'columnType',
+        label: 'Column Type',
+        type: 'enum',
+        options: ['String', 'Int32', 'Boolean', 'Double', 'Object'],
+        defaultValue: 'String'
+      }
+    ]
+  },
+  {
+    type: 'Data.FilterDataTable',
+    displayName: 'Filter Data Table',
+    category: 'Data',
+    description: 'Filters rows from a DataTable into an output table (simple column/value match in dry-run).',
+    icon: '$(filter)',
+    color: '#06B6D4',
+    properties: [
+      {
+        name: 'dataTable',
+        label: 'Input DataTable',
+        type: 'expression',
+        defaultValue: 'dt',
+        required: true
+      },
+      {
+        name: 'columnName',
+        label: 'Column',
+        type: 'string',
+        defaultValue: 'Status',
+        required: true
+      },
+      {
+        name: 'value',
+        label: 'Equals Value',
+        type: 'expression',
+        defaultValue: '"Success"',
+        required: true
+      },
+      {
+        name: 'result',
+        label: 'Output DataTable',
+        type: 'expression',
+        defaultValue: 'filteredDt',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Data.ForEachRow',
+    displayName: 'For Each Row',
+    category: 'Data',
+    description: 'Iterates each row of a DataTable (up to 5 rows in dry-run).',
+    icon: '$(arrow-swap)',
+    color: '#06B6D4',
+    container: true,
+    properties: [
+      {
+        name: 'dataTable',
+        label: 'DataTable',
+        type: 'expression',
+        defaultValue: 'dt',
+        required: true
+      },
+      {
+        name: 'row',
+        label: 'Current Row',
+        type: 'expression',
+        defaultValue: 'row',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Data.ClearDataTable',
+    displayName: 'Clear Data Table',
+    category: 'Data',
+    description: 'Removes all rows from a DataTable.',
+    icon: '$(clear-all)',
+    color: '#06B6D4',
+    properties: [
+      {
+        name: 'dataTable',
+        label: 'DataTable',
+        type: 'expression',
+        defaultValue: 'dt',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Data.OutputDataTable',
+    displayName: 'Output Data Table',
+    category: 'Data',
+    description: 'Converts a DataTable to a string (CSV-like) for logging.',
+    icon: '$(export)',
+    color: '#06B6D4',
+    properties: [
+      {
+        name: 'dataTable',
+        label: 'DataTable',
+        type: 'expression',
+        defaultValue: 'dt',
+        required: true
+      },
+      {
+        name: 'result',
+        label: 'Result',
+        type: 'expression',
+        defaultValue: 'tableText',
         required: true
       }
     ]
@@ -845,6 +1194,54 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         label: 'Result',
         type: 'expression',
         defaultValue: 'response'
+      }
+    ]
+  },
+  {
+    type: 'Messaging.DeserializeJson',
+    displayName: 'Deserialize JSON',
+    category: 'Messaging',
+    description: 'Parses a JSON string into an object (dry-run uses JSON.parse).',
+    icon: '$(json)',
+    color: '#EC4899',
+    properties: [
+      {
+        name: 'jsonString',
+        label: 'JSON String',
+        type: 'expression',
+        defaultValue: '"{\\"ok\\":true}"',
+        required: true
+      },
+      {
+        name: 'result',
+        label: 'Result',
+        type: 'expression',
+        defaultValue: 'jsonObj',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Messaging.SerializeJson',
+    displayName: 'Serialize JSON',
+    category: 'Messaging',
+    description: 'Serializes an object to a JSON string.',
+    icon: '$(bracket-dot)',
+    color: '#EC4899',
+    properties: [
+      {
+        name: 'value',
+        label: 'Value',
+        type: 'expression',
+        defaultValue: 'jsonObj',
+        required: true
+      },
+      {
+        name: 'result',
+        label: 'Result',
+        type: 'expression',
+        defaultValue: 'jsonText',
+        required: true
       }
     ]
   },
