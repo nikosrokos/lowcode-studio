@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "1.0",
+  "name": "FlowchartDemo",
+  "description": "Sample flowchart with decision and links",
+  "type": "Flowchart",
+  "startActivityId": "start_1",
+  "variables": [
+    {
+      "name": "amount",
+      "type": "Int32",
+      "defaultValue": 120
+    }
+  ],
+  "arguments": [],
+  "activities": [
+    {
+      "id": "start_1",
+      "type": "Flowchart.Start",
+      "displayName": "Start",
+      "properties": {},
+      "x": 280,
+      "y": 40
+    },
+    {
+      "id": "dec_1",
+      "type": "Flowchart.FlowDecision",
+      "displayName": "Amount > 100?",
+      "properties": {
+        "condition": "amount > 100"
+      },
+      "x": 250,
+      "y": 160
+    },
+    {
+      "id": "log_high",
+      "type": "System.LogMessage",
+      "displayName": "High Amount",
+      "properties": {
+        "message": "\"High value path\"",
+        "level": "Info"
+      },
+      "x": 80,
+      "y": 360
+    },
+    {
+      "id": "log_low",
+      "type": "System.LogMessage",
+      "displayName": "Low Amount",
+      "properties": {
+        "message": "\"Low value path\"",
+        "level": "Info"
+      },
+      "x": 420,
+      "y": 360
+    },
+    {
+      "id": "end_1",
+      "type": "Flowchart.End",
+      "displayName": "End",
+      "properties": {},
+      "x": 280,
+      "y": 520
+    }
+  ],
+  "connections": [
+    { "id": "c1", "from": "start_1", "to": "dec_1", "label": "" },
+    { "id": "c2", "from": "dec_1", "to": "log_high", "label": "True" },
+    { "id": "c3", "from": "dec_1", "to": "log_low", "label": "False" },
+    { "id": "c4", "from": "log_high", "to": "end_1", "label": "" },
+    { "id": "c5", "from": "log_low", "to": "end_1", "label": "" }
+  ],
+  "metadata": {
+    "createdAt": "2026-08-03T00:00:00.000Z",
+    "updatedAt": "2026-08-03T00:00:00.000Z"
+  }
+}

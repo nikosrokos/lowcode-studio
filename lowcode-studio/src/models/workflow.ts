@@ -33,6 +33,17 @@ export interface ActivityNode {
   properties: Record<string, unknown>;
   children?: ActivityNode[];
   elseChildren?: ActivityNode[];
+  /** Flowchart canvas position */
+  x?: number;
+  y?: number;
+}
+
+export interface FlowConnection {
+  id: string;
+  from: string;
+  to: string;
+  /** Optional label such as True / False / Default */
+  label?: string;
 }
 
 export interface WorkflowDocument {
@@ -43,12 +54,18 @@ export interface WorkflowDocument {
   variables: WorkflowVariable[];
   arguments: WorkflowArgument[];
   activities: ActivityNode[];
+  /** Used when type === Flowchart */
+  connections?: FlowConnection[];
+  startActivityId?: string;
   metadata?: {
     createdAt?: string;
     updatedAt?: string;
     author?: string;
+    template?: string;
   };
 }
+
+export type ProjectTemplate = 'blank' | 'reframework';
 
 export interface ProjectManifest {
   schemaVersion: '1.0';
@@ -56,6 +73,7 @@ export interface ProjectManifest {
   description?: string;
   main: string;
   workflows: string[];
+  template?: ProjectTemplate;
   createdAt: string;
 }
 
@@ -64,11 +82,58 @@ export function createEmptyWorkflow(
   type: WorkflowType = 'Sequence'
 ): WorkflowDocument {
   const now = new Date().toISOString();
+  if (type === 'Flowchart') {
+    const startId = newId();
+    const logId = newId();
+    return {
+      schemaVersion: '1.0',
+      name,
+      description: '',
+      type: 'Flowchart',
+      variables: [],
+      arguments: [],
+      startActivityId: startId,
+      activities: [
+        {
+          id: startId,
+          type: 'Flowchart.Start',
+          displayName: 'Start',
+          properties: {},
+          x: 280,
+          y: 40
+        },
+        {
+          id: logId,
+          type: 'System.LogMessage',
+          displayName: 'Log Message',
+          properties: {
+            message: `"Hello from ${name}"`,
+            level: 'Info'
+          },
+          x: 240,
+          y: 160
+        }
+      ],
+      connections: [
+        {
+          id: newId('conn'),
+          from: startId,
+          to: logId,
+          label: ''
+        }
+      ],
+      metadata: {
+        createdAt: now,
+        updatedAt: now
+      }
+    };
+  }
+
   return {
     schemaVersion: '1.0',
     name,
     description: '',
-    type,
+    type: 'Sequence',
     variables: [],
     arguments: [],
     activities: [
@@ -89,19 +154,28 @@ export function createEmptyWorkflow(
   };
 }
 
-export function createProjectManifest(name: string, mainWorkflow: string): ProjectManifest {
+export function createProjectManifest(
+  name: string,
+  mainWorkflow: string,
+  workflows: string[] = [mainWorkflow],
+  template: ProjectTemplate = 'blank'
+): ProjectManifest {
   return {
     schemaVersion: '1.0',
     name,
-    description: `${name} LowCode Studio project`,
+    description:
+      template === 'reframework'
+        ? `${name} — UiPath-style REFramework project`
+        : `${name} LowCode Studio project`,
     main: mainWorkflow,
-    workflows: [mainWorkflow],
+    workflows,
+    template,
     createdAt: new Date().toISOString()
   };
 }
 
-export function newId(): string {
-  return `act_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+export function newId(prefix = 'act'): string {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export function parseWorkflow(text: string): WorkflowDocument {
@@ -116,7 +190,13 @@ export function parseWorkflow(text: string): WorkflowDocument {
     type: raw.type === 'Flowchart' ? 'Flowchart' : 'Sequence',
     variables: Array.isArray(raw.variables) ? raw.variables : [],
     arguments: Array.isArray(raw.arguments) ? raw.arguments : [],
-    activities: raw.activities,
+    activities: raw.activities.map((a) => ({
+      ...a,
+      x: typeof a.x === 'number' ? a.x : undefined,
+      y: typeof a.y === 'number' ? a.y : undefined
+    })),
+    connections: Array.isArray(raw.connections) ? raw.connections : [],
+    startActivityId: raw.startActivityId,
     metadata: raw.metadata || {}
   };
 }
@@ -124,6 +204,7 @@ export function parseWorkflow(text: string): WorkflowDocument {
 export function stringifyWorkflow(doc: WorkflowDocument): string {
   const updated: WorkflowDocument = {
     ...doc,
+    connections: doc.type === 'Flowchart' ? doc.connections || [] : doc.connections,
     metadata: {
       ...doc.metadata,
       updatedAt: new Date().toISOString(),

@@ -14,6 +14,7 @@ import {
 } from './models/workflow';
 import { dryRunWorkflow, toPseudocode, validateWorkflow } from './commands/simulator';
 import { getActivityDefinition } from './models/activities';
+import { generateREFrameworkProject } from './templates/reframework';
 
 let editorProvider: WorkflowEditorProvider;
 let variablesProvider: VariablesTreeProvider;
@@ -57,6 +58,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('lowcodeStudio.newProject', () => newProject()),
+    vscode.commands.registerCommand('lowcodeStudio.newREFramework', () =>
+      newProject('reframework')
+    ),
     vscode.commands.registerCommand('lowcodeStudio.newWorkflow', () => newWorkflow()),
     vscode.commands.registerCommand('lowcodeStudio.openDesigner', async () => {
       const editor = vscode.window.activeTextEditor;
@@ -224,16 +228,40 @@ export function deactivate(): void {
   // no-op
 }
 
-async function newProject(): Promise<void> {
+async function newProject(forcedTemplate?: 'blank' | 'reframework'): Promise<void> {
   const workspace = vscode.workspace.workspaceFolders?.[0];
   if (!workspace) {
     vscode.window.showErrorMessage('Open a folder in VS Code / Cursor first.');
     return;
   }
 
+  const templatePick =
+    forcedTemplate ||
+    (
+      await vscode.window.showQuickPick(
+        [
+          {
+            label: 'Blank Project',
+            description: 'Empty Sequence or Flowchart',
+            value: 'blank' as const
+          },
+          {
+            label: 'REFramework',
+            description: 'UiPath-style Init → Get Data → Process → End (recommended)',
+            value: 'reframework' as const
+          }
+        ],
+        { placeHolder: 'Choose a project template' }
+      )
+    )?.value;
+
+  if (!templatePick) {
+    return;
+  }
+
   const name = await vscode.window.showInputBox({
     prompt: 'Project name',
-    value: 'MyAutomation',
+    value: templatePick === 'reframework' ? 'MyREFramework' : 'MyAutomation',
     validateInput: (v) => (v.trim() ? undefined : 'Name is required')
   });
   if (!name) {
@@ -246,53 +274,68 @@ async function newProject(): Promise<void> {
     return;
   }
 
-  const mainWorkflow = 'Main.lcs.json';
   fs.mkdirSync(projectDir, { recursive: true });
-  fs.writeFileSync(
-    path.join(projectDir, 'project.json'),
-    JSON.stringify(createProjectManifest(name.trim(), mainWorkflow), null, 2) + '\n',
-    'utf8'
-  );
 
-  const workflowType =
-    vscode.workspace
-      .getConfiguration('lowcodeStudio')
-      .get<'Sequence' | 'Flowchart'>('defaultWorkflowType', 'Sequence') || 'Sequence';
+  if (templatePick === 'reframework') {
+    const files = generateREFrameworkProject(name.trim());
+    for (const file of files) {
+      const full = path.join(projectDir, file.relativePath);
+      fs.mkdirSync(path.dirname(full), { recursive: true });
+      fs.writeFileSync(full, file.content, 'utf8');
+    }
+  } else {
+    const mainWorkflow = 'Main.lcs.json';
+    const workflowType =
+      (await vscode.window.showQuickPick(['Sequence', 'Flowchart'], {
+        placeHolder: 'Default workflow type'
+      })) ||
+      vscode.workspace
+        .getConfiguration('lowcodeStudio')
+        .get<'Sequence' | 'Flowchart'>('defaultWorkflowType', 'Sequence') ||
+      'Sequence';
 
-  const workflow = createEmptyWorkflow('Main', workflowType);
-  fs.writeFileSync(
-    path.join(projectDir, mainWorkflow),
-    stringifyWorkflow(workflow),
-    'utf8'
-  );
-  fs.writeFileSync(
-    path.join(projectDir, 'README.md'),
-    `# ${name.trim()}
+    fs.writeFileSync(
+      path.join(projectDir, 'project.json'),
+      JSON.stringify(createProjectManifest(name.trim(), mainWorkflow), null, 2) + '\n',
+      'utf8'
+    );
+    fs.writeFileSync(
+      path.join(projectDir, mainWorkflow),
+      stringifyWorkflow(createEmptyWorkflow('Main', workflowType as 'Sequence' | 'Flowchart')),
+      'utf8'
+    );
+    fs.writeFileSync(
+      path.join(projectDir, 'README.md'),
+      `# ${name.trim()}
 
 LowCode Studio project (Studio-like low-code workflows for VS Code / Cursor on Mac).
 
 ## Getting started
 
 1. Open \`Main.lcs.json\` — the visual designer loads automatically.
-2. Drag activities from the **Activities** panel onto the sequence.
+2. Drag activities from the **Activities** panel onto the canvas.
 3. Configure properties on the right.
 4. Press **F5** or run **LowCode Studio: Dry Run**.
 
-> This extension is independent community tooling inspired by classic Studio workflows.
-> For UiPath Maestro Flows, use the official UiPath Maestro VS Code extension.
+> Independent community tooling inspired by classic Studio workflows.
 `,
-    'utf8'
-  );
+      'utf8'
+    );
+  }
 
   projectProvider.refresh();
 
-  const uri = vscode.Uri.file(path.join(projectDir, mainWorkflow));
+  const uri = vscode.Uri.file(path.join(projectDir, 'Main.lcs.json'));
   await vscode.commands.executeCommand(
     'vscode.openWith',
     uri,
     WorkflowEditorProvider.viewType
   );
-  vscode.window.showInformationMessage(`Created project "${name.trim()}".`);
+  vscode.window.showInformationMessage(
+    templatePick === 'reframework'
+      ? `Created REFramework project "${name.trim()}". Open Process.lcs.json to add business logic.`
+      : `Created project "${name.trim()}".`
+  );
 }
 
 async function newWorkflow(): Promise<void> {
@@ -445,27 +488,29 @@ A **Studio-like low-code designer** for VS Code and Cursor — built for Mac use
 
 | Studio concept | In this extension |
 |---|---|
-| Designer canvas | Visual sequence editor for \`.lcs.json\` |
+| Sequence designer | Vertical activity list for \`.lcs.json\` |
+| Flowchart designer | Free-form canvas + True/False links |
+| REFramework | One-click Init → Get Data → Process → End |
 | Activities panel | Drag/drop toolbox + sidebar |
-| Properties pane | Right-side property editor |
-| Variables | Variables panel + manager |
+| Properties / Variables | Right-side editors |
 | Run / Debug | Dry Run simulator (F5) |
-| Project | \`project.json\` + workflows |
 
 ## Quick start
 
-1. **LowCode Studio: New Project**
-2. Open \`Main.lcs.json\` (designer opens automatically)
-3. Drag **Log Message**, **If**, **Click**, **HTTP Request**, etc.
-4. Press **F5** to dry-run
+1. **LowCode Studio: New REFramework Project** (easiest path)
+2. Open \`Main.lcs.json\` — flowchart of the framework states
+3. Edit \`Framework/Process.lcs.json\` for business logic
+4. Edit \`Data/Config.json\` for retries / endpoints
+5. Press **F5** to dry-run Main
+
+Or use **New Project → Blank** and pick Sequence or Flowchart.
 
 ## About UiPath Maestro
 
-UiPath's official **Maestro** VS Code extension targets **Maestro Flows** (\`.flow\`) — orchestration of agents/robots/APIs — not classic RPA Studio workflows.
+UiPath's official **Maestro** VS Code extension targets **Maestro Flows** (\`.flow\`).
+LowCode Studio covers classic Studio / REFramework-style low-code design on Mac.
 
-LowCode Studio fills the **classic Studio / low-code RPA design** gap locally in your editor on Mac.
-
-> Not an official UiPath product. Compatible in spirit with Studio phases: design → framework → development → testing.
+> Not an official UiPath product.
 `;
   void vscode.workspace
     .openTextDocument({ content: md, language: 'markdown' })
