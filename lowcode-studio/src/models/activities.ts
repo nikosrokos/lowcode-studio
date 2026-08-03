@@ -4,7 +4,9 @@ export type ActivityCategory =
   | 'UI Automation'
   | 'Data'
   | 'Programming'
-  | 'Messaging';
+  | 'Messaging'
+  | 'Flowchart'
+  | 'REFramework';
 
 export interface ActivityPropertyDef {
   name: string;
@@ -478,6 +480,88 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         label: 'Result',
         type: 'expression',
         defaultValue: 'response'
+      }
+    ]
+  },
+  {
+    type: 'Flowchart.Start',
+    displayName: 'Start',
+    category: 'Flowchart',
+    description: 'Entry point for a flowchart.',
+    icon: '$(debug-start)',
+    color: '#22C55E',
+    properties: []
+  },
+  {
+    type: 'Flowchart.FlowDecision',
+    displayName: 'Flow Decision',
+    category: 'Flowchart',
+    description: 'Diamond decision with True/False outgoing links.',
+    icon: '$(debug-breakpoint-conditional)',
+    color: '#F59E0B',
+    properties: [
+      {
+        name: 'condition',
+        label: 'Condition',
+        type: 'expression',
+        defaultValue: 'true',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Flowchart.End',
+    displayName: 'End',
+    category: 'Flowchart',
+    description: 'Terminal node for a flowchart path.',
+    icon: '$(debug-stop)',
+    color: '#EF4444',
+    properties: []
+  },
+  {
+    type: 'REFramework.InvokeWorkflow',
+    displayName: 'Invoke Workflow',
+    category: 'REFramework',
+    description: 'Calls another .lcs.json workflow (REFramework building block).',
+    icon: '$(run-all)',
+    color: '#0EA5E9',
+    properties: [
+      {
+        name: 'workflowPath',
+        label: 'Workflow Path',
+        type: 'string',
+        defaultValue: 'Framework/Process.lcs.json',
+        required: true
+      },
+      {
+        name: 'description',
+        label: 'Description',
+        type: 'string',
+        defaultValue: ''
+      }
+    ]
+  },
+  {
+    type: 'REFramework.SetTransactionStatus',
+    displayName: 'Set Transaction Status',
+    category: 'REFramework',
+    description: 'Marks the current transaction Success / Business / System exception.',
+    icon: '$(checklist)',
+    color: '#0EA5E9',
+    properties: [
+      {
+        name: 'status',
+        label: 'Status',
+        type: 'enum',
+        options: ['Success', 'BusinessRuleException', 'SystemException'],
+        defaultValue: 'Success',
+        required: true
+      },
+      {
+        name: 'reason',
+        label: 'Reason',
+        type: 'expression',
+        defaultValue: '""'
       }
     ]
   }

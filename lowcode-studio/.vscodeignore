@@ -10,3 +10,4 @@ node_modules/**
 samples/**
 .git/**
 out/test/**
+docs/images/**

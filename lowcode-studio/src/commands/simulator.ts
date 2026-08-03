@@ -87,6 +87,27 @@ export function validateWorkflow(doc: WorkflowDocument): ValidationIssue[] {
     });
   }
 
+  if (doc.type === 'Flowchart') {
+    const ids = new Set(doc.activities.map((a) => a.id));
+    if (!doc.startActivityId || !ids.has(doc.startActivityId)) {
+      const start = doc.activities.find((a) => a.type === 'Flowchart.Start');
+      if (!start) {
+        issues.push({
+          severity: 'error',
+          message: 'Flowchart needs a Start node or startActivityId.'
+        });
+      }
+    }
+    for (const c of doc.connections || []) {
+      if (!ids.has(c.from) || !ids.has(c.to)) {
+        issues.push({
+          severity: 'error',
+          message: `Connection ${c.id} references a missing node.`
+        });
+      }
+    }
+  }
+
   return issues;
 }
 
@@ -101,71 +122,188 @@ export function dryRunWorkflow(doc: WorkflowDocument): DryRunResult {
   let index = 1;
   let ok = true;
 
+  const pushStep = (activity: ActivityNode, action: string, status: DryRunStep['status'] = 'ok') => {
+    steps.push({
+      index: index++,
+      activityId: activity.id,
+      displayName: activity.displayName,
+      type: activity.type,
+      action,
+      status
+    });
+  };
+
   const runList = (list: ActivityNode[], depth = 0) => {
     for (const activity of list) {
       const indent = '  '.repeat(depth);
       const summary = summarize(activity, variables);
-      const step: DryRunStep = {
-        index: index++,
-        activityId: activity.id,
-        displayName: activity.displayName,
-        type: activity.type,
-        action: summary,
-        status: 'ok'
-      };
-
       try {
         executeStub(activity, variables, log, indent);
-        steps.push(step);
-
-        if (activity.children?.length) {
-          if (activity.type === 'ControlFlow.If') {
-            const condition = String(activity.properties?.condition ?? 'true');
-            const truthy = evaluateLoose(condition, variables);
-            log.push(`${indent}If (${condition}) => ${truthy}`);
-            if (truthy) {
-              runList(activity.children, depth + 1);
-            } else if (activity.elseChildren?.length) {
-              runList(activity.elseChildren, depth + 1);
-            }
-          } else if (activity.type === 'ControlFlow.ForEach') {
-            const valuesExpr = String(activity.properties?.values ?? '[]');
-            const values = asArray(resolveExpression(valuesExpr, variables));
-            const itemName = String(activity.properties?.item ?? 'item');
-            log.push(`${indent}For Each ${itemName} in ${valuesExpr} (${values.length} items)`);
-            for (const item of values.slice(0, 5)) {
-              variables[itemName] = item;
-              runList(activity.children, depth + 1);
-            }
-            if (values.length > 5) {
-              log.push(`${indent}... truncated remaining ${values.length - 5} iterations in dry-run`);
-            }
-          } else if (activity.type === 'ControlFlow.While') {
-            log.push(`${indent}While simulated for 1 iteration`);
-            runList(activity.children, depth + 1);
-          } else if (activity.type === 'ControlFlow.TryCatch') {
-            log.push(`${indent}Try`);
-            runList(activity.children, depth + 1);
-            if (activity.elseChildren?.length) {
-              log.push(`${indent}Catch (not entered in dry-run)`);
-            }
-          } else {
-            runList(activity.children, depth + 1);
-          }
-        }
+        pushStep(activity, summary);
+        runChildren(activity, depth, runList, log, variables);
       } catch (err) {
         ok = false;
-        step.status = 'error';
-        step.action = err instanceof Error ? err.message : String(err);
-        steps.push(step);
-        log.push(`${indent}ERROR: ${step.action}`);
+        const message = err instanceof Error ? err.message : String(err);
+        pushStep(activity, message, 'error');
+        log.push(`${indent}ERROR: ${message}`);
       }
     }
   };
 
-  runList(doc.activities);
+  if (doc.type === 'Flowchart') {
+    ok = runFlowchart(doc, variables, log, pushStep) && ok;
+  } else {
+    runList(doc.activities);
+  }
+
   log.push(ok ? 'Dry-run completed successfully.' : 'Dry-run completed with errors.');
   return { ok, steps, variables, log };
+}
+
+function runChildren(
+  activity: ActivityNode,
+  depth: number,
+  runList: (list: ActivityNode[], depth?: number) => void,
+  log: string[],
+  variables: Record<string, unknown>
+) {
+  if (!activity.children?.length) {
+    return;
+  }
+  const indent = '  '.repeat(depth);
+  if (activity.type === 'ControlFlow.If') {
+    const condition = String(activity.properties?.condition ?? 'true');
+    const truthy = evaluateLoose(condition, variables);
+    log.push(`${indent}If (${condition}) => ${truthy}`);
+    if (truthy) {
+      runList(activity.children, depth + 1);
+    } else if (activity.elseChildren?.length) {
+      runList(activity.elseChildren, depth + 1);
+    }
+  } else if (activity.type === 'ControlFlow.ForEach') {
+    const valuesExpr = String(activity.properties?.values ?? '[]');
+    const values = asArray(resolveExpression(valuesExpr, variables));
+    const itemName = String(activity.properties?.item ?? 'item');
+    log.push(`${indent}For Each ${itemName} in ${valuesExpr} (${values.length} items)`);
+    for (const item of values.slice(0, 5)) {
+      variables[itemName] = item;
+      runList(activity.children, depth + 1);
+    }
+    if (values.length > 5) {
+      log.push(`${indent}... truncated remaining ${values.length - 5} iterations in dry-run`);
+    }
+  } else if (activity.type === 'ControlFlow.While') {
+    log.push(`${indent}While simulated for 1 iteration`);
+    runList(activity.children, depth + 1);
+  } else if (activity.type === 'ControlFlow.TryCatch') {
+    log.push(`${indent}Try`);
+    runList(activity.children, depth + 1);
+    if (activity.elseChildren?.length) {
+      log.push(`${indent}Catch (not entered in dry-run)`);
+    }
+  } else {
+    runList(activity.children, depth + 1);
+  }
+}
+
+function runFlowchart(
+  doc: WorkflowDocument,
+  variables: Record<string, unknown>,
+  log: string[],
+  pushStep: (activity: ActivityNode, action: string, status?: DryRunStep['status']) => void
+): boolean {
+  const byId = new Map(doc.activities.map((a) => [a.id, a]));
+  const outs = new Map<string, { to: string; label?: string }[]>();
+  for (const c of doc.connections || []) {
+    const list = outs.get(c.from) || [];
+    list.push({ to: c.to, label: c.label });
+    outs.set(c.from, list);
+  }
+
+  let currentId =
+    doc.startActivityId ||
+    doc.activities.find((a) => a.type === 'Flowchart.Start')?.id ||
+    doc.activities[0]?.id;
+
+  if (!currentId) {
+    log.push('Flowchart has no nodes to run.');
+    return false;
+  }
+
+  let ok = true;
+  const visited = new Map<string, number>();
+  let guard = 0;
+  const maxSteps = 80;
+
+  while (currentId && guard++ < maxSteps) {
+    const activity = byId.get(currentId);
+    if (!activity) {
+      log.push(`Missing node ${currentId}`);
+      return false;
+    }
+
+    const seen = (visited.get(currentId) || 0) + 1;
+    visited.set(currentId, seen);
+    if (seen > 8) {
+      log.push(`Loop guard: stopped revisiting ${activity.displayName}`);
+      break;
+    }
+
+    try {
+      executeStub(activity, variables, log, '');
+      pushStep(activity, summarize(activity, variables));
+    } catch (err) {
+      ok = false;
+      const message = err instanceof Error ? err.message : String(err);
+      pushStep(activity, message, 'error');
+      log.push(`ERROR: ${message}`);
+      break;
+    }
+
+    if (activity.type === 'Flowchart.End') {
+      break;
+    }
+
+    const edges = outs.get(currentId) || [];
+    if (!edges.length) {
+      break;
+    }
+
+    if (activity.type === 'Flowchart.FlowDecision') {
+      const condition = String(activity.properties?.condition ?? 'true');
+      const truthy = evaluateLoose(condition, variables);
+      log.push(`Decision (${condition}) => ${truthy}`);
+      const label = truthy ? 'True' : 'False';
+      const match =
+        edges.find((e) => (e.label || '').toLowerCase() === label.toLowerCase()) ||
+        edges.find((e) => (truthy ? !e.label || e.label.toLowerCase() === 'true' : e.label?.toLowerCase() === 'false')) ||
+        edges[0];
+      currentId = match?.to;
+    } else {
+      // Prefer unlabeled / Next / default edge
+      const next =
+        edges.find((e) => !e.label || e.label.toLowerCase() === 'next') || edges[0];
+      currentId = next?.to;
+    }
+
+    // Simulate REFramework transaction exhaustion after a few Get Transaction loops
+    if (
+      activity.displayName.toLowerCase().includes('get transaction') &&
+      typeof variables.TransactionNumber === 'number'
+    ) {
+      const n = Number(variables.TransactionNumber);
+      const max = Number(variables.MaxTransactions ?? 3);
+      if (n > max) {
+        variables.TransactionItem = null;
+        log.push('No more transaction items (simulated).');
+      }
+    }
+  }
+
+  if (guard >= maxSteps) {
+    log.push('Flowchart dry-run hit max step limit.');
+  }
+  return ok;
 }
 
 export function toPseudocode(doc: WorkflowDocument): string {
@@ -293,6 +431,16 @@ function summarize(activity: ActivityNode, variables: Record<string, unknown>): 
       return `Type ${activity.properties.text}`;
     case 'Messaging.HttpRequest':
       return `${activity.properties.method} ${activity.properties.url}`;
+    case 'Flowchart.Start':
+      return 'Start';
+    case 'Flowchart.End':
+      return 'End';
+    case 'Flowchart.FlowDecision':
+      return `Decision: ${activity.properties.condition}`;
+    case 'REFramework.InvokeWorkflow':
+      return `Invoke ${activity.properties.workflowPath}`;
+    case 'REFramework.SetTransactionStatus':
+      return `Status=${activity.properties.status}`;
     default:
       return Object.keys(variables).length
         ? `${activity.displayName}`
@@ -386,6 +534,51 @@ function executeStub(
       );
       break;
     }
+    case 'Flowchart.Start':
+      log.push(`${indent}▶ Start`);
+      break;
+    case 'Flowchart.End':
+      log.push(`${indent}■ End`);
+      break;
+    case 'Flowchart.FlowDecision':
+      log.push(`${indent}◇ Decision ${activity.properties.condition}`);
+      break;
+    case 'REFramework.InvokeWorkflow': {
+      const wfPath = String(activity.properties.workflowPath || '');
+      log.push(
+        `${indent}InvokeWorkflow ${wfPath}` +
+          (activity.properties.description ? ` (${activity.properties.description})` : '')
+      );
+      if (/GetTransactionData/i.test(wfPath)) {
+        const n = Number(variables.TransactionNumber ?? 1);
+        const max = Number(variables.MaxTransactions ?? 3);
+        if (n > max) {
+          variables.TransactionItem = null;
+          log.push(`${indent}  → no more items (TransactionNumber=${n})`);
+        } else {
+          variables.TransactionItem = { id: n, data: `Item-${n}` };
+          log.push(`${indent}  → TransactionItem id=${n}`);
+        }
+      } else if (/InitAllSettings/i.test(wfPath)) {
+        variables.Config = variables.Config || { Settings: { MaxRetryNumber: 2 } };
+        variables.MaxTransactions = variables.MaxTransactions ?? 3;
+        variables.MaxRetryNumber = variables.MaxRetryNumber ?? 2;
+      } else if (/Process\.lcs\.json/i.test(wfPath)) {
+        variables.TransactionResult = 'Success';
+        log.push(`${indent}  → Process completed (Success)`);
+      } else if (/SetTransactionStatus/i.test(wfPath)) {
+        variables.RetryNumber = 0;
+        variables.TransactionNumber = Number(variables.TransactionNumber ?? 1) + 1;
+        log.push(
+          `${indent}  → status set, next TransactionNumber=${variables.TransactionNumber}`
+        );
+      }
+      break;
+    }
+    case 'REFramework.SetTransactionStatus':
+      variables.TransactionResult = activity.properties.status;
+      log.push(`${indent}SetTransactionStatus ${activity.properties.status}`);
+      break;
     default:
       log.push(`${indent}${activity.displayName}`);
   }
@@ -399,6 +592,9 @@ function resolveExpression(expr: string, variables: Record<string, unknown>): un
   ) {
     return trimmed.slice(1, -1);
   }
+  if (trimmed === 'null' || trimmed === 'undefined') {
+    return null;
+  }
   if (trimmed in variables) {
     return variables[trimmed];
   }
@@ -411,6 +607,10 @@ function resolveExpression(expr: string, variables: Record<string, unknown>): un
   if (trimmed === 'false') {
     return false;
   }
+  const add = trimmed.match(/^([A-Za-z_][\w]*)\s*\+\s*(-?\d+)$/);
+  if (add && add[1] in variables) {
+    return Number(variables[add[1]] ?? 0) + Number(add[2]);
+  }
   if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
     try {
       return JSON.parse(trimmed);
@@ -422,18 +622,63 @@ function resolveExpression(expr: string, variables: Record<string, unknown>): un
 }
 
 function evaluateLoose(condition: string, variables: Record<string, unknown>): boolean {
-  const value = resolveExpression(condition, variables);
+  const expr = condition.trim();
+
+  const cmp = expr.match(/^(.+?)\s*(==|!=|>=|<=|>|<)\s*(.+)$/);
+  if (cmp) {
+    const left = resolveExpression(cmp[1].trim(), variables);
+    const right = resolveExpression(cmp[3].trim(), variables);
+    const op = cmp[2];
+    switch (op) {
+      case '==':
+        return looseEqual(left, right);
+      case '!=':
+        return !looseEqual(left, right);
+      case '>':
+        return Number(left) > Number(right);
+      case '<':
+        return Number(left) < Number(right);
+      case '>=':
+        return Number(left) >= Number(right);
+      case '<=':
+        return Number(left) <= Number(right);
+    }
+  }
+
+  if (/\s+!=\s*null$/i.test(expr)) {
+    const name = expr.replace(/\s+!=\s*null$/i, '').trim();
+    return resolveExpression(name, variables) != null;
+  }
+  if (/\s+==\s*null$/i.test(expr)) {
+    const name = expr.replace(/\s+==\s*null$/i, '').trim();
+    return resolveExpression(name, variables) == null;
+  }
+
+  const value = resolveExpression(expr, variables);
   if (typeof value === 'boolean') {
     return value;
   }
   if (typeof value === 'number') {
     return value !== 0;
   }
+  if (value === null || value === undefined) {
+    return false;
+  }
   const text = String(value).trim().toLowerCase();
-  if (text === 'false' || text === '0' || text === '') {
+  if (text === 'false' || text === '0' || text === '' || text === 'null') {
     return false;
   }
   return true;
+}
+
+function looseEqual(a: unknown, b: unknown): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (a == null && (b === 'null' || b === null)) {
+    return true;
+  }
+  return String(a) === String(b);
 }
 
 function asArray(value: unknown): unknown[] {
