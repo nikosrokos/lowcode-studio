@@ -1,12 +1,12 @@
 # LowCode Studio
 
-**Version 0.6.7** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.6.8** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.6.7-0ea5e9)
+![version](https://img.shields.io/badge/version-0.6.8-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
@@ -26,7 +26,7 @@ Design on Mac (REFramework)
 |---|---|---|
 | **1. Test** | Dry Run + **Manage Scenarios** | F5 / **Shift+F5** / Cmd+Shift+T |
 | **2. Ship** | **Connect to Studio Web** | **Cmd+Shift+U** |
-| Design | **Robot Blueprint** / REFramework / Designer | — |
+| Design | **Insert (⌘K)** / Blueprint / REFramework | **⌘K** in designer |
 | Config | Config.json ↔ Config.xlsx | — |
 
 ## In action
@@ -45,7 +45,13 @@ Design on Mac (REFramework)
 2. **Project Explorer** — title actions with tooltips (Open, Scenarios, Connect, Validate…)  
 3. **Extract Table Data** — smart page → DataTable extraction for Windows UI automation
 
-## What’s in 0.6.7
+## What’s in 0.6.8
+
+- **Cmd+K activity palette** in the designer — search Favorites / Recent / All; pin up to 10 favorites (★)
+- Shortcuts: **⌘K** (in designer), **⌘⇧A**, or **⌘K ⌘I**; also **Insert** toolbar button
+- **Smart property suggestions** — Config keys (`Config.Settings…`), variables, and Invoke workflow paths as chips + datalist
+
+### Also in 0.6.7
 
 - **Robot blueprints** — one-click scaffolds beyond REFramework:
   - Web scrape → Excel
@@ -109,7 +115,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.7.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.8.vsix` → reload.
 
 ## Easy path
 
@@ -189,6 +195,7 @@ See [docs/ACTIVITIES.md](docs/ACTIVITIES.md). Invoke Code / UI steps are dry-run
 |---|---|
 | Dry Run | F5 |
 | **Dry Run Scenarios** | **Shift+F5** |
+| **Activity Palette** | **⌘K** (designer) / Cmd+Shift+A |
 | **Manage Scenarios** | Cmd+Shift+T |
 | **Connect to Studio Web** | **Cmd+Shift+U** |
 | Show Studio Web Guide | — |
@@ -210,11 +217,11 @@ See [docs/ACTIVITIES.md](docs/ACTIVITIES.md). Invoke Code / UI steps are dry-run
 - Selector Builder, Use Application/Browser scope, Windows TODO on Connect
 - Stronger Mac dry-run (fixtures, step-through, scenario diffs)
 - Robot blueprint gallery (scrape→Excel, login→email, API→table)
+- Cmd+K activity palette (favorites/recent) + smart property suggestions
 
 ### Next
 1. Import polish for `Imported.*` placeholders
-2. Cmd+K activity palette + favorites
-3. Marketplace publish
+2. Marketplace publish
 
 ## License
 

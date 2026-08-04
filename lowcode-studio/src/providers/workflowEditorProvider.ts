@@ -14,6 +14,17 @@ import {
   validateWorkflow
 } from '../commands/simulator';
 import { getDesignerHtml } from '../webview/designerHtml';
+import {
+  ACTIVITY_FAVORITES_KEY,
+  ACTIVITY_RECENT_KEY,
+  ActivityPaletteState,
+  MAX_PINNED_FAVORITES,
+  MAX_RECENT,
+  normalizeActivityList,
+  pushRecent,
+  toggleFavorite
+} from '../interop/activityPalette';
+import { buildPropertySuggestions } from '../interop/propertySuggestions';
 
 export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
   public static readonly viewType = 'lowcodeStudio.workflowEditor';
@@ -37,6 +48,50 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
     }
   }
 
+  getPaletteState(): ActivityPaletteState {
+    return {
+      favorites: normalizeActivityList(
+        this.context.globalState.get<string[]>(ACTIVITY_FAVORITES_KEY),
+        MAX_PINNED_FAVORITES
+      ),
+      recent: normalizeActivityList(
+        this.context.globalState.get<string[]>(ACTIVITY_RECENT_KEY),
+        MAX_RECENT
+      )
+    };
+  }
+
+  async rememberActivityUse(activityType: string): Promise<void> {
+    const state = this.getPaletteState();
+    const recent = pushRecent(state.recent, activityType);
+    await this.context.globalState.update(ACTIVITY_RECENT_KEY, recent);
+    this.activePanel?.webview.postMessage({
+      type: 'paletteState',
+      palette: { ...state, recent }
+    });
+  }
+
+  async toggleActivityFavorite(activityType: string): Promise<string[]> {
+    const state = this.getPaletteState();
+    const favorites = toggleFavorite(state.favorites, activityType);
+    await this.context.globalState.update(ACTIVITY_FAVORITES_KEY, favorites);
+    this.activePanel?.webview.postMessage({
+      type: 'paletteState',
+      palette: { ...state, favorites }
+    });
+    return favorites;
+  }
+
+  openActivityPalette(): void {
+    if (!this.activePanel) {
+      vscode.window.showInformationMessage(
+        'Open a .lcs.json workflow in the LowCode Studio designer first.'
+      );
+      return;
+    }
+    this.activePanel.webview.postMessage({ type: 'openActivityPalette' });
+  }
+
   insertActivity(activityType: string): void {
     if (!this.activePanel) {
       vscode.window.showInformationMessage(
@@ -44,6 +99,7 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
       );
       return;
     }
+    void this.rememberActivityUse(activityType);
     this.activePanel.webview.postMessage({
       type: 'insertActivity',
       activityType
@@ -79,7 +135,11 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
     const updateWebview = () => {
       try {
         const workflow = parseWorkflow(document.getText());
-        webviewPanel.webview.html = this.getHtml(webviewPanel.webview, workflow);
+        webviewPanel.webview.html = this.getHtml(
+          webviewPanel.webview,
+          workflow,
+          document
+        );
         this.onWorkflowChanged(workflow);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -206,6 +266,21 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           await this.openInvokedWorkflow(document, String(message.workflowPath || ''));
           break;
         }
+        case 'activityUsed': {
+          await this.rememberActivityUse(String(message.activityType || ''));
+          break;
+        }
+        case 'toggleFavorite': {
+          const favorites = await this.toggleActivityFavorite(
+            String(message.activityType || '')
+          );
+          const pinned = favorites.includes(String(message.activityType || ''));
+          webviewPanel.webview.postMessage({
+            type: 'toast',
+            message: pinned ? 'Pinned to favorites' : 'Removed from favorites'
+          });
+          break;
+        }
         case 'ready':
           break;
       }
@@ -263,9 +338,23 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
     await vscode.workspace.applyEdit(edit);
   }
 
-  private getHtml(webview: vscode.Webview, workflow: WorkflowDocument): string {
+  private getHtml(
+    webview: vscode.Webview,
+    workflow: WorkflowDocument,
+    document?: vscode.TextDocument
+  ): string {
     const nonce = getNonce();
-    return getDesignerHtml(nonce, webview.cspSource, workflow, getActivityCatalog());
+    const docPath = document?.uri.fsPath || this.activeDocument?.uri.fsPath || '';
+    const projectRoot = docPath ? findProjectRoot(path.dirname(docPath)) : undefined;
+    const suggestions = buildPropertySuggestions(projectRoot, workflow);
+    return getDesignerHtml(
+      nonce,
+      webview.cspSource,
+      workflow,
+      getActivityCatalog(),
+      suggestions,
+      this.getPaletteState()
+    );
   }
 
   private getErrorHtml(message: string): string {
