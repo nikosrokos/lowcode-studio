@@ -102,64 +102,64 @@ export interface DesignerProjectEntry {
   children?: DesignerProjectEntry[];
 }
 
+const SKIP_DIRS = new Set([
+  'node_modules',
+  '.git',
+  'out',
+  'bin',
+  'obj',
+  '.vs',
+  '.local'
+]);
+
+function shouldSkipDir(name: string): boolean {
+  return SKIP_DIRS.has(name) || name.endsWith('.StudioWeb') || name.endsWith('.StudioWebLocal');
+}
+
 /**
- * Build a shallow project tree for the designer left rail.
+ * Build designer Project Explorer entries for a single current LCS project
+ * (folders + files of that RPA / solution only — not every workspace project).
+ */
+export function buildCurrentProjectTree(projectDir: string | undefined): DesignerProjectEntry[] {
+  if (!projectDir || !isLcsProjectDir(projectDir)) {
+    return [];
+  }
+  return listProjectEntries(projectDir, 3);
+}
+
+/**
+ * @deprecated Prefer buildCurrentProjectTree for the designer rail.
+ * Kept for tests that assert multi-project discovery.
  */
 export function buildDesignerProjectTree(
   roots: string[],
   activeProjectDir?: string
 ): DesignerProjectEntry[] {
   const projects = findAllLcsProjects(roots);
-  return projects.map((projectDir) => {
-    const children: DesignerProjectEntry[] = [];
-    try {
-      for (const entry of fs.readdirSync(projectDir, { withFileTypes: true })) {
-        const full = path.join(projectDir, entry.name);
-        if (entry.isDirectory()) {
-          if (
-            entry.name === 'node_modules' ||
-            entry.name === '.git' ||
-            entry.name === 'out' ||
-            entry.name.endsWith('.StudioWeb')
-          ) {
-            continue;
-          }
-          children.push({
-            name: entry.name,
-            path: full,
-            kind: 'folder',
-            children: listWorkflowFiles(full, 1)
-          });
-        } else if (entry.isFile() && entry.name.endsWith('.lcs.json')) {
-          children.push({
-            name: entry.name.replace(/\.lcs\.json$/i, ''),
-            path: full,
-            kind: 'workflow'
-          });
-        }
-      }
-    } catch {
-      // ignore
+  const focus =
+    activeProjectDir && isLcsProjectDir(activeProjectDir)
+      ? [activeProjectDir]
+      : projects.length === 1
+        ? projects
+        : activeProjectDir
+          ? projects.filter((p) => path.resolve(p) === path.resolve(activeProjectDir))
+          : [];
+  const target = focus[0] || projects[0];
+  if (!target) {
+    return [];
+  }
+  return [
+    {
+      name: path.basename(target),
+      path: target,
+      kind: 'project',
+      active: true,
+      children: listProjectEntries(target, 3)
     }
-    children.sort((a, b) => {
-      if (a.kind !== b.kind) {
-        return a.kind === 'folder' ? -1 : 1;
-      }
-      return a.name.localeCompare(b.name);
-    });
-    return {
-      name: path.basename(projectDir),
-      path: projectDir,
-      kind: 'project' as const,
-      active: Boolean(
-        activeProjectDir && path.resolve(activeProjectDir) === path.resolve(projectDir)
-      ),
-      children
-    };
-  });
+  ];
 }
 
-function listWorkflowFiles(dir: string, depth: number): DesignerProjectEntry[] {
+function listProjectEntries(dir: string, depth: number): DesignerProjectEntry[] {
   if (depth < 0) {
     return [];
   }
@@ -167,21 +167,46 @@ function listWorkflowFiles(dir: string, depth: number): DesignerProjectEntry[] {
   try {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory() && depth > 0) {
-        const nested = listWorkflowFiles(full, depth - 1);
-        if (nested.length) {
-          items.push({ name: entry.name, path: full, kind: 'folder', children: nested });
+      if (entry.isDirectory()) {
+        if (shouldSkipDir(entry.name)) {
+          continue;
         }
-      } else if (entry.isFile() && entry.name.endsWith('.lcs.json')) {
         items.push({
-          name: entry.name.replace(/\.lcs\.json$/i, ''),
+          name: entry.name,
           path: full,
-          kind: 'workflow'
+          kind: 'folder',
+          children: depth > 0 ? listProjectEntries(full, depth - 1) : undefined
         });
+      } else if (entry.isFile()) {
+        if (entry.name.endsWith('.lcs.json')) {
+          items.push({
+            name: entry.name.replace(/\.lcs\.json$/i, ''),
+            path: full,
+            kind: 'workflow'
+          });
+        } else if (
+          entry.name === 'project.json' ||
+          entry.name.endsWith('.json') ||
+          entry.name.endsWith('.xlsx') ||
+          entry.name.endsWith('.md') ||
+          entry.name.endsWith('.txt')
+        ) {
+          items.push({
+            name: entry.name,
+            path: full,
+            kind: 'file'
+          });
+        }
       }
     }
   } catch {
     // ignore
   }
-  return items.sort((a, b) => a.name.localeCompare(b.name));
+  return items.sort((a, b) => {
+    if (a.kind !== b.kind) {
+      const order = { folder: 0, project: 1, workflow: 2, file: 3 } as const;
+      return (order[a.kind] ?? 9) - (order[b.kind] ?? 9);
+    }
+    return a.name.localeCompare(b.name);
+  });
 }

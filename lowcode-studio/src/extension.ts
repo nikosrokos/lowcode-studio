@@ -36,6 +36,10 @@ import {
   studioWebSyncGuideMarkdown
 } from './interop/studioWebConnect';
 import {
+  getStudioWebLocalLink,
+  trySyncToStudioWebLocal
+} from './interop/studioWebLocal';
+import {
   formatPackageValidationReport,
   validateProjectPackages
 } from './interop/packageValidation';
@@ -388,6 +392,30 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidSaveTextDocument((doc) => {
       if (doc.fileName.endsWith('.lcs.json') || path.basename(doc.fileName) === 'project.json') {
         projectProvider.refresh();
+        editorProvider?.refreshProjectTree?.();
+        const syncOnSave = vscode.workspace
+          .getConfiguration('lowcodeStudio')
+          .get<boolean>('syncStudioWebOnSave', true);
+        if (syncOnSave) {
+          const projectRoot = findProjectRoot(path.dirname(doc.fileName));
+          if (projectRoot && getStudioWebLocalLink(projectRoot)) {
+            try {
+              const synced = trySyncToStudioWebLocal(projectRoot);
+              if (synced) {
+                void vscode.window.setStatusBarMessage(
+                  `Synced → Studio Web Local (${path.basename(synced.link.solutionDir)})`,
+                  2500
+                );
+              }
+            } catch (err) {
+              void vscode.window.showWarningMessage(
+                err instanceof Error
+                  ? `Studio Web Local sync failed: ${err.message}`
+                  : 'Studio Web Local sync failed'
+              );
+            }
+          }
+        }
       }
       if (path.basename(doc.fileName) === CUSTOM_ACTIVITIES_FILENAME) {
         refreshCustomActivityOverlay();
@@ -1148,158 +1176,158 @@ async function connectStudioWebCommand(treeItem?: ProjectTreeItem): Promise<void
     return;
   }
   try {
-    let packageReport = '';
-    let windowsTodoReport = '';
-    let windowsTodoPath = '';
-    try {
-      const pkg = validateProjectPackages(projectDir);
-      packageReport = formatPackageValidationReport(pkg);
-      const todo = buildWindowsTodoChecklist(projectDir);
-      windowsTodoReport = formatWindowsTodoReport(todo);
-      try {
-        windowsTodoPath = writeWindowsTodoFile(projectDir, todo);
-      } catch {
-        // ignore write failures during pre-check
+    const existing = getStudioWebLocalLink(projectDir);
+    const choices: Array<vscode.QuickPickItem & { id: string }> = [];
+    if (existing && fs.existsSync(existing.solutionDir)) {
+      choices.push({
+        id: 'sync',
+        label: `$(sync) Sync & open linked Local Workspace`,
+        description: path.basename(existing.solutionDir),
+        detail: existing.solutionDir
+      });
+    }
+    choices.push(
+      {
+        id: 'create',
+        label: '$(new-folder) Create new Studio Web Local Workspace solution',
+        detail: 'Writes a .uipx solution folder; open it in Studio Web → Local Workspace'
+      },
+      {
+        id: 'open',
+        label: '$(folder-opened) Open existing Studio Web Local Workspace solution',
+        detail: 'Pick a folder that already contains a .uipx solution'
+      },
+      {
+        id: 'legacy',
+        label: '$(file-zip) Legacy: export .uip package once',
+        detail: 'One-off Import project handoff (no sync-on-save)'
       }
-      const warnCount = pkg.warnings.filter((w) => w.severity === 'warning').length;
-      const highTodo = todo.items.filter((i) => i.priority === 'high').length;
-      if (warnCount > 0 || highTodo > 0) {
-        const label =
-          highTodo > 0
-            ? `${highTodo} high-priority Windows TODO(s)` +
-              (warnCount ? ` + ${warnCount} package warning(s)` : '') +
-              ' before Studio Web packaging.'
-            : `${warnCount} package validation warning(s) before Studio Web packaging.`;
-        const proceed = await vscode.window.showWarningMessage(
-          label,
-          'Continue',
-          'Show Windows TODO',
-          'Cancel'
-        );
-        if (!proceed || proceed === 'Cancel') {
-          return;
-        }
-        if (proceed === 'Show Windows TODO') {
-          const channel = getOutput();
-          channel.clear();
-          if (windowsTodoReport) {
-            channel.appendLine(windowsTodoReport);
-            channel.appendLine('');
-          }
-          if (packageReport) {
-            channel.appendLine(packageReport);
-          }
-          channel.show(true);
-          if (windowsTodoPath && fs.existsSync(windowsTodoPath)) {
-            const doc = await vscode.workspace.openTextDocument(windowsTodoPath);
-            await vscode.window.showTextDocument(doc, { preview: true });
-          }
-          const again = await vscode.window.showWarningMessage(
-            'Continue packaging for Studio Web?',
-            'Continue',
-            'Cancel'
-          );
-          if (again !== 'Continue') {
-            return;
-          }
-        }
+    );
+
+    const picked = await vscode.window.showQuickPick(choices, {
+      title: `Studio Web — ${path.basename(projectDir)}`,
+      placeHolder: 'Open/create Local Workspace (recommended) or legacy .uip export'
+    });
+    if (!picked) {
+      return;
+    }
+
+    if (picked.id === 'legacy') {
+      const result = await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: `Exporting .uip for ${path.basename(projectDir)}…`
+        },
+        async () => connectToStudioWeb(projectDir, { legacyUip: true })
+      );
+      const uip = result.archives?.uipPath;
+      const next = await vscode.window.showInformationMessage(
+        uip ? `Exported ${path.basename(uip)}` : 'Exported Studio Web package',
+        'Reveal .uip',
+        'Open Studio Web',
+        'Open Folder'
+      );
+      if (next === 'Reveal .uip' && uip) {
+        await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(uip));
       }
-    } catch {
-      // packaging can still proceed if validation cannot run
+      if (next === 'Open Studio Web') {
+        await vscode.env.openExternal(vscode.Uri.parse(STUDIO_WEB_URL));
+      }
+      if (next === 'Open Folder') {
+        await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(result.targetDir));
+      }
+      return;
+    }
+
+    let connectOptions: Parameters<typeof connectToStudioWeb>[1];
+    if (picked.id === 'sync') {
+      connectOptions = undefined; // uses existing link
+    } else if (picked.id === 'create') {
+      const parent = await vscode.window.showOpenDialog({
+        canSelectFiles: false,
+        canSelectFolders: true,
+        canSelectMany: false,
+        openLabel: 'Create solution here',
+        title: 'Parent folder for the new Studio Web Local Workspace solution'
+      });
+      if (!parent?.[0]) {
+        return;
+      }
+      connectOptions = {
+        local: {
+          mode: 'create',
+          targetDir: parent[0].fsPath,
+          solutionName: path.basename(projectDir)
+        }
+      };
+    } else {
+      const folder = await vscode.window.showOpenDialog({
+        canSelectFiles: false,
+        canSelectFolders: true,
+        canSelectMany: false,
+        openLabel: 'Use this solution',
+        title: 'Select an existing Studio Web Local Workspace solution folder (.uipx)'
+      });
+      if (!folder?.[0]) {
+        return;
+      }
+      connectOptions = {
+        local: {
+          mode: 'open',
+          targetDir: folder[0].fsPath
+        }
+      };
     }
 
     const result = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: `Exporting .uip for ${path.basename(projectDir)}…`
+        title: `Linking Studio Web Local Workspace for ${path.basename(projectDir)}…`
       },
-      async () => connectToStudioWeb(projectDir)
-    );
-    await extensionContext.workspaceState.update(
-      'lowcodeStudio.lastStudioWebExport',
-      result.targetDir
+      async () => connectToStudioWeb(projectDir, connectOptions)
     );
 
-    let exportTodoPath = '';
+    await extensionContext.workspaceState.update(
+      'lowcodeStudio.lastStudioWebExport',
+      result.local?.link.solutionDir || result.targetDir
+    );
+
     try {
       const todo = buildWindowsTodoChecklist(projectDir);
-      windowsTodoReport = formatWindowsTodoReport(todo);
-      exportTodoPath = writeWindowsTodoFile(result.targetDir, todo);
+      writeWindowsTodoFile(result.local?.link.solutionDir || result.targetDir, todo);
       writeWindowsTodoFile(projectDir, todo);
     } catch {
       // ignore
     }
 
+    const solutionDir = result.local?.link.solutionDir || result.targetDir;
     const channel = getOutput();
     channel.clear();
-    channel.appendLine('Connect to Studio Web');
+    channel.appendLine('Studio Web Local Workspace');
     channel.appendLine('─'.repeat(48));
-    channel.appendLine(`Project: ${projectDir}`);
-    channel.appendLine(`Export: ${result.targetDir}`);
-    channel.appendLine(`Package (.uip): ${result.archives.uipPath}`);
-    channel.appendLine(`Main:   ${result.mainXaml}`);
+    channel.appendLine(`LCS project: ${projectDir}`);
+    channel.appendLine(`Solution:    ${solutionDir}`);
+    channel.appendLine(`Project dir: ${result.targetDir}`);
+    channel.appendLine(`Main:        ${result.mainXaml}`);
     channel.appendLine('');
-    if (windowsTodoReport) {
-      channel.appendLine(windowsTodoReport);
-      channel.appendLine('');
-    }
-    if (packageReport) {
-      channel.appendLine(packageReport);
-      channel.appendLine('');
-    }
     channel.appendLine('Checklist:');
     result.checklist.forEach((c, i) => channel.appendLine(`  ${i + 1}. ${c}`));
     channel.show(true);
 
-    // Persist warnings next to export for handoff review
-    if (packageReport) {
-      try {
-        fs.writeFileSync(
-          path.join(result.targetDir, 'PACKAGE_WARNINGS.md'),
-          `# Package validation\n\n\`\`\`\n${packageReport}\n\`\`\`\n`,
-          'utf8'
-        );
-      } catch {
-        // ignore
-      }
-    }
-
     const next = await vscode.window.showInformationMessage(
-      `Ready for Studio Web → ${path.basename(result.archives.uipPath)}`,
-      'Reveal .uip',
+      `Linked Local Workspace → ${path.basename(solutionDir)}. Save syncs automatically.`,
+      'Reveal Solution',
       'Open Studio Web',
-      'Open Folder',
-      'Open Windows TODO',
       'Open Checklist',
       'Show Guide'
     );
-    if (next === 'Reveal .uip') {
-      await vscode.commands.executeCommand(
-        'revealFileInOS',
-        vscode.Uri.file(result.archives.uipPath)
-      );
+    if (next === 'Reveal Solution') {
+      await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(solutionDir));
     }
     if (next === 'Open Studio Web') {
       await vscode.env.openExternal(vscode.Uri.parse(STUDIO_WEB_URL));
     }
-    if (next === 'Open Folder') {
-      await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(result.targetDir));
-    }
-    if (next === 'Open Windows TODO') {
-      const todoFile =
-        exportTodoPath && fs.existsSync(exportTodoPath)
-          ? exportTodoPath
-          : windowsTodoPath && fs.existsSync(windowsTodoPath)
-            ? windowsTodoPath
-            : path.join(result.targetDir, 'WINDOWS_TODO.md');
-      if (fs.existsSync(todoFile)) {
-        const doc = await vscode.workspace.openTextDocument(todoFile);
-        await vscode.window.showTextDocument(doc);
-      } else {
-        vscode.window.showWarningMessage('WINDOWS_TODO.md was not generated for this export.');
-      }
-    }
-    if (next === 'Open Checklist') {
+    if (next === 'Open Checklist' && fs.existsSync(result.guidePath)) {
       const doc = await vscode.workspace.openTextDocument(result.guidePath);
       await vscode.window.showTextDocument(doc);
     }

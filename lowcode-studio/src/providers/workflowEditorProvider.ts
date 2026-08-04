@@ -26,7 +26,7 @@ import {
 } from '../interop/activityPalette';
 import { buildPropertySuggestions } from '../interop/propertySuggestions';
 import {
-  buildDesignerProjectTree,
+  buildCurrentProjectTree,
   findProjectRoot
 } from '../interop/projectResolve';
 
@@ -56,9 +56,10 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
   }
 
   private buildProjectTree() {
-    const roots = (vscode.workspace.workspaceFolders || []).map((f) => f.uri.fsPath);
     const active = this.context.workspaceState.get<string>('lowcodeStudio.activeProjectDir');
-    return buildDesignerProjectTree(roots, active);
+    const docPath = this.activeDocument?.uri.fsPath;
+    const fromDoc = docPath ? findProjectRoot(path.dirname(docPath)) : undefined;
+    return buildCurrentProjectTree(fromDoc || active);
   }
 
   get activeWorkflow(): WorkflowDocument | undefined {

@@ -2,19 +2,81 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { exportToStudioWebProject, ExportedStudioWebProject } from './studioProject';
 import { packageStudioWebArchives, PackagedStudioArchives } from './studioPackage';
+import {
+  getStudioWebLocalLink,
+  linkStudioWebLocalWorkspace,
+  studioWebLocalGuideMarkdown,
+  STUDIO_WEB_LOCAL_URL,
+  syncToStudioWebLocal,
+  StudioWebLocalSyncResult
+} from './studioWebLocal';
 
-export const STUDIO_WEB_URL = 'https://studio.uipath.com';
+export const STUDIO_WEB_URL = STUDIO_WEB_LOCAL_URL;
 
 export interface StudioWebConnectResult extends ExportedStudioWebProject {
   guidePath: string;
   checklist: string[];
-  archives: PackagedStudioArchives;
+  archives?: PackagedStudioArchives;
+  local?: StudioWebLocalSyncResult;
+  mode: 'local-workspace' | 'uip-package';
 }
 
+export type LinkLocalMode = 'create' | 'open' | 'sync';
+
 /**
- * Export for Studio Web, package `.uip` only, and write an import checklist.
+ * Preferred path: open/create a Studio Web Local Workspace solution and sync into it.
+ * Optional legacy path still packages `.uip` when `legacyUip` is true.
  */
 export function connectToStudioWeb(
+  lcsProjectDir: string,
+  options?: {
+    destinationParent?: string;
+    legacyUip?: boolean;
+    local?: {
+      mode: 'create' | 'open';
+      targetDir: string;
+      solutionName?: string;
+    };
+  }
+): StudioWebConnectResult {
+  if (options?.legacyUip) {
+    return connectLegacyUip(lcsProjectDir, options.destinationParent);
+  }
+
+  const existing = getStudioWebLocalLink(lcsProjectDir);
+  let local: StudioWebLocalSyncResult;
+  if (options?.local) {
+    local = linkStudioWebLocalWorkspace(lcsProjectDir, options.local);
+  } else if (existing) {
+    local = syncToStudioWebLocal(lcsProjectDir);
+  } else {
+    throw new Error(
+      'No Studio Web Local Workspace linked. Choose Create or Open when connecting.'
+    );
+  }
+
+  const guidePath = path.join(local.link.solutionDir, 'OPEN_IN_STUDIO_WEB_LOCAL.md');
+  const checklist = [
+    'Open Studio Web → Local Workspace',
+    `Open solution folder: ${local.link.solutionDir}`,
+    'Allow the browser to edit files when prompted',
+    'Save workflows in LowCode Studio — they sync into this folder automatically',
+    'Publish from Studio Web when ready'
+  ];
+
+  return {
+    targetDir: local.targetDir,
+    mainXaml: local.mainXaml,
+    files: local.files,
+    dependencies: local.dependencies,
+    guidePath,
+    checklist,
+    local,
+    mode: 'local-workspace'
+  };
+}
+
+function connectLegacyUip(
   lcsProjectDir: string,
   destinationParent?: string
 ): StudioWebConnectResult {
@@ -39,99 +101,36 @@ export function connectToStudioWeb(
     guidePath,
     `# Open in UiPath Studio Web
 
-Exported from **LowCode Studio** as an importable \`.uip\` package.
+Legacy \`.uip\` package export from LowCode Studio.
 
-## Fastest path — import \`.uip\`
+Prefer **Connect / Open Studio Web Local Workspace** (sync-on-save) instead of importing \`.uip\` each time.
+
+## Import \`.uip\`
 
 1. Go to [${STUDIO_WEB_URL}](${STUDIO_WEB_URL})
-2. Automations → arrow next to **New project** → **Import project**
-3. Choose **\`${path.basename(archives.uipPath)}\`** (next to the \`.StudioWeb\` folder)
-4. Let packages restore, open \`${exported.mainXaml}\`, publish when ready
-
-## Folder export (Git)
-
-\`${path.basename(exported.targetDir)}\` remains available for Git-linked Studio Web tenants.
+2. Automations → **Import project** → \`${path.basename(archives.uipPath)}\`
 
 ## Checklist
 
 ${checklist.map((c, i) => `${i + 1}. ${c}`).join('\n')}
 
-## Packages included
+## Packages
 
 ${depLines || '_No dependencies listed_'}
-
-## Files produced
-
-| File | Use |
-|---|---|
-| \`${path.basename(archives.uipPath)}\` | Studio Web **Import project** (Windows-compatible) |
-| \`${path.basename(exported.targetDir)}/\` | Unpacked **Windows** UiPath project (Git / Studio Desktop) |
-
-> Projects export with \`targetFramework: Windows\` and classic Windows UI selectors so they run on **Windows robots**. Refine selectors with UI Explorer on a Windows machine.
-
-Publish remains in **Studio Web** / Studio Desktop by design.
 `,
     'utf8'
   );
-
-  const readmePath = path.join(exported.targetDir, 'README_STUDIO_WEB.md');
-  if (fs.existsSync(readmePath)) {
-    fs.appendFileSync(
-      readmePath,
-      `\n## Import package\n\n- \`.uip\`: \`${archives.uipPath}\`\n`,
-      'utf8'
-    );
-  }
 
   return {
     ...exported,
     guidePath,
     checklist,
     archives,
-    files: [
-      ...exported.files,
-      'OPEN_IN_STUDIO_WEB.md',
-      path.basename(archives.uipPath)
-    ]
+    mode: 'uip-package',
+    files: [...exported.files, 'OPEN_IN_STUDIO_WEB.md', path.basename(archives.uipPath)]
   };
 }
 
 export function studioWebSyncGuideMarkdown(): string {
-  return `# Connect LowCode Studio ↔ UiPath Studio Web
-
-LowCode Studio is optimized for **Mac design + dry-run**. Exports target **Windows** so automations run on **Windows robots**.
-
-## Recommended loop
-
-\`\`\`
-Design on Mac (LowCode Studio)
-   → Dry Run / Scenarios (F5 / Shift+F5)
-   → Connect to Studio Web (exports Windows .uip)
-   → Import .uip / open in Studio Desktop (Windows)
-   → Refine selectors with UI Explorer on Windows
-   → Publish → run on Windows robot
-\`\`\`
-
-## One-command handoff
-
-1. Open your LowCode Studio project
-2. Run **LowCode Studio: Connect to Studio Web**
-3. Prefer **Reveal .uip** then **Open Studio Web**
-4. In Studio Web: **Import project** → select the \`.uip\` file (or open the folder in Studio Desktop)
-
-| Package | Use |
-|---|---|
-| **\`.uip\`** | Studio Web Automations → Import project |
-| **\`.StudioWeb/\` folder** | Windows project for Git / Studio Desktop |
-
-## Tips
-
-- Prefer activities mapped to real UiPath packages (see ACTIVITIES.md)
-- UI selectors are **Windows classic** (\`<html>/<webctrl>\`, \`<wnd>\`) — capture/refine on Windows
-- Review Comment / \`Imported.*\` placeholders after import
-- Keep scenario dry-runs in LowCode Studio
-- Publish stays in Studio Web / Studio Desktop (by design)
-
-> Not an official UiPath product.
-`;
+  return studioWebLocalGuideMarkdown();
 }

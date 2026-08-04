@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Mac-first low-code RPA for VS Code/Cursor: REFramework design, scenario dry-runs (Shift+F5), and the easiest Connect to Studio Web handoff for Orchestrator publish.",
-  "version": "0.6.10",
+  "version": "0.6.11",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -201,9 +201,9 @@
       },
       {
         "command": "lowcodeStudio.connectStudioWeb",
-        "title": "Connect to Studio Web \u2014 export Windows .uip for publish",
+        "title": "Connect / Open Studio Web Local Workspace (sync on Save)",
         "icon": "$(cloud-upload)",
-        "shortTitle": "Export .uip",
+        "shortTitle": "Studio Web",
         "category": "LowCode Studio"
       },
       {
@@ -269,7 +269,7 @@
           "command": "lowcodeStudio.connectStudioWeb",
           "when": "view == lowcodeStudio.projects",
           "group": "navigation@3",
-          "tooltip": "Export .uip for the selected / active project"
+          "tooltip": "Open/create Studio Web Local Workspace — Save syncs .xaml"
         },
         {
           "command": "lowcodeStudio.validatePackages",
@@ -490,6 +490,11 @@
           "type": "boolean",
           "default": true,
           "description": "Show step numbers on the designer canvas."
+        },
+        "lowcodeStudio.syncStudioWebOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "When a project is linked to a Studio Web Local Workspace, sync .xaml / project.json into that folder on every Save."
         }
       }
     }
@@ -502,7 +507,7 @@
     "package": "npm run bundle && vsce package --no-dependencies",
     "lint": "tsc --noEmit",
     "docs:activities": "npm run compile && node scripts/generate-activities-md.js",
-    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && node out/test/windowsTarget.test.js && node out/test/extractTableData.test.js && node out/test/selectorBuilder.test.js && node out/test/windowsTodo.test.js && node out/test/strongDryRun.test.js && node out/test/blueprints.test.js && node out/test/activityPaletteSmartProps.test.js && node out/test/inputMethod.test.js && node out/test/projectResolve.test.js && npm run docs:activities"
+    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && node out/test/windowsTarget.test.js && node out/test/extractTableData.test.js && node out/test/selectorBuilder.test.js && node out/test/windowsTodo.test.js && node out/test/strongDryRun.test.js && node out/test/blueprints.test.js && node out/test/activityPaletteSmartProps.test.js && node out/test/inputMethod.test.js && node out/test/projectResolve.test.js && node out/test/studioWebLocal.test.js && npm run docs:activities"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
