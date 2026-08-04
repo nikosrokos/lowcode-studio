@@ -12,7 +12,12 @@ import {
   stringifyWorkflow,
   WorkflowDocument
 } from './models/workflow';
-import { dryRunWorkflow, toPseudocode, validateWorkflow } from './commands/simulator';
+import {
+  dryRunWorkflow,
+  formatDryRunReport,
+  toPseudocode,
+  validateWorkflow
+} from './commands/simulator';
 import {
   createQuickScenario,
   duplicateScenario,
@@ -168,22 +173,46 @@ export function activate(context: vscode.ExtensionContext): void {
       if (!doc) {
         return;
       }
+      const mode = await vscode.window.showQuickPick(
+        [
+          {
+            label: 'Run All',
+            description: 'Full dry-run with step diffs in Output',
+            mode: 'all' as const
+          },
+          {
+            label: 'Step Through',
+            description: 'Highlight each activity in the designer',
+            mode: 'step' as const
+          }
+        ],
+        { placeHolder: 'Dry Run mode' }
+      );
+      if (!mode) {
+        return;
+      }
       const result = dryRunWorkflow(doc);
       const channel = getOutput();
       channel.clear();
-      channel.appendLine(`Dry Run — ${doc.name}`);
-      channel.appendLine('─'.repeat(48));
+      channel.appendLine(formatDryRunReport(result, `Dry Run — ${doc.name}`));
+      channel.appendLine('');
+      channel.appendLine('Log:');
       for (const line of result.log) {
         channel.appendLine(line);
       }
-      channel.appendLine('─'.repeat(48));
-      channel.appendLine(JSON.stringify(result.variables, null, 2));
       channel.show(true);
-      vscode.window.showInformationMessage(
-        result.ok
-          ? `Dry run completed (${result.steps.length} steps).`
-          : 'Dry run finished with errors.'
-      );
+      if (mode.mode === 'step') {
+        editorProvider.playDryRun(result);
+        vscode.window.showInformationMessage(
+          `Step-through ready (${result.steps.length} steps). Use Step / Continue in the designer.`
+        );
+      } else {
+        vscode.window.showInformationMessage(
+          result.ok
+            ? `Dry run completed (${result.steps.length} steps${result.warnings.length ? `, ${result.warnings.length} warning(s)` : ''}).`
+            : 'Dry run finished with errors.'
+        );
+      }
     }),
     vscode.commands.registerCommand('lowcodeStudio.dryRunScenario', () =>
       dryRunScenarioCommand()

@@ -1,6 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { dryRunWorkflow, DryRunResult } from './simulator';
+import {
+  dryRunWorkflow,
+  DryRunFixtures,
+  DryRunResult,
+  formatVariableDiff
+} from './simulator';
 import { parseWorkflow, WorkflowDocument } from '../models/workflow';
 import { loadProjectConfig } from '../interop/configBridge';
 
@@ -21,6 +26,8 @@ export interface DryRunScenario {
   configOverrides?: Record<string, unknown>;
   /** Initial workflow variables (merged over defaults + Config) */
   variables?: Record<string, unknown>;
+  /** Mock UI / HTTP / table responses for Mac dry-run */
+  fixtures?: DryRunFixtures;
   expect?: ScenarioExpect;
 }
 
@@ -270,7 +277,10 @@ export function runScenario(
   // Ensure Config object stays consistent with overrides
   initialVariables.Config = config;
 
-  const dryRun = dryRunWorkflow(doc, { initialVariables });
+  const dryRun = dryRunWorkflow(doc, {
+    initialVariables,
+    fixtures: scenario.fixtures
+  });
   const assertions = evaluateExpect(scenario.expect, dryRun);
   const passed = assertions.every((a) => a.ok);
 
@@ -344,7 +354,24 @@ function looseEqual(a: unknown, b: unknown): boolean {
   if (a == null && b == null) {
     return true;
   }
+  if (isDataTable(a) && isDataTable(b)) {
+    return (
+      JSON.stringify(a.columns || []) === JSON.stringify(b.columns || []) &&
+      JSON.stringify(a.rows || []) === JSON.stringify(b.rows || [])
+    );
+  }
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function isDataTable(
+  value: unknown
+): value is { columns?: string[]; rows?: unknown[][] } {
+  return Boolean(
+    value &&
+      typeof value === 'object' &&
+      (Array.isArray((value as { columns?: unknown }).columns) ||
+        Array.isArray((value as { rows?: unknown }).rows))
+  );
 }
 
 export function formatScenarioReport(results: ScenarioRunResult[]): string {
@@ -354,10 +381,28 @@ export function formatScenarioReport(results: ScenarioRunResult[]): string {
     if (r.scenario.description) {
       lines.push(`  ${r.scenario.description}`);
     }
+    if (r.scenario.fixtures) {
+      lines.push('  fixtures: UI/HTTP/tables mocks active');
+    }
     for (const a of r.assertions) {
       lines.push(`  ${a.ok ? '✓' : '✗'} ${a.message}`);
     }
-    lines.push(`  steps=${r.dryRun.steps.length} ok=${r.dryRun.ok}`);
+    if (!r.passed && r.scenario.expect?.variables) {
+      const diff = formatVariableDiff(r.scenario.expect.variables, r.dryRun.variables);
+      for (const line of diff.split('\n')) {
+        lines.push(`  ${line}`);
+      }
+    }
+    if (r.dryRun.warnings?.length) {
+      lines.push(`  warnings=${r.dryRun.warnings.length}`);
+      for (const w of r.dryRun.warnings.slice(0, 5)) {
+        lines.push(`  ! ${w}`);
+      }
+    }
+    const changed = r.dryRun.steps.filter((s) => s.changedKeys?.length).length;
+    lines.push(
+      `  steps=${r.dryRun.steps.length} ok=${r.dryRun.ok} varChanges=${changed}`
+    );
     lines.push('');
   }
   const passed = results.filter((r) => r.passed).length;

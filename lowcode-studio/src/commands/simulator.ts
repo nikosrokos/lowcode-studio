@@ -18,7 +18,22 @@ export interface DryRunStep {
   displayName: string;
   type: string;
   action: string;
-  status: 'ok' | 'skipped' | 'error';
+  status: 'ok' | 'skipped' | 'error' | 'warn';
+  /** Full variable snapshot after this step */
+  variablesSnapshot?: Record<string, unknown>;
+  /** Keys that changed vs the previous step */
+  changedKeys?: string[];
+}
+
+export interface DryRunFixtures {
+  /** GetText / GetAttribute values by activity id, result var, or selector */
+  uiText?: Record<string, string>;
+  /** ElementExists outcomes by activity id, result var, or selector */
+  elementExists?: Record<string, boolean>;
+  /** Table fixtures for ExtractTableData / ReadCsv by activity id or result var */
+  tables?: Record<string, { columns: string[]; rows: unknown[][] }>;
+  /** HTTP response fixtures by activity id, result var, or URL fragment */
+  http?: Record<string, { status?: number; body?: unknown }>;
 }
 
 export interface DryRunResult {
@@ -26,11 +41,16 @@ export interface DryRunResult {
   steps: DryRunStep[];
   variables: Record<string, unknown>;
   log: string[];
+  warnings: string[];
 }
 
 export interface DryRunOptions {
   /** Seed / override variables before execution (Config, MaxTransactions, …) */
   initialVariables?: Record<string, unknown>;
+  /** Mock UI / HTTP / table responses for stronger Mac dry-runs */
+  fixtures?: DryRunFixtures;
+  /** Capture per-step variable snapshots (default true) */
+  captureSnapshots?: boolean;
 }
 
 export function validateWorkflow(doc: WorkflowDocument): ValidationIssue[] {
@@ -129,25 +149,43 @@ export function dryRunWorkflow(
     Object.assign(variables, options.initialVariables);
   }
 
+  const fixtures = options.fixtures || {};
+  const captureSnapshots = options.captureSnapshots !== false;
   const steps: DryRunStep[] = [];
+  const warnings: string[] = [];
   const log: string[] = [`Starting dry-run for "${doc.name}" (${doc.type})`];
   if (options.initialVariables && Object.keys(options.initialVariables).length) {
     log.push(
       `Seeded variables: ${Object.keys(options.initialVariables).sort().join(', ')}`
     );
   }
+  if (hasFixtures(fixtures)) {
+    log.push('Using dry-run fixtures (UI / HTTP / tables).');
+  }
   let index = 1;
   let ok = true;
+  let previousSnapshot = captureSnapshots ? cloneVars(variables) : undefined;
 
-  const pushStep = (activity: ActivityNode, action: string, status: DryRunStep['status'] = 'ok') => {
-    steps.push({
+  const pushStep = (
+    activity: ActivityNode,
+    action: string,
+    status: DryRunStep['status'] = 'ok'
+  ) => {
+    const step: DryRunStep = {
       index: index++,
       activityId: activity.id,
       displayName: activity.displayName,
       type: activity.type,
       action,
       status
-    });
+    };
+    if (captureSnapshots) {
+      const snap = cloneVars(variables);
+      step.variablesSnapshot = snap;
+      step.changedKeys = diffVariableKeys(previousSnapshot || {}, snap);
+      previousSnapshot = snap;
+    }
+    steps.push(step);
   };
 
   const runList = (list: ActivityNode[], depth = 0) => {
@@ -155,9 +193,15 @@ export function dryRunWorkflow(
       const indent = '  '.repeat(depth);
       const summary = summarize(activity, variables);
       try {
-        executeStub(activity, variables, log, indent);
-        pushStep(activity, summary);
-        runChildren(activity, depth, runList, log, variables);
+        const warn = executeStub(activity, variables, log, indent, fixtures);
+        if (warn) {
+          warnings.push(warn);
+          log.push(`${indent}WARN: ${warn}`);
+          pushStep(activity, summary, 'warn');
+        } else {
+          pushStep(activity, summary);
+        }
+        runChildren(activity, depth, runList, log, variables, fixtures, warnings);
       } catch (err) {
         ok = false;
         const message = err instanceof Error ? err.message : String(err);
@@ -168,13 +212,66 @@ export function dryRunWorkflow(
   };
 
   if (doc.type === 'Flowchart') {
-    ok = runFlowchart(doc, variables, log, pushStep) && ok;
+    ok = runFlowchart(doc, variables, log, pushStep, fixtures, warnings) && ok;
   } else {
     runList(doc.activities);
   }
 
   log.push(ok ? 'Dry-run completed successfully.' : 'Dry-run completed with errors.');
-  return { ok, steps, variables, log };
+  if (warnings.length) {
+    log.push(`${warnings.length} warning(s) during dry-run.`);
+  }
+  return { ok, steps, variables, log, warnings };
+}
+
+/** Human-readable dry-run report with per-step variable diffs. */
+export function formatDryRunReport(result: DryRunResult, title = 'Dry Run'): string {
+  const lines: string[] = [title, '─'.repeat(48)];
+  for (const step of result.steps) {
+    const mark =
+      step.status === 'error' ? '✗' : step.status === 'warn' ? '!' : step.status === 'skipped' ? '·' : '✓';
+    lines.push(`[${step.index}] ${mark} ${step.displayName} — ${step.action}`);
+    if (step.changedKeys?.length && step.variablesSnapshot) {
+      for (const key of step.changedKeys) {
+        lines.push(`     Δ ${key} = ${JSON.stringify(step.variablesSnapshot[key])}`);
+      }
+    }
+  }
+  lines.push('─'.repeat(48));
+  if (result.warnings.length) {
+    lines.push('Warnings:');
+    for (const w of result.warnings) {
+      lines.push(`  ! ${w}`);
+    }
+    lines.push('');
+  }
+  lines.push('Variables snapshot:');
+  lines.push(JSON.stringify(result.variables, null, 2));
+  lines.push(result.ok ? 'Result: OK' : 'Result: ERRORS');
+  return lines.join('\n');
+}
+
+/** Side-by-side expected vs actual for scenario assertions. */
+export function formatVariableDiff(
+  expected: Record<string, unknown>,
+  actual: Record<string, unknown>
+): string {
+  const keys = [...new Set([...Object.keys(expected), ...Object.keys(actual)])].sort();
+  const lines = ['Expected vs actual', '─'.repeat(48)];
+  lines.push('Variable'.padEnd(22) + 'Expected'.padEnd(28) + 'Actual');
+  for (const key of keys) {
+    const exp = key in expected ? JSON.stringify(expected[key]) : '—';
+    const act = key in actual ? JSON.stringify(actual[key]) : '—';
+    const match = looseJsonEqual(expected[key], actual[key]);
+    const mark = match ? '✓' : '✗';
+    lines.push(
+      `${mark} ${key}`.padEnd(22) + truncate(exp, 26).padEnd(28) + truncate(act, 40)
+    );
+    if (!match && isDataTableLike(expected[key]) && isDataTableLike(actual[key])) {
+      lines.push(...formatDataTableSideBySide(expected[key] as DataTableLike, actual[key] as DataTableLike));
+    }
+  }
+  return lines.join('\n');
 }
 
 function runChildren(
@@ -182,7 +279,9 @@ function runChildren(
   depth: number,
   runList: (list: ActivityNode[], depth?: number) => void,
   log: string[],
-  variables: Record<string, unknown>
+  variables: Record<string, unknown>,
+  fixtures: DryRunFixtures,
+  warnings: string[]
 ) {
   if (!activity.children?.length) {
     return;
@@ -249,13 +348,17 @@ function runChildren(
   } else {
     runList(activity.children, depth + 1);
   }
+  void fixtures;
+  void warnings;
 }
 
 function runFlowchart(
   doc: WorkflowDocument,
   variables: Record<string, unknown>,
   log: string[],
-  pushStep: (activity: ActivityNode, action: string, status?: DryRunStep['status']) => void
+  pushStep: (activity: ActivityNode, action: string, status?: DryRunStep['status']) => void,
+  fixtures: DryRunFixtures,
+  warnings: string[]
 ): boolean {
   const byId = new Map(doc.activities.map((a) => [a.id, a]));
   const outs = new Map<string, { to: string; label?: string }[]>();
@@ -295,8 +398,14 @@ function runFlowchart(
     }
 
     try {
-      executeStub(activity, variables, log, '');
-      pushStep(activity, summarize(activity, variables));
+      const warn = executeStub(activity, variables, log, '', fixtures);
+      if (warn) {
+        warnings.push(warn);
+        log.push(`WARN: ${warn}`);
+        pushStep(activity, summarize(activity, variables), 'warn');
+      } else {
+        pushStep(activity, summarize(activity, variables));
+      }
     } catch (err) {
       ok = false;
       const message = err instanceof Error ? err.message : String(err);
@@ -513,8 +622,15 @@ function executeStub(
   activity: ActivityNode,
   variables: Record<string, unknown>,
   log: string[],
-  indent: string
-) {
+  indent: string,
+  fixtures: DryRunFixtures = {}
+): string | undefined {
+  let warning: string | undefined;
+  const selector = String(activity.properties?.selector ?? '').trim();
+  if (needsSelector(activity.type) && !selector) {
+    warning = `${activity.displayName}: selector is empty (capture on Windows or use Selector Builder)`;
+  }
+
   switch (activity.type) {
     case 'System.LogMessage': {
       const msg = resolveExpression(String(activity.properties.message ?? ''), variables);
@@ -729,9 +845,11 @@ function executeStub(
       break;
     case 'UI.GetAttribute': {
       const result = String(activity.properties.result || 'attributeValue');
-      variables[result] = `sample-${activity.properties.attribute || 'aaname'}`;
+      const attr = String(activity.properties.attribute || 'aaname');
+      const fromFixture = lookupFixtureString(fixtures.uiText, activity, result, selector);
+      variables[result] = fromFixture ?? `sample-${attr}`;
       log.push(
-        `${indent}GetAttribute ${activity.properties.attribute} -> ${result}`
+        `${indent}GetAttribute ${attr} -> ${result}${fromFixture !== undefined ? ' (fixture)' : ''}`
       );
       break;
     }
@@ -777,12 +895,26 @@ function executeStub(
       break;
     case 'UI.GetText': {
       const result = String(activity.properties.result || 'extractedText');
-      variables[result] = 'Sample extracted text';
-      log.push(`${indent}GetText -> ${result}`);
+      const fromFixture = lookupFixtureString(fixtures.uiText, activity, result, selector);
+      variables[result] = fromFixture ?? 'Sample extracted text';
+      log.push(
+        `${indent}GetText -> ${result}=${JSON.stringify(variables[result])}${fromFixture !== undefined ? ' (fixture)' : ''}`
+      );
       break;
     }
     case 'UI.ExtractTableData': {
       const result = String(activity.properties.result || 'extractedTable');
+      const tableFixture = lookupFixtureTable(fixtures.tables, activity, result);
+      if (tableFixture) {
+        variables[result] = {
+          ...tableFixture,
+          smartExtraction: activity.properties.smartExtraction !== false
+        };
+        log.push(
+          `${indent}ExtractTableData fixture cols=${tableFixture.columns.length} rows=${tableFixture.rows.length} -> ${result}`
+        );
+        break;
+      }
       let columns = ['Column1', 'Column2'];
       try {
         const meta = JSON.parse(String(activity.properties.extractionMetadata || '{}')) as {
@@ -810,8 +942,11 @@ function executeStub(
     }
     case 'UI.ElementExists': {
       const result = String(activity.properties.result || 'exists');
-      variables[result] = true;
-      log.push(`${indent}ElementExists -> ${result}=true`);
+      const fromFixture = lookupFixtureBool(fixtures.elementExists, activity, result, selector);
+      variables[result] = fromFixture ?? true;
+      log.push(
+        `${indent}ElementExists -> ${result}=${variables[result]}${fromFixture !== undefined ? ' (fixture)' : ''}`
+      );
       break;
     }
     case 'Data.ReadCsv': {
@@ -846,9 +981,11 @@ function executeStub(
       break;
     case 'Messaging.HttpRequest': {
       const result = String(activity.properties.result || 'response');
-      variables[result] = { status: 200, body: { ok: true } };
+      const url = String(activity.properties.url || '');
+      const fromFixture = lookupFixtureHttp(fixtures.http, activity, result, url);
+      variables[result] = fromFixture || { status: 200, body: { ok: true } };
       log.push(
-        `${indent}HTTP ${activity.properties.method} ${activity.properties.url} -> ${result}`
+        `${indent}HTTP ${activity.properties.method} ${url} -> ${result}${fromFixture ? ' (fixture)' : ''}`
       );
       break;
     }
@@ -914,6 +1051,7 @@ function executeStub(
       }
     }
   }
+  return warning;
 }
 
 function resolveExpression(expr: string, variables: Record<string, unknown>): unknown {
@@ -1021,4 +1159,182 @@ function asArray(value: unknown): unknown[] {
     return (value as { rows: unknown[] }).rows;
   }
   return [value];
+}
+
+type DataTableLike = { columns?: string[]; rows?: unknown[][] };
+
+function hasFixtures(fixtures: DryRunFixtures): boolean {
+  return Boolean(
+    (fixtures.uiText && Object.keys(fixtures.uiText).length) ||
+      (fixtures.elementExists && Object.keys(fixtures.elementExists).length) ||
+      (fixtures.tables && Object.keys(fixtures.tables).length) ||
+      (fixtures.http && Object.keys(fixtures.http).length)
+  );
+}
+
+function cloneVars(variables: Record<string, unknown>): Record<string, unknown> {
+  try {
+    return JSON.parse(JSON.stringify(variables)) as Record<string, unknown>;
+  } catch {
+    return { ...variables };
+  }
+}
+
+function diffVariableKeys(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>
+): string[] {
+  const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort();
+  return keys.filter((k) => !looseJsonEqual(before[k], after[k]));
+}
+
+function looseJsonEqual(a: unknown, b: unknown): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (a == null && b == null) {
+    return true;
+  }
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return String(a) === String(b);
+  }
+}
+
+function truncate(text: string, max: number): string {
+  return text.length <= max ? text : text.slice(0, max - 1) + '…';
+}
+
+function isDataTableLike(value: unknown): value is DataTableLike {
+  return Boolean(
+    value &&
+      typeof value === 'object' &&
+      Array.isArray((value as DataTableLike).columns) &&
+      Array.isArray((value as DataTableLike).rows)
+  );
+}
+
+function formatDataTableSideBySide(expected: DataTableLike, actual: DataTableLike): string[] {
+  const lines = ['     DataTable side-by-side:'];
+  lines.push(
+    `     expected columns: ${(expected.columns || []).join(', ') || '(none)'}`
+  );
+  lines.push(`     actual   columns: ${(actual.columns || []).join(', ') || '(none)'}`);
+  const maxRows = Math.max(expected.rows?.length || 0, actual.rows?.length || 0, 0);
+  for (let i = 0; i < Math.min(maxRows, 5); i++) {
+    const expRow = expected.rows?.[i];
+    const actRow = actual.rows?.[i];
+    lines.push(
+      `     row ${i + 1}: exp=${JSON.stringify(expRow ?? '—')} | act=${JSON.stringify(actRow ?? '—')}`
+    );
+  }
+  if (maxRows > 5) {
+    lines.push(`     … ${maxRows - 5} more row(s)`);
+  }
+  return lines;
+}
+
+function needsSelector(type: string): boolean {
+  return (
+    type === 'UI.Click' ||
+    type === 'UI.TypeInto' ||
+    type === 'UI.GetText' ||
+    type === 'UI.GetAttribute' ||
+    type === 'UI.ElementExists' ||
+    type === 'UI.Check' ||
+    type === 'UI.Hover' ||
+    type === 'UI.SelectItem' ||
+    type === 'UI.WaitElement' ||
+    type === 'UI.ExtractTableData'
+  );
+}
+
+function lookupKeys(activity: ActivityNode, result?: string, extra?: string): string[] {
+  const keys = [activity.id, activity.displayName];
+  if (result) {
+    keys.push(result);
+  }
+  if (extra) {
+    keys.push(extra, extra.slice(0, 80));
+  }
+  return keys.filter(Boolean);
+}
+
+function lookupFixtureString(
+  map: Record<string, string> | undefined,
+  activity: ActivityNode,
+  result: string,
+  selector: string
+): string | undefined {
+  if (!map) {
+    return undefined;
+  }
+  for (const key of lookupKeys(activity, result, selector)) {
+    if (key in map) {
+      return map[key];
+    }
+  }
+  for (const [key, value] of Object.entries(map)) {
+    if (selector && selector.includes(key)) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function lookupFixtureBool(
+  map: Record<string, boolean> | undefined,
+  activity: ActivityNode,
+  result: string,
+  selector: string
+): boolean | undefined {
+  if (!map) {
+    return undefined;
+  }
+  for (const key of lookupKeys(activity, result, selector)) {
+    if (key in map) {
+      return map[key];
+    }
+  }
+  return undefined;
+}
+
+function lookupFixtureTable(
+  map: Record<string, { columns: string[]; rows: unknown[][] }> | undefined,
+  activity: ActivityNode,
+  result: string
+): { columns: string[]; rows: unknown[][] } | undefined {
+  if (!map) {
+    return undefined;
+  }
+  for (const key of lookupKeys(activity, result)) {
+    if (key in map) {
+      return map[key];
+    }
+  }
+  return undefined;
+}
+
+function lookupFixtureHttp(
+  map: Record<string, { status?: number; body?: unknown }> | undefined,
+  activity: ActivityNode,
+  result: string,
+  url: string
+): { status: number; body: unknown } | undefined {
+  if (!map) {
+    return undefined;
+  }
+  for (const key of lookupKeys(activity, result, url)) {
+    if (key in map) {
+      const hit = map[key];
+      return { status: hit.status ?? 200, body: hit.body ?? null };
+    }
+  }
+  for (const [key, value] of Object.entries(map)) {
+    if (url && url.includes(key)) {
+      return { status: value.status ?? 200, body: value.body ?? null };
+    }
+  }
+  return undefined;
 }
