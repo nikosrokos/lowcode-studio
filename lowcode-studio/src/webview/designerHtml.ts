@@ -377,6 +377,35 @@ export function getDesignerHtml(
       transform: translateY(8px); transition: .2s ease; z-index: 5;
     }
     .toast.show { opacity: 1; transform: translateY(0); }
+    .card.dry-run-done, .flow-node.dry-run-done {
+      outline: 1px solid color-mix(in srgb, #22c55e 55%, transparent);
+    }
+    .card.dry-run-active, .flow-node.dry-run-active {
+      outline: 2px solid #0ea5e9;
+      box-shadow: 0 0 0 3px color-mix(in srgb, #0ea5e9 28%, transparent), var(--shadow);
+      animation: pulse-step .9s ease infinite alternate;
+    }
+    .card.dry-run-warn, .flow-node.dry-run-warn { outline-color: #f59e0b; }
+    .card.dry-run-error, .flow-node.dry-run-error { outline-color: #ef4444; }
+    @keyframes pulse-step {
+      from { transform: translateY(0); }
+      to { transform: translateY(-2px); }
+    }
+    .playback-bar {
+      display: none; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin: 0 0 10px; padding: 8px 10px; border-radius: 10px;
+      border: 1px solid color-mix(in srgb, #0ea5e9 45%, var(--border));
+      background: color-mix(in srgb, #0ea5e9 12%, var(--panel));
+    }
+    .playback-bar.show { display: flex; }
+    .playback-bar .pb-label {
+      font-size: 12px; font-weight: 600; flex: 1; min-width: 160px;
+      font-family: var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .playback-bar .pb-vars {
+      width: 100%; font-size: 11px; color: var(--muted); font-family: var(--mono);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
     @keyframes rise {
       from { opacity: 0; transform: translateY(6px); }
       to { opacity: 1; transform: translateY(0); }
@@ -394,7 +423,8 @@ export function getDesignerHtml(
       <button class="btn" id="btnAutoLayout" style="display:none">Auto Layout</button>
       <button class="btn" id="btnPropsPanel" title="Show / focus properties panel" style="display:none">Properties</button>
       <button class="btn" id="btnValidate">Validate</button>
-      <button class="btn" id="btnDryRun">Dry Run</button>
+      <button class="btn" id="btnDryRun" title="Run All dry-run">Dry Run</button>
+      <button class="btn" id="btnStepThrough" title="Step through activities on the canvas">Step Through</button>
       <button class="btn primary" id="btnSave">Save</button>
     </div>
 
@@ -409,6 +439,13 @@ export function getDesignerHtml(
     </aside>
 
     <main class="canvas-wrap" id="canvasWrap">
+      <div class="playback-bar" id="playbackBar">
+        <span class="pb-label" id="playbackLabel">Step-through</span>
+        <button class="btn" id="btnPbStep" type="button">Step</button>
+        <button class="btn primary" id="btnPbContinue" type="button">Continue</button>
+        <button class="btn" id="btnPbStop" type="button">Stop</button>
+        <div class="pb-vars" id="playbackVars"></div>
+      </div>
       <div class="canvas-bar">
         <div class="canvas-help" id="canvasHelp"></div>
         <div class="zoom-tools">
@@ -494,7 +531,8 @@ export function getDesignerHtml(
       propsMode: 'docked', // docked | floating | collapsed
       propsWidth: 300,
       propsHeight: Math.round(window.innerHeight * 0.7),
-      propsFloatPos: { x: null, y: null }
+      propsFloatPos: { x: null, y: null },
+      playback: null // { steps, index, timer, doneIds }
     };
 
     const els = {
@@ -931,7 +969,8 @@ export function getDesignerHtml(
       const color = node.color || def?.color || '#64748B';
       const wrap = document.createElement('div');
       const card = document.createElement('div');
-      card.className = 'card' + (state.selectedId === node.id ? ' selected' : '');
+      card.dataset.id = node.id;
+      card.className = 'card' + (state.selectedId === node.id ? ' selected' : '') + dryRunClass(node.id);
       const openBtn = node.type === 'REFramework.InvokeWorkflow'
         ? '<button class="icon-btn" data-act="open" title="Open workflow in new tab">↗</button>'
         : '';
@@ -1072,11 +1111,13 @@ export function getDesignerHtml(
         const isDecision = node.type === 'Flowchart.FlowDecision';
         const isStart = node.type === 'Flowchart.Start';
         const isEnd = node.type === 'Flowchart.End';
+        el.dataset.id = node.id;
         el.className = 'flow-node' +
           (state.selectedId === node.id ? ' selected' : '') +
           (isDecision ? ' decision' : '') +
           (isStart ? ' start' : '') +
-          (isEnd ? ' end' : '');
+          (isEnd ? ' end' : '') +
+          dryRunClass(node.id);
         el.style.left = (node.x || 40) + 'px';
         el.style.top = (node.y || 40) + 'px';
         el.style.borderColor = node.color || def?.color || undefined;
@@ -1629,9 +1670,113 @@ export function getDesignerHtml(
     document.getElementById('btnValidate').addEventListener('click', () => {
       vscode.postMessage({ type: 'validate', workflow: state.workflow });
     });
+    function dryRunClass(id) {
+      if (!state.playback) return '';
+      const step = state.playback.steps[state.playback.index];
+      if (step && step.activityId === id) {
+        if (step.status === 'error') return ' dry-run-active dry-run-error';
+        if (step.status === 'warn') return ' dry-run-active dry-run-warn';
+        return ' dry-run-active';
+      }
+      if (state.playback.doneIds && state.playback.doneIds.has(id)) return ' dry-run-done';
+      return '';
+    }
+    function stopPlayback() {
+      if (state.playback?.timer) clearInterval(state.playback.timer);
+      state.playback = null;
+      const bar = document.getElementById('playbackBar');
+      if (bar) bar.classList.remove('show');
+      renderAll();
+    }
+    function showPlaybackStep() {
+      const pb = state.playback;
+      if (!pb) return;
+      const bar = document.getElementById('playbackBar');
+      const label = document.getElementById('playbackLabel');
+      const varsEl = document.getElementById('playbackVars');
+      if (!bar) return;
+      bar.classList.add('show');
+      pb.doneIds = new Set(pb.steps.slice(0, Math.max(0, pb.index)).map(s => s.activityId));
+      if (pb.index >= pb.steps.length) {
+        pb.doneIds = new Set(pb.steps.map(s => s.activityId));
+        if (label) label.textContent = 'Done — ' + pb.steps.length + ' steps';
+        if (varsEl) varsEl.textContent = pb.finalVars
+          ? Object.keys(pb.finalVars).slice(0, 8).map(k => k + '=' + JSON.stringify(pb.finalVars[k])).join(' · ')
+          : '';
+        if (pb.timer) { clearInterval(pb.timer); pb.timer = null; }
+        renderAll();
+        toast('Step-through complete');
+        return;
+      }
+      const step = pb.steps[pb.index];
+      state.selectedId = step.activityId;
+      if (label) {
+        label.textContent = '[' + step.index + '/' + pb.steps.length + '] ' + step.displayName + ' — ' + step.action;
+      }
+      if (varsEl) {
+        const keys = step.changedKeys || [];
+        varsEl.textContent = keys.length
+          ? ('Δ ' + keys.map(k => k + '=' + JSON.stringify((step.variablesSnapshot || {})[k])).join(' · '))
+          : 'no variable changes';
+      }
+      const varSection = document.getElementById('variablesSection');
+      if (varSection) {
+        varSection.classList.remove('collapsed');
+        const chev = varSection.querySelector('.chev');
+        if (chev) chev.textContent = '▾';
+      }
+      renderAll();
+      const el = document.querySelector('[data-id="' + step.activityId + '"]');
+      if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+    function stepPlayback() {
+      if (!state.playback) return;
+      if (state.playback.index >= state.playback.steps.length) {
+        stopPlayback();
+        return;
+      }
+      state.playback.index += 1;
+      showPlaybackStep();
+    }
+    function startPlayback(result) {
+      if (state.playback?.timer) clearInterval(state.playback.timer);
+      state.playback = {
+        steps: result.steps || [],
+        index: 0,
+        timer: null,
+        doneIds: new Set(),
+        finalVars: result.variables || {}
+      };
+      if (!state.playback.steps.length) {
+        toast('No steps to play');
+        stopPlayback();
+        return;
+      }
+      showPlaybackStep();
+    }
+    function continuePlayback() {
+      if (!state.playback) return;
+      if (state.playback.timer) return;
+      state.playback.timer = setInterval(() => {
+        if (!state.playback) return;
+        if (state.playback.index >= state.playback.steps.length - 1) {
+          state.playback.index = state.playback.steps.length;
+          showPlaybackStep();
+          return;
+        }
+        stepPlayback();
+      }, 650);
+    }
+
     document.getElementById('btnDryRun').addEventListener('click', () => {
-      vscode.postMessage({ type: 'dryRun', workflow: state.workflow });
+      vscode.postMessage({ type: 'dryRun', workflow: state.workflow, stepThrough: false });
     });
+    document.getElementById('btnStepThrough').addEventListener('click', () => {
+      vscode.postMessage({ type: 'dryRun', workflow: state.workflow, stepThrough: true });
+    });
+    document.getElementById('btnPbStep')?.addEventListener('click', () => stepPlayback());
+    document.getElementById('btnPbContinue')?.addEventListener('click', () => continuePlayback());
+    document.getElementById('btnPbStop')?.addEventListener('click', () => stopPlayback());
     document.getElementById('btnAddVar').addEventListener('click', () => {
       state.workflow.variables ||= [];
       state.workflow.variables.push({ name: 'var' + (state.workflow.variables.length + 1), type: 'String', defaultValue: '' });
@@ -1675,6 +1820,12 @@ export function getDesignerHtml(
         toast('Added ' + node.displayName);
       }
       if (msg.type === 'toast' && msg.message) toast(msg.message);
+      if (msg.type === 'dryRunPlayback' && msg.result) {
+        startPlayback(msg.result);
+      }
+      if (msg.type === 'dryRunDone' && msg.result?.warnings?.length) {
+        toast(msg.result.warnings.length + ' dry-run warning(s) — see Output');
+      }
     });
 
     restorePropsPanelState();
