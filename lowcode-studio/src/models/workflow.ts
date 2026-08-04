@@ -79,6 +79,12 @@ export interface ProjectManifest {
   createdAt: string;
   /** UiPath NuGet activity packages preserved from import / used on Studio Web export */
   uipathDependencies?: Record<string, string>;
+  /**
+   * UiPath compatibility for Connect / Export.
+   * Windows (default) = run on Windows robots with classic UI selectors.
+   * Portable = cross-platform / cloud-friendly.
+   */
+  uipathTargetFramework?: 'Windows' | 'Portable';
 }
 
 export function createEmptyWorkflow(
@@ -169,12 +175,13 @@ export function createProjectManifest(
     name,
     description:
       template === 'reframework'
-        ? `${name} — UiPath-style REFramework project`
-        : `${name} LowCode Studio project`,
+        ? `${name} — UiPath-style REFramework project (Windows target)`
+        : `${name} LowCode Studio project (Windows target)`,
     main: mainWorkflow,
     workflows,
     template,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    uipathTargetFramework: 'Windows'
   };
 }
 

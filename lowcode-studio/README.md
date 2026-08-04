@@ -1,12 +1,12 @@
 # LowCode Studio
 
-**Version 0.6.2** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.6.3** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.6.2-0ea5e9)
+![version](https://img.shields.io/badge/version-0.6.3-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
@@ -51,7 +51,13 @@ Design on Mac (REFramework)
 
 ![REFramework Process with Invoke Code](docs/images/vscode-reframework-process-activities.png)
 
-## What’s in 0.6.2
+## What’s in 0.6.3
+
+- **Windows project target** — Connect/Export writes `targetFramework: Windows` (`net8.0-windows`) so automations run on Windows robots
+- **Windows classic selectors** — UI activities default to `<html>/<webctrl>` (and normalize `<target>` placeholders on export)
+- Package validation warns on missing / placeholder selectors
+
+### Also in 0.6.2
 
 - **Variables panel collapsed** by default in the designer (expand when needed)
 - **Package validation warnings** — Validate Packages + pre-check on Connect to Studio Web
@@ -82,7 +88,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.2.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.3.vsix` → reload.
 
 ## Easy path (REFramework)
 
@@ -117,10 +123,10 @@ Last scenario is remembered for one-click re-run.
 
 | Step | Action |
 |---|---|
-| 1 | **Connect to Studio Web** (exports `.uip` + `.uis` + Portable folder) |
+| 1 | **Connect to Studio Web** (exports Windows `.uip` + `.uis`) |
 | 2 | **Reveal .uip** / Open Checklist (`OPEN_IN_STUDIO_WEB.md`) |
-| 3 | Open [studio.uipath.com](https://studio.uipath.com) → **Import project** → select `.uip` |
-| 4 | Restore packages → publish to Orchestrator |
+| 3 | Import in Studio Web **or** open in Studio Desktop (Windows) |
+| 4 | Refine selectors on Windows → publish → run on Windows robot |
 
 Git tenants: commit the `*.StudioWeb` folder into the repo Studio Web tracks, then pull in Studio Web. Full notes: [docs/STUDIO_WEB.md](docs/STUDIO_WEB.md).
 
@@ -172,6 +178,7 @@ See [docs/ACTIVITIES.md](docs/ACTIVITIES.md). Invoke Code / UI steps are dry-run
 - **Connect to Studio Web** guided handoff + Git notes
 - Config.xlsx bridge, custom activities, Invoke Code / top activities, Python pack
 - Package validation warnings + Open Local Project + Project Explorer title actions
+- Windows project target + classic Windows UI selectors for robot execution
 
 ### Next
 1. Import polish for `Imported.*` placeholders

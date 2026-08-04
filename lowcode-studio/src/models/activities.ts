@@ -438,16 +438,17 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     type: 'UI.Click',
     displayName: 'Click',
     category: 'UI Automation',
-    description: 'Clicks a UI target described by a selector.',
+    description: 'Clicks a Windows UI / browser target using a classic UiPath selector.',
     icon: '$(inspect)',
     color: '#10B981',
     properties: [
       {
         name: 'selector',
-        label: 'Selector',
+        label: 'Selector (Windows)',
         type: 'multiline',
-        defaultValue: '<target id=\"btnSubmit\" />',
-        required: true
+        defaultValue: "<html app='chrome.exe' title='*' />\n<webctrl tag='BUTTON' id='btnSubmit' />",
+        required: true,
+        description: 'Classic Windows UiPath selector (<html>/<webctrl> or <wnd>). Capture on a Windows machine.'
       },
       {
         name: 'selectorModern',
@@ -481,9 +482,9 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     properties: [
       {
         name: 'selector',
-        label: 'Selector',
+        label: 'Selector (Windows)',
         type: 'multiline',
-        defaultValue: '<target id=\"input\" />',
+        defaultValue: "<html app='chrome.exe' title='*' />\n<webctrl tag='INPUT' id='input' />",
         required: true
       },
       {
@@ -518,9 +519,9 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     properties: [
       {
         name: 'selector',
-        label: 'Selector',
+        label: 'Selector (Windows)',
         type: 'multiline',
-        defaultValue: '<target id=\"label\" />',
+        defaultValue: "<html app='chrome.exe' title='*' />\n<webctrl tag='*' id='label' />",
         required: true
       },
       {
@@ -549,9 +550,9 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     properties: [
       {
         name: 'selector',
-        label: 'Selector',
+        label: 'Selector (Windows)',
         type: 'multiline',
-        defaultValue: '<target id=\"popup\" />',
+        defaultValue: "<html app='chrome.exe' title='*' />\n<webctrl tag='*' id='popup' />",
         required: true
       },
       {
@@ -585,9 +586,9 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     properties: [
       {
         name: 'selector',
-        label: 'Selector',
+        label: 'Selector (Windows)',
         type: 'multiline',
-        defaultValue: '<target id=\"chkAgree\" />',
+        defaultValue: "<html app='chrome.exe' title='*' />\n<webctrl tag='INPUT' id='chkAgree' />",
         required: true
       },
       {
@@ -615,9 +616,9 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     properties: [
       {
         name: 'selector',
-        label: 'Selector',
+        label: 'Selector (Windows)',
         type: 'multiline',
-        defaultValue: '<target id=\"menu\" />',
+        defaultValue: "<html app='chrome.exe' title='*' />\n<webctrl tag='*' id='menu' />",
         required: true
       },
       {
@@ -638,9 +639,9 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     properties: [
       {
         name: 'selector',
-        label: 'Selector',
+        label: 'Selector (Windows)',
         type: 'multiline',
-        defaultValue: '<target id=\"cmbCountry\" />',
+        defaultValue: "<html app='chrome.exe' title='*' />\n<webctrl tag='SELECT' id='cmbCountry' />",
         required: true
       },
       {
@@ -690,9 +691,9 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     properties: [
       {
         name: 'selector',
-        label: 'Selector',
+        label: 'Selector (Windows)',
         type: 'multiline',
-        defaultValue: '<html app=\'chrome.exe\' />',
+        defaultValue: "<html app='chrome.exe' title='*' />\n<webctrl tag='*' id='element' />",
         required: true
       },
       {
@@ -727,9 +728,9 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     properties: [
       {
         name: 'selector',
-        label: 'Selector',
+        label: 'Selector (Windows)',
         type: 'multiline',
-        defaultValue: '<html app=\'chrome.exe\' />',
+        defaultValue: "<html app='chrome.exe' title='*' />\n<webctrl tag='*' id='element' />",
         required: true
       },
       {

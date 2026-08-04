@@ -11,6 +11,11 @@ import {
   loadProjectCustomActivities
 } from '../models/customActivities';
 import { getActivityDefinition } from '../models/activities';
+import {
+  isPlaceholderSelector,
+  isWindowsClassicSelector,
+  resolveUiPathTarget
+} from './windowsTarget';
 
 export interface PackageWarning {
   severity: 'warning' | 'info';
@@ -45,6 +50,7 @@ export function validateProjectPackages(projectDir: string): PackageValidationRe
     workflows?: string[];
     schemaVersion?: string;
     uipathDependencies?: Record<string, string>;
+    uipathTargetFramework?: string;
   };
 
   if (manifest.schemaVersion !== '1.0') {
@@ -54,13 +60,28 @@ export function validateProjectPackages(projectDir: string): PackageValidationRe
   }
 
   const projectName = manifest.name || path.basename(projectDir);
+  const warnings: PackageWarning[] = [];
+  const targetFramework = resolveUiPathTarget(manifest.uipathTargetFramework);
+  if (targetFramework !== 'Windows') {
+    warnings.push({
+      severity: 'warning',
+      code: 'non-windows-target',
+      message: `Project targetFramework is "${targetFramework}" — set uipathTargetFramework to "Windows" so robots run on Windows machines.`
+    });
+  } else {
+    warnings.push({
+      severity: 'info',
+      code: 'windows-target',
+      message: 'Export target is Windows (net8.0-windows) — suitable for Windows Studio / Windows robots.'
+    });
+  }
+
   const workflowRels =
     manifest.workflows?.length
       ? manifest.workflows
       : listLcsWorkflows(projectDir);
 
   const docs: Array<{ rel: string; doc: WorkflowDocument }> = [];
-  const warnings: PackageWarning[] = [];
 
   for (const rel of workflowRels) {
     const abs = path.join(projectDir, rel);
@@ -251,9 +272,23 @@ function classifyActivity(
     if (!selector) {
       warnings.push({
         ...base,
-        severity: 'info',
+        severity: 'warning',
         code: 'ui-missing-selector',
-        message: `${activity.displayName}: UI activity has no selector — Studio Web will need a target.`
+        message: `${activity.displayName}: UI activity has no Windows selector — capture with UI Explorer on Windows.`
+      });
+    } else if (isPlaceholderSelector(selector)) {
+      warnings.push({
+        ...base,
+        severity: 'warning',
+        code: 'ui-placeholder-selector',
+        message: `${activity.displayName}: selector is still a <target> placeholder — replace with a Windows <html>/<webctrl> or <wnd> selector.`
+      });
+    } else if (!isWindowsClassicSelector(selector)) {
+      warnings.push({
+        ...base,
+        severity: 'info',
+        code: 'ui-nonclassic-selector',
+        message: `${activity.displayName}: selector may not be classic Windows format (expected <html>/<webctrl>/<wnd>).`
       });
     }
   }

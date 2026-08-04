@@ -67,11 +67,13 @@ ${depLines || '_No dependencies listed_'}
 
 | File | Use |
 |---|---|
-| \`${path.basename(archives.uipPath)}\` | Studio Web **Import project** |
+| \`${path.basename(archives.uipPath)}\` | Studio Web **Import project** (Windows-compatible) |
 | \`${path.basename(archives.uisPath)}\` | Solution / CLI upload |
-| \`${path.basename(exported.targetDir)}/\` | Unpacked Portable project (Git) |
+| \`${path.basename(exported.targetDir)}/\` | Unpacked **Windows** UiPath project (Git / Studio Desktop) |
 
-Publish remains in **Studio Web** by design.
+> Projects export with \`targetFramework: Windows\` and classic Windows UI selectors so they run on **Windows robots**. Refine selectors with UI Explorer on a Windows machine.
+
+Publish remains in **Studio Web** / Studio Desktop by design.
 `,
     'utf8'
   );
@@ -102,16 +104,17 @@ Publish remains in **Studio Web** by design.
 export function studioWebSyncGuideMarkdown(): string {
   return `# Connect LowCode Studio ↔ UiPath Studio Web
 
-LowCode Studio is optimized for **Mac design + dry-run**. Studio Web is the **cloud publish** path.
+LowCode Studio is optimized for **Mac design + dry-run**. Exports target **Windows** so automations run on **Windows robots**.
 
 ## Recommended loop
 
 \`\`\`
 Design on Mac (LowCode Studio)
    → Dry Run / Scenarios (F5 / Shift+F5)
-   → Connect to Studio Web (exports .uip + .uis)
-   → Import .uip in studio.uipath.com
-   → Publish to Orchestrator
+   → Connect to Studio Web (exports Windows .uip + .uis)
+   → Import .uip / open in Studio Desktop (Windows)
+   → Refine selectors with UI Explorer on Windows
+   → Publish → run on Windows robot
 \`\`\`
 
 ## One-command handoff
@@ -119,20 +122,21 @@ Design on Mac (LowCode Studio)
 1. Open your LowCode Studio project
 2. Run **LowCode Studio: Connect to Studio Web**
 3. Prefer **Reveal .uip** then **Open Studio Web**
-4. In Studio Web: **Import project** → select the \`.uip\` file
+4. In Studio Web: **Import project** → select the \`.uip\` file (or open the folder in Studio Desktop)
 
 | Package | Use |
 |---|---|
 | **\`.uip\`** | Studio Web Automations → Import project |
 | **\`.uis\`** | Solution / CLI \`uip solution upload\` |
-| **\`.StudioWeb/\` folder** | Git-linked Studio Web tenants |
+| **\`.StudioWeb/\` folder** | Windows project for Git / Studio Desktop |
 
 ## Tips
 
 - Prefer activities mapped to real UiPath packages (see ACTIVITIES.md)
+- UI selectors are **Windows classic** (\`<html>/<webctrl>\`, \`<wnd>\`) — capture/refine on Windows
 - Review Comment / \`Imported.*\` placeholders after import
 - Keep scenario dry-runs in LowCode Studio
-- Publish stays in Studio Web (by design)
+- Publish stays in Studio Web / Studio Desktop (by design)
 
 > Not an official UiPath product.
 `;
