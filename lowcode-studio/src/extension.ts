@@ -14,11 +14,22 @@ import {
 } from './models/workflow';
 import { dryRunWorkflow, toPseudocode, validateWorkflow } from './commands/simulator';
 import {
+  createQuickScenario,
+  duplicateScenario,
+  ensureScenariosFile,
   formatScenarioReport,
   loadScenariosFile,
   runAllScenarios,
-  runScenario
+  runScenario,
+  saveScenariosFile,
+  scenariosFilePath,
+  upsertScenario
 } from './commands/refDryRun';
+import {
+  connectToStudioWeb,
+  STUDIO_WEB_URL,
+  studioWebSyncGuideMarkdown
+} from './interop/studioWebConnect';
 import {
   getActivityDefinition,
   setCustomActivityOverlay
@@ -155,6 +166,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('lowcodeStudio.dryRunScenario', () =>
       dryRunScenarioCommand()
     ),
+    vscode.commands.registerCommand('lowcodeStudio.manageScenarios', () =>
+      manageScenariosCommand()
+    ),
     vscode.commands.registerCommand('lowcodeStudio.registerCustomActivity', () =>
       registerCustomActivityCommand()
     ),
@@ -253,6 +267,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('lowcodeStudio.exportStudioWeb', () =>
       exportStudioWebCommand()
     ),
+    vscode.commands.registerCommand('lowcodeStudio.connectStudioWeb', () =>
+      connectStudioWebCommand()
+    ),
     vscode.commands.registerCommand('lowcodeStudio.exportConfigXlsx', () =>
       exportConfigXlsxCommand()
     ),
@@ -260,7 +277,14 @@ export function activate(context: vscode.ExtensionContext): void {
       importConfigXlsxCommand()
     ),
     vscode.commands.registerCommand('lowcodeStudio.openStudioWeb', () => {
-      void vscode.env.openExternal(vscode.Uri.parse('https://studio.uipath.com'));
+      void vscode.env.openExternal(vscode.Uri.parse(STUDIO_WEB_URL));
+    }),
+    vscode.commands.registerCommand('lowcodeStudio.showStudioWebGuide', async () => {
+      const doc = await vscode.workspace.openTextDocument({
+        content: studioWebSyncGuideMarkdown(),
+        language: 'markdown'
+      });
+      await vscode.window.showTextDocument(doc, { preview: true });
     }),
     vscode.commands.registerCommand('lowcodeStudio.showGettingStarted', () => {
       showGettingStarted();
@@ -657,44 +681,91 @@ async function resolveLcsProjectDir(): Promise<string | undefined> {
 }
 
 async function exportStudioWebCommand(): Promise<void> {
-  const workspace = vscode.workspace.workspaceFolders?.[0];
-  if (!workspace) {
-    vscode.window.showErrorMessage('Open a workspace folder first.');
+  // Keep classic export; guided flow is Connect to Studio Web
+  const projectDir = await resolveLcsProjectDir();
+  if (!projectDir) {
     return;
   }
-
-  const projectJson = findNearestProject(workspace.uri.fsPath);
-  let projectDir = projectJson ? path.dirname(projectJson) : undefined;
-
-  if (!projectDir) {
-    const picked = await vscode.window.showOpenDialog({
-      canSelectFiles: false,
-      canSelectFolders: true,
-      canSelectMany: false,
-      openLabel: 'Select LowCode Studio project folder'
-    });
-    if (!picked?.[0]) {
-      return;
-    }
-    projectDir = picked[0].fsPath;
-  }
-
   try {
     const result = exportToStudioWebProject(projectDir);
+    await extensionContext.workspaceState.update(
+      'lowcodeStudio.lastStudioWebExport',
+      result.targetDir
+    );
     const open = await vscode.window.showInformationMessage(
       `Exported Studio Web project to ${path.basename(result.targetDir)}`,
       'Open Folder',
-      'Open Studio Web'
+      'Open Studio Web',
+      'Show Guide'
     );
     if (open === 'Open Folder') {
       await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(result.targetDir));
     }
     if (open === 'Open Studio Web') {
-      await vscode.env.openExternal(vscode.Uri.parse('https://studio.uipath.com'));
+      await vscode.env.openExternal(vscode.Uri.parse(STUDIO_WEB_URL));
+    }
+    if (open === 'Show Guide') {
+      await vscode.commands.executeCommand('lowcodeStudio.showStudioWebGuide');
     }
   } catch (err) {
     vscode.window.showErrorMessage(
       err instanceof Error ? err.message : 'Export failed'
+    );
+  }
+}
+
+async function connectStudioWebCommand(): Promise<void> {
+  const projectDir = await resolveLcsProjectDir();
+  if (!projectDir) {
+    return;
+  }
+  try {
+    const result = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Connecting to Studio Web (exporting Portable project)…'
+      },
+      async () => connectToStudioWeb(projectDir)
+    );
+    await extensionContext.workspaceState.update(
+      'lowcodeStudio.lastStudioWebExport',
+      result.targetDir
+    );
+
+    const channel = getOutput();
+    channel.clear();
+    channel.appendLine('Connect to Studio Web');
+    channel.appendLine('─'.repeat(48));
+    channel.appendLine(`Export: ${result.targetDir}`);
+    channel.appendLine(`Main:   ${result.mainXaml}`);
+    channel.appendLine('');
+    channel.appendLine('Checklist:');
+    result.checklist.forEach((c, i) => channel.appendLine(`  ${i + 1}. ${c}`));
+    channel.show(true);
+
+    const next = await vscode.window.showInformationMessage(
+      `Ready for Studio Web → ${path.basename(result.targetDir)}`,
+      'Open Folder',
+      'Open Studio Web',
+      'Open Checklist',
+      'Show Guide'
+    );
+    if (next === 'Open Folder') {
+      await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(result.targetDir));
+    }
+    if (next === 'Open Studio Web') {
+      await vscode.env.openExternal(vscode.Uri.parse(STUDIO_WEB_URL));
+    }
+    if (next === 'Open Checklist') {
+      const doc = await vscode.workspace.openTextDocument(result.guidePath);
+      await vscode.window.showTextDocument(doc);
+    }
+    if (next === 'Show Guide') {
+      await vscode.commands.executeCommand('lowcodeStudio.showStudioWebGuide');
+    }
+  } catch (err) {
+    vscode.window.showErrorMessage(
+      err instanceof Error ? err.message : 'Studio Web connect failed'
     );
   }
 }
@@ -929,41 +1000,68 @@ async function manageCustomActivitiesCommand(): Promise<void> {
 }
 
 async function dryRunScenarioCommand(): Promise<void> {
-  const workspace = vscode.workspace.workspaceFolders?.[0];
-  if (!workspace) {
-    vscode.window.showErrorMessage('Open a workspace folder first.');
+  const projectDir = await resolveLcsProjectDir();
+  if (!projectDir) {
     return;
   }
-  const projectJson = findNearestProject(workspace.uri.fsPath);
-  if (!projectJson) {
-    vscode.window.showErrorMessage('No LowCode Studio project found.');
-    return;
-  }
-  const projectDir = path.dirname(projectJson);
   const mainPath = path.join(projectDir, 'Main.lcs.json');
   if (!fs.existsSync(mainPath)) {
     vscode.window.showErrorMessage('REFramework Main.lcs.json not found in project.');
     return;
   }
 
-  let scenarios = loadScenariosFile(projectDir).scenarios;
+  const projectName = path.basename(projectDir);
+  let scenarios = ensureScenariosFile(projectDir, projectName).scenarios;
   if (!scenarios.length) {
-    const results = runAllScenarios(projectDir);
-    scenarios = results.map((r) => r.scenario);
+    scenarios = runAllScenarios(projectDir).map((r) => r.scenario);
   }
+
+  const last =
+    extensionContext.workspaceState.get<string>('lowcodeStudio.lastScenario') || '';
 
   const pick = await vscode.window.showQuickPick(
     [
-      { label: 'All scenarios', description: 'Run every test in Data/Test/scenarios.json', value: '__all__' },
+      ...(last && scenarios.some((s) => s.name === last)
+        ? [
+            {
+              label: `$(history) Run last: ${last}`,
+              description: 'Fastest path',
+              value: last
+            }
+          ]
+        : []),
+      {
+        label: '$(run-all) All scenarios',
+        description: 'Run every test in Data/Test/scenarios.json',
+        value: '__all__'
+      },
+      {
+        label: '$(add) Add quick scenario…',
+        description: 'Create a MaxTransactions smoke test',
+        value: '__add__'
+      },
+      {
+        label: '$(checklist) Manage scenarios…',
+        description: 'Duplicate / open / organize',
+        value: '__manage__'
+      },
       ...scenarios.map((s) => ({
-        label: s.name,
+        label: `$(beaker) ${s.name}`,
         description: s.description || '',
         value: s.name
       }))
     ],
-    { placeHolder: 'Choose a REFramework dry-run scenario' }
+    { placeHolder: 'Dry-run scenario — easiest way to test REFramework on Mac' }
   );
   if (!pick) {
+    return;
+  }
+  if (pick.value === '__manage__') {
+    await manageScenariosCommand();
+    return;
+  }
+  if (pick.value === '__add__') {
+    await addQuickScenarioCommand(projectDir);
     return;
   }
 
@@ -972,6 +1070,141 @@ async function dryRunScenarioCommand(): Promise<void> {
       ? runAllScenarios(projectDir)
       : [runScenario(projectDir, scenarios.find((s) => s.name === pick.value)!)];
 
+  if (pick.value !== '__all__') {
+    await extensionContext.workspaceState.update('lowcodeStudio.lastScenario', pick.value);
+  }
+
+  await showScenarioResults(results);
+}
+
+async function manageScenariosCommand(): Promise<void> {
+  const projectDir = await resolveLcsProjectDir();
+  if (!projectDir) {
+    return;
+  }
+  const projectName = path.basename(projectDir);
+  const file = ensureScenariosFile(projectDir, projectName);
+
+  const action = await vscode.window.showQuickPick(
+    [
+      {
+        label: '$(run-all) Run all scenarios',
+        value: 'run-all'
+      },
+      {
+        label: '$(add) Add quick scenario',
+        description: 'Name + MaxTransactions → saved to scenarios.json',
+        value: 'add'
+      },
+      {
+        label: '$(copy) Duplicate scenario',
+        value: 'duplicate'
+      },
+      {
+        label: '$(go-to-file) Open scenarios.json',
+        value: 'open'
+      },
+      {
+        label: '$(play) Run one scenario',
+        value: 'run-one'
+      }
+    ],
+    { placeHolder: 'Manage REFramework dry-run scenarios' }
+  );
+  if (!action) {
+    return;
+  }
+
+  if (action.value === 'run-all') {
+    await showScenarioResults(runAllScenarios(projectDir));
+    return;
+  }
+  if (action.value === 'add') {
+    await addQuickScenarioCommand(projectDir);
+    return;
+  }
+  if (action.value === 'open') {
+    const doc = await vscode.workspace.openTextDocument(scenariosFilePath(projectDir));
+    await vscode.window.showTextDocument(doc);
+    return;
+  }
+  if (action.value === 'duplicate') {
+    if (!file.scenarios.length) {
+      vscode.window.showInformationMessage('No scenarios to duplicate yet.');
+      return;
+    }
+    const source = await vscode.window.showQuickPick(
+      file.scenarios.map((s) => ({ label: s.name, description: s.description, scenario: s })),
+      { placeHolder: 'Scenario to duplicate' }
+    );
+    if (!source) {
+      return;
+    }
+    const newName = await vscode.window.showInputBox({
+      prompt: 'New scenario name',
+      value: `${source.scenario.name}-copy`,
+      validateInput: (v) =>
+        /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(v) ? undefined : 'Use letters, numbers, _ or -'
+    });
+    if (!newName) {
+      return;
+    }
+    const next = upsertScenario(file, duplicateScenario(source.scenario, newName));
+    saveScenariosFile(projectDir, next);
+    projectProvider.refresh();
+    vscode.window.showInformationMessage(`Duplicated scenario → ${newName}`);
+    return;
+  }
+  if (action.value === 'run-one') {
+    await dryRunScenarioCommand();
+  }
+}
+
+async function addQuickScenarioCommand(projectDir: string): Promise<void> {
+  const name = await vscode.window.showInputBox({
+    prompt: 'Scenario name',
+    value: 'smoke',
+    validateInput: (v) =>
+      /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(v) ? undefined : 'Use letters, numbers, _ or -'
+  });
+  if (!name) {
+    return;
+  }
+  const maxText = await vscode.window.showInputBox({
+    prompt: 'MaxTransactions (0 = empty queue)',
+    value: '1',
+    validateInput: (v) => (/^\d+$/.test(v) ? undefined : 'Enter a non-negative integer')
+  });
+  if (maxText == null) {
+    return;
+  }
+  const projectName = path.basename(projectDir);
+  const file = ensureScenariosFile(projectDir, projectName);
+  const scenario = createQuickScenario({
+    name,
+    maxTransactions: Number(maxText)
+  });
+  saveScenariosFile(projectDir, upsertScenario(file, scenario));
+  await extensionContext.workspaceState.update('lowcodeStudio.lastScenario', name);
+  projectProvider.refresh();
+
+  const runNow = await vscode.window.showInformationMessage(
+    `Saved scenario "${name}" (MaxTransactions=${maxText})`,
+    'Dry Run now',
+    'Open file'
+  );
+  if (runNow === 'Dry Run now') {
+    await showScenarioResults([runScenario(projectDir, scenario)]);
+  }
+  if (runNow === 'Open file') {
+    const doc = await vscode.workspace.openTextDocument(scenariosFilePath(projectDir));
+    await vscode.window.showTextDocument(doc);
+  }
+}
+
+async function showScenarioResults(
+  results: ReturnType<typeof runAllScenarios>
+): Promise<void> {
   const channel = getOutput();
   channel.clear();
   channel.appendLine(formatScenarioReport(results));
@@ -988,11 +1221,11 @@ async function dryRunScenarioCommand(): Promise<void> {
   const passed = results.filter((r) => r.passed).length;
   if (passed === results.length) {
     vscode.window.showInformationMessage(
-      `REFramework scenarios: ${passed}/${results.length} passed`
+      `Scenarios: ${passed}/${results.length} passed`
     );
   } else {
     vscode.window.showWarningMessage(
-      `REFramework scenarios: ${passed}/${results.length} passed — see LowCode Studio output`
+      `Scenarios: ${passed}/${results.length} passed — see LowCode Studio output`
     );
   }
 }
@@ -1048,41 +1281,58 @@ function showGettingStarted(): void {
 
 A **Studio-like low-code designer** for VS Code and Cursor — built for Mac users who cannot run UiPath Studio Desktop.
 
-## What you get
+## The easy loop (keys of this extension)
 
-| Studio concept | In this extension |
-|---|---|
-| Sequence designer | Vertical activity list for \`.lcs.json\` |
-| Flowchart designer | Free-form canvas + True/False links |
-| REFramework | One-click Init → Get Data → Process → End |
-| Activities panel | Drag/drop toolbox + sidebar |
-| Properties / Variables | Right-side editors |
-| Run / Debug | Dry Run simulator (F5) |
+\`\`\`
+1. New REFramework Project
+2. Dry Run / Scenarios   ← Shift+F5  (fastest local testing)
+3. Connect to Studio Web ← export + open studio.uipath.com
+4. Publish from Studio Web to Orchestrator
+\`\`\`
+
+| Priority | Command | Shortcut |
+|---|---|---|
+| **1. Test** | Dry Run / Dry Run Scenarios / Manage Scenarios | F5 / **Shift+F5** |
+| **2. Ship** | **Connect to Studio Web** | — |
+| Design | New REFramework / Open Designer | — |
+| Config | Import/Export Config.xlsx | — |
 
 ## Quick start
 
-1. **LowCode Studio: New REFramework Project** (easiest path)
-2. Open \`Main.lcs.json\` — flowchart of the framework states
-3. Edit \`Framework/Process.lcs.json\` for business logic
-4. Edit \`Data/Config.json\` (or **Import Config.xlsx** from classic REFramework)
-5. Press **F5** to dry-run Main, or **Dry Run REFramework Scenario** for \`Data/Test/scenarios.json\`
+1. **New REFramework Project**
+2. Edit \`Framework/Process.lcs.json\` for business logic
+3. Tune \`Data/Config.json\` (or import classic \`Config.xlsx\`)
+4. **Shift+F5** → pick a scenario (or All) — PASS/FAIL in Output
+5. **Connect to Studio Web** → Open Folder → Import in [studio.uipath.com](https://studio.uipath.com)
 
-**Config bridge:** \`Export Config.xlsx\` / \`Import Config.xlsx\` — JSON ↔ classic Settings/Constants/Assets sheets
+Project Explorer shows **▶ Dry Run Scenarios**, **✎ Manage Scenarios**, and **☁ Connect to Studio Web** on every project.
 
-**Custom activities:** \`Register Custom Activity\` → This project (\`activities.custom.json\`) or All my projects (user library)
+## Studio Web connection
 
-**Import UiPath:** \`Import UiPath Package (.nupkg)\` or \`Import UiPath Project Folder\`
+Use **Connect to Studio Web** (not only Export). It:
 
-**Studio Web:** \`Export for Studio Web\` then open [studio.uipath.com](https://studio.uipath.com)
+1. Builds a Portable \`*.StudioWeb\` folder (XAML + \`project.json\` + packages + Config)
+2. Writes \`OPEN_IN_STUDIO_WEB.md\` checklist
+3. Offers Open Folder / Open Studio Web / Open Checklist
 
-Or use **New Project → Blank** and pick Sequence or Flowchart.
+Guide: command **Show Studio Web Guide** or \`docs/STUDIO_WEB.md\`.
 
-Tip: select any activity → **Container color** to customize sequence/flowchart colors.
+## Scenarios (easiest dry-run)
+
+- File: \`Data/Test/scenarios.json\`
+- **Manage Scenarios** → add quick MaxTransactions smoke tests, duplicate, open file
+- Last scenario is remembered for one-click re-run
+
+## Also available
+
+- Custom activities (project or user library)
+- Import UiPath folder / \`.nupkg\`
+- Sequence + Flowchart designer, container colors
 
 ## About UiPath Maestro
 
-UiPath's official **Maestro** VS Code extension targets **Maestro Flows** (\`.flow\`).
-LowCode Studio covers classic Studio / REFramework-style low-code design on Mac.
+UiPath's official **Maestro** extension targets Maestro Flows (\`.flow\`).
+LowCode Studio covers classic Studio / REFramework design on Mac.
 
 > Not an official UiPath product.
 `;

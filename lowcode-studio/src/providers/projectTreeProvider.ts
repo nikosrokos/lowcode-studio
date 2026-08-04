@@ -35,7 +35,7 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
       if (!projects.length) {
         return [
           new ProjectTreeItem(
-            'No project yet — use New Project',
+            'No project yet — use New REFramework Project',
             this.workspaceRoot,
             vscode.TreeItemCollapsibleState.None,
             'info'
@@ -58,10 +58,51 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
         const manifest = JSON.parse(fs.readFileSync(element.resourcePath, 'utf8')) as {
           workflows?: string[];
           main?: string;
+          template?: string;
         };
         const dir = path.dirname(element.resourcePath);
+        const items: ProjectTreeItem[] = [];
+
+        // Hero actions — dry-run + Studio Web first
+        items.push(
+          actionItem(
+            '▶ Dry Run Scenarios',
+            dir,
+            'lowcodeStudio.dryRunScenario',
+            'beaker',
+            'Run Data/Test/scenarios.json'
+          )
+        );
+        items.push(
+          actionItem(
+            '✎ Manage Scenarios',
+            dir,
+            'lowcodeStudio.manageScenarios',
+            'checklist',
+            'Add / duplicate / open scenarios'
+          )
+        );
+        items.push(
+          actionItem(
+            '☁ Connect to Studio Web',
+            dir,
+            'lowcodeStudio.connectStudioWeb',
+            'cloud-upload',
+            'Export Portable project + open studio.uipath.com'
+          )
+        );
+
+        const configJson = path.join(dir, 'Data', 'Config.json');
+        if (fs.existsSync(configJson)) {
+          items.push(fileItem('Data/Config.json', configJson, 'settings-gear'));
+        }
+        const scenarios = path.join(dir, 'Data', 'Test', 'scenarios.json');
+        if (fs.existsSync(scenarios)) {
+          items.push(fileItem('Data/Test/scenarios.json', scenarios, 'beaker'));
+        }
+
         const workflows = manifest.workflows || [];
-        return workflows.map((wf) => {
+        for (const wf of workflows) {
           const full = path.join(dir, wf);
           const item = new ProjectTreeItem(
             wf,
@@ -71,13 +112,14 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
           );
           item.description = wf === manifest.main ? 'main' : undefined;
           item.command = {
-            command: 'vscode.open',
-            title: 'Open Workflow',
-            arguments: [vscode.Uri.file(full)]
+            command: 'vscode.openWith',
+            title: 'Open Designer',
+            arguments: [vscode.Uri.file(full), 'lowcodeStudio.workflowEditor']
           };
           item.iconPath = new vscode.ThemeIcon('file-code');
-          return item;
-        });
+          items.push(item);
+        }
+        return items;
       } catch {
         return [
           new ProjectTreeItem(
@@ -134,7 +176,7 @@ export class ProjectTreeItem extends vscode.TreeItem {
     label: string,
     public readonly resourcePath: string,
     collapsibleState: vscode.TreeItemCollapsibleState,
-    contextValue: 'project' | 'workflow' | 'info'
+    contextValue: 'project' | 'workflow' | 'info' | 'action' | 'file'
   ) {
     super(label, collapsibleState);
     this.contextValue = contextValue;
@@ -143,4 +185,39 @@ export class ProjectTreeItem extends vscode.TreeItem {
       this.tooltip = resourcePath;
     }
   }
+}
+
+function actionItem(
+  label: string,
+  projectDir: string,
+  command: string,
+  icon: string,
+  tooltip: string
+): ProjectTreeItem {
+  const item = new ProjectTreeItem(
+    label,
+    projectDir,
+    vscode.TreeItemCollapsibleState.None,
+    'action'
+  );
+  item.command = { command, title: label };
+  item.iconPath = new vscode.ThemeIcon(icon);
+  item.tooltip = tooltip;
+  return item;
+}
+
+function fileItem(label: string, fullPath: string, icon: string): ProjectTreeItem {
+  const item = new ProjectTreeItem(
+    label,
+    fullPath,
+    vscode.TreeItemCollapsibleState.None,
+    'file'
+  );
+  item.command = {
+    command: 'vscode.open',
+    title: 'Open',
+    arguments: [vscode.Uri.file(fullPath)]
+  };
+  item.iconPath = new vscode.ThemeIcon(icon);
+  return item;
 }

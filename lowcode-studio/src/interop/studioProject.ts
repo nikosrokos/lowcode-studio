@@ -296,14 +296,20 @@ export function exportToStudioWebProject(
   );
   written.push('project.json');
 
-  // Copy Config.json / classic Config.xlsx if present (Studio Web resources)
-  for (const rel of ['Data/Config.json', 'Data/Config.xlsx']) {
+  // Copy config + scenario files (Studio Web resources / team handoff)
+  for (const rel of [
+    'Data/Config.json',
+    'Data/Config.xlsx',
+    'Data/Test/scenarios.json',
+    'activities.custom.json'
+  ]) {
     const abs = path.join(lcsProjectDir, rel);
     if (!fs.existsSync(abs)) {
       continue;
     }
-    fs.mkdirSync(path.join(outDir, 'Data'), { recursive: true });
-    fs.copyFileSync(abs, path.join(outDir, rel));
+    const dest = path.join(outDir, rel);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(abs, dest);
     written.push(rel);
   }
 

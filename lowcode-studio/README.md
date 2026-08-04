@@ -1,18 +1,35 @@
 # LowCode Studio
 
-**Version 0.5.2** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.6.0** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
-Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally in your editor — with import/export paths to Studio Web.
+Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.5.2-0ea5e9)
+![version](https://img.shields.io/badge/version-0.6.0-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
-**Full activity list:** [docs/ACTIVITIES.md](docs/ACTIVITIES.md)
+**Full activity list:** [docs/ACTIVITIES.md](docs/ACTIVITIES.md) · **Studio Web guide:** [docs/STUDIO_WEB.md](docs/STUDIO_WEB.md)
 
-## In action (v0.5.2)
+## The easy loop (what this extension is for)
+
+```
+Design on Mac (REFramework)
+   → Dry Run / Scenarios   (F5 / Shift+F5)
+   → Connect to Studio Web (Cmd+Shift+U)
+   → Import at studio.uipath.com
+   → Publish to Orchestrator
+```
+
+| Priority | What | Shortcut |
+|---|---|---|
+| **1. Test** | Dry Run + **Manage Scenarios** | F5 / **Shift+F5** / Cmd+Shift+T |
+| **2. Ship** | **Connect to Studio Web** | **Cmd+Shift+U** |
+| Design | New REFramework / Designer | — |
+| Config | Config.json ↔ Config.xlsx | — |
+
+## In action
 
 ### 1. Sequence designer + custom container colors
 
@@ -34,22 +51,13 @@ Built for UiPath practitioners who design, framework, develop, deploy, and test 
 
 ![REFramework Process with Invoke Code](docs/images/vscode-reframework-process-activities.png)
 
-## What’s in 0.5.2
+## What’s in 0.6.0
 
-- Visual **Sequence** + **Flowchart** designer (`.lcs.json`)
-- **Custom container colors** per activity
-- One-click **REFramework** template with **scenario dry-runs** (`Data/Test/scenarios.json`)
-- **Config.xlsx bridge** — classic Settings / Constants / Assets ↔ `Data/Config.json` (both shipped with new REF projects)
-- **Register Custom Activity** — project (`activities.custom.json`) or user library
-- **Import** UiPath project folders / `.nupkg` (XAML → `.lcs.json`)
-- **Top-use activities** — Invoke Code, Multiple Assign, Switch, Throw, Terminate Workflow, Add/Filter/ForEach Row DataTable, Get Attribute, Wait Element, Deserialize/Serialize JSON
-- **Richer XAML coverage** — Excel, Mail, MessageBox, WriteLine, DoWhile, RetryScope, Check/Hover/SelectItem/Screenshot, Use Application/Browser
-- **Python pack** — `UiPath.Python.Activities` style: Python Scope, Load/Run Script, Invoke Method, Get Object
-- **Selector round-trip** — classic + modern encodings
-- **Export for Studio Web** with activity package dependencies (includes custom NuGet packages when registered)
-- Activity coverage catalog: [docs/ACTIVITIES.md](docs/ACTIVITIES.md) (**57** activities)
-- Dry Run simulator (F5) + **Dry Run REFramework Scenario**
-- Works in VS Code, Cursor, and other forks
+- **Connect to Studio Web** — one guided export + checklist + open studio.uipath.com ([guide](docs/STUDIO_WEB.md))
+- **Dry Run Scenarios** as a first-class path — Shift+F5, last-scenario recall, Manage Scenarios (add / duplicate / open)
+- Project Explorer actions: ▶ Dry Run Scenarios · ✎ Manage Scenarios · ☁ Connect to Studio Web
+- Config.xlsx bridge, custom activities, Invoke Code + top-use activities, Python pack, XAML import/export
+- Activity catalog: [docs/ACTIVITIES.md](docs/ACTIVITIES.md) (**57** activities)
 
 ## Install
 
@@ -61,129 +69,101 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.5.2.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.0.vsix` → reload.
 
 ## Easy path (REFramework)
 
-1. **LowCode Studio: New REFramework Project**
-2. Open `Main.lcs.json` (flowchart)
-3. Edit `Framework/Process.lcs.json` for business logic
-4. Tune `Data/Config.json`
-5. Press **F5** to dry-run Main, or run **Dry Run REFramework Scenario**
+1. **New REFramework Project**
+2. Edit `Framework/Process.lcs.json`
+3. Tune `Data/Config.json` (or import classic `Config.xlsx`)
+4. **Shift+F5** → run scenarios (or **Manage Scenarios** to add a quick smoke test)
+5. **Connect to Studio Web** → Open Folder → Import in [studio.uipath.com](https://studio.uipath.com)
 
 ```
 MyREFramework/
   Main.lcs.json
-  Framework/
-    InitAllSettings.lcs.json
-    GetTransactionData.lcs.json
-    Process.lcs.json
-    SetTransactionStatus.lcs.json
-    ...
+  Framework/Process.lcs.json
   Data/
-    Config.json            ← Mac-friendly source of truth
-    Config.xlsx            ← classic REFramework twin
-    Test/scenarios.json    ← simulated tests (variables + expects)
-  activities.custom.json   ← project custom activities
+    Config.json + Config.xlsx
+    Test/scenarios.json      ← easiest local tests
+  activities.custom.json
 ```
 
-### Config.xlsx bridge (classic REFramework)
-
-| Command | Direction |
-|---|---|
-| **Export Config.xlsx** | `Config.json` → Excel (`Settings` / `Constants` / `Assets` / extras like `Endpoints`) |
-| **Import Config.xlsx** | classic Excel → `Config.json` |
-
-Assets sheet columns: **Name | Asset | OrchestratorFolder**. Dry-run prefers `Config.json` when both exist; if only `.xlsx` is present it is loaded automatically.
-
-### Simulated tests (Config + scenarios)
-
-Yes — for REFramework on Mac, use **variables/config files + simulated scenarios**, not a robot:
+### Dry-run & scenarios (key feature)
 
 | Piece | Purpose |
 |---|---|
-| `Data/Config.json` / `Config.xlsx` | Shared settings (`MaxTransactions`, retries, endpoints) |
-| `Data/Test/scenarios.json` | Named dry-runs with seeded variables + assertions |
-| **Dry Run REFramework Scenario** | Pick a scenario (or All) and see PASS/FAIL in Output |
+| **F5** | Dry-run the open workflow |
+| **Shift+F5** | Pick scenario / All / Add quick / Manage |
+| **Manage Scenarios** | Add MaxTransactions smoke tests, duplicate, open file |
+| `Data/Test/scenarios.json` | Named seeds + PASS/FAIL expects |
+
+Last scenario is remembered for one-click re-run.
+
+### Connect to Studio Web (key feature)
+
+| Step | Action |
+|---|---|
+| 1 | **Connect to Studio Web** (exports Portable `*.StudioWeb`) |
+| 2 | Open Folder / Open Checklist (`OPEN_IN_STUDIO_WEB.md`) |
+| 3 | Open [studio.uipath.com](https://studio.uipath.com) → Import that folder |
+| 4 | Restore packages → publish to Orchestrator |
+
+Git tenants: commit the export into the repo Studio Web tracks, then pull in Studio Web. Full notes: [docs/STUDIO_WEB.md](docs/STUDIO_WEB.md).
+
+Export includes XAML, `project.json` (NuGet deps), Config.json/xlsx, and `scenarios.json` for handoff reference.
+
+### Config.xlsx bridge
+
+| Command | Direction |
+|---|---|
+| **Export Config.xlsx** | JSON → classic Settings / Constants / Assets |
+| **Import Config.xlsx** | classic Excel → JSON |
 
 ### Custom activities
 
-**Register Custom Activity** → choose **This project** (`activities.custom.json`, team-shared) or **All my projects** (user library on this machine). They appear in the Activities toolbox, get dry-run stubs, and contribute NuGet package refs on Studio Web export.
+**Register Custom Activity** → This project (`activities.custom.json`) or All my projects (user library).
 
-## Import → design on Mac → Studio Web
+## Activity catalog (summary)
 
-| Step | Command |
+| Category | Highlights |
 |---|---|
-| Import Studio folder | **Import UiPath Project Folder** |
-| Import package | **Import UiPath Package (.nupkg)** *(needs Include Sources)* |
-| Export | **Export for Studio Web** |
-| Open cloud designer | **Open Studio Web** → import the `*.StudioWeb` folder |
-| Publish | Publish from Studio Web to Orchestrator |
-
-Exported `project.json` includes packages such as `UiPath.System.Activities`, `UiPath.UIAutomation.Activities`, and Mail/WebAPI when used — so Studio can restore dependencies and avoid missing-package errors.
-
-## Custom colors
-
-Select an activity → **Container color** (presets, picker, or `#RRGGBB`). Saved on each node in `.lcs.json`.
-
-## Activity catalog
-
-| Category | Activities |
-|---|---|
-| System | Log Message, Delay, Comment, Message Box, Write Line, **Throw**, **Terminate Workflow** |
-| Programming | Assign, **Multiple Assign**, **Invoke Code** |
-| Control Flow | If, While, Do While, For Each, Try Catch, Sequence, Retry Scope, Break, **Switch** |
-| UI Automation | Open Application, Click, Type Into, Get Text, Element Exists, Check, Hover, Select Item, Take Screenshot, **Get Attribute**, **Wait Element** |
-| Data | Read/Write CSV, Build Data Table, **Add Data Row/Column**, **Filter Data Table**, **For Each Row**, **Clear/Output Data Table** |
-| Excel | Read Range, Write Range, Read Cell, Write Cell |
-| Python | Python Scope, Load Python Script, Run Python Script, Invoke Python Method, Get Python Object |
-| Messaging | Send Email, HTTP Request, **Deserialize JSON**, **Serialize JSON** |
-| Flowchart | Start, Flow Decision, End |
+| Programming | Assign, Multiple Assign, **Invoke Code** |
+| Data | Build/Filter/ForEach Row, Add Row/Column, CSV |
+| System | Log, Throw, Terminate Workflow |
+| UI | Click, Type Into, Get Attribute, Wait Element, … |
+| Messaging | HTTP, Email, Deserialize/Serialize JSON |
+| Python | Scope, Load/Run Script, Invoke Method, Get Object |
 | REFramework | Invoke Workflow, Set Transaction Status |
-| Custom | Project / user registered activities |
 
-See the full property-level list in [docs/ACTIVITIES.md](docs/ACTIVITIES.md).
-
-**Invoke Code** and UI/messaging steps are design + dry-run stubs on Mac (code is not executed locally — real run stays in Studio/Robot).
+See [docs/ACTIVITIES.md](docs/ACTIVITIES.md). Invoke Code / UI steps are dry-run stubs on Mac (real run in Studio/Robot).
 
 ## Commands
 
 | Command | Shortcut |
 |---|---|
-| New Project / New REFramework Project | — |
-| Import UiPath Project Folder / Package | — |
-| Export for Studio Web / Open Studio Web | — |
-| New Workflow | Cmd+Alt+N |
-| Validate Workflow | Cmd+Shift+V |
 | Dry Run | F5 |
-| Dry Run REFramework Scenario | — |
+| **Dry Run Scenarios** | **Shift+F5** |
+| **Manage Scenarios** | Cmd+Shift+T |
+| **Connect to Studio Web** | **Cmd+Shift+U** |
+| Show Studio Web Guide | — |
+| Export for Studio Web | — |
 | Export / Import Config.xlsx | — |
-| Register / Manage Custom Activities | — |
+| New REFramework Project | — |
 | Getting Started | — |
 
-## Roadmap — next steps
+## Roadmap
 
 ### Done
-- Richer XAML activity coverage (Excel, Mail, modern UI, RetryScope, …)
-- Selector round-trip (classic + modern encodings)
-- **Python activities** (`UiPath.Python.Activities` pack) + **ACTIVITIES.md** coverage catalog
-- **Custom activity registration** (project + user) + **REFramework scenario dry-runs**
-- **Invoke Code + top-use activities** (Multiple Assign, DataTable helpers, JSON, Get Attribute, Switch, Throw, …)
-- **Config.xlsx bridge** for classic REFramework (JSON ↔ Excel)
-
-### Near term
-1. **Import polish** — clearer placeholder UI for `Imported.*` activities + one-click “replace with…”
-2. **Git-friendly Studio Web sync docs** — short guide for tenants using Git with Studio Web
+- Scenario dry-runs + Manage Scenarios UX
+- **Connect to Studio Web** guided handoff + Git notes
+- Config.xlsx bridge, custom activities, Invoke Code / top activities, Python pack
 
 ### Next
-3. **Validation against Studio packages** — warn when an activity needs a package not listed in dependencies
-4. **Deeper modern UI** — Use Application/Browser scope variables, anchors, CV activities (best-effort)
-5. **Marketplace publish** of the VSIX
-
-### Later (only if needed)
-7. Optional Orchestrator API publish from VS Code (today: publish stays in Studio Web — by design)
-8. Selector recorder helpers for Mac
-9. Optional real local Python runner for dry-run (today: simulated handlers only)
+1. Import polish for `Imported.*` placeholders
+2. Package validation warnings
+3. Deeper modern UI scopes
+4. Marketplace publish
 
 ## License
 

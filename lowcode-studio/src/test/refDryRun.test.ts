@@ -4,11 +4,14 @@ import * as os from 'os';
 import * as path from 'path';
 import { generateREFrameworkProject } from '../templates/reframework';
 import {
+  createQuickScenario,
   deepMerge,
+  duplicateScenario,
   evaluateExpect,
   loadScenariosFile,
   runAllScenarios,
   runScenario,
+  upsertScenario,
   variablesFromConfig
 } from '../commands/refDryRun';
 import { dryRunWorkflow } from '../commands/simulator';
@@ -33,7 +36,11 @@ function run(): void {
   for (const file of generateREFrameworkProject('ScenarioDemo')) {
     const full = path.join(dir, file.relativePath);
     fs.mkdirSync(path.dirname(full), { recursive: true });
-    fs.writeFileSync(full, file.content, 'utf8');
+    if (Buffer.isBuffer(file.content)) {
+      fs.writeFileSync(full, file.content);
+    } else {
+      fs.writeFileSync(full, file.content, 'utf8');
+    }
   }
 
   assert.ok(fs.existsSync(path.join(dir, 'Data/Test/scenarios.json')));
@@ -66,6 +73,15 @@ function run(): void {
     seeded
   );
   assert.ok(asserts.every((a) => a.ok));
+
+  const quick = createQuickScenario({ name: 'smoke', maxTransactions: 1 });
+  assert.strictEqual(quick.variables?.MaxTransactions, 1);
+  const dup = duplicateScenario(quick, 'smoke-copy');
+  assert.strictEqual(dup.name, 'smoke-copy');
+  const scenarioFile = upsertScenario({ schemaVersion: '1.0', scenarios: [] }, quick);
+  assert.strictEqual(scenarioFile.scenarios.length, 1);
+  const smokeRun = runScenario(dir, quick);
+  assert.ok(smokeRun.passed, smokeRun.assertions.map((a) => a.message).join('; '));
 
   fs.rmSync(dir, { recursive: true, force: true });
   console.log('refDryRun.test.ts: all assertions passed');

@@ -1,8 +1,8 @@
 {
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
-  "description": "Studio-like low-code RPA designer for VS Code and Cursor on Mac. Sequence + Flowchart designer, REFramework template, activity toolbox, and dry-run simulation.",
-  "version": "0.5.2",
+  "description": "Mac-first low-code RPA for VS Code/Cursor: REFramework design, scenario dry-runs (Shift+F5), and the easiest Connect to Studio Web handoff for Orchestrator publish.",
+  "version": "0.6.0",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -98,8 +98,13 @@
       },
       {
         "command": "lowcodeStudio.dryRunScenario",
-        "title": "LowCode Studio: Dry Run REFramework Scenario",
+        "title": "LowCode Studio: Dry Run Scenarios",
         "icon": "$(beaker)"
+      },
+      {
+        "command": "lowcodeStudio.manageScenarios",
+        "title": "LowCode Studio: Manage Scenarios",
+        "icon": "$(checklist)"
       },
       {
         "command": "lowcodeStudio.registerCustomActivity",
@@ -139,9 +144,18 @@
         "icon": "$(file-zip)"
       },
       {
+        "command": "lowcodeStudio.connectStudioWeb",
+        "title": "LowCode Studio: Connect to Studio Web",
+        "icon": "$(cloud-upload)"
+      },
+      {
         "command": "lowcodeStudio.exportStudioWeb",
         "title": "LowCode Studio: Export for Studio Web",
-        "icon": "$(cloud-upload)"
+        "icon": "$(export)"
+      },
+      {
+        "command": "lowcodeStudio.showStudioWebGuide",
+        "title": "LowCode Studio: Show Studio Web Guide"
       },
       {
         "command": "lowcodeStudio.exportConfigXlsx",
@@ -180,9 +194,19 @@
           "group": "navigation"
         },
         {
+          "command": "lowcodeStudio.dryRunScenario",
+          "when": "view == lowcodeStudio.projects",
+          "group": "navigation@1"
+        },
+        {
+          "command": "lowcodeStudio.connectStudioWeb",
+          "when": "view == lowcodeStudio.projects",
+          "group": "navigation@2"
+        },
+        {
           "command": "lowcodeStudio.exportStudioWeb",
           "when": "view == lowcodeStudio.projects",
-          "group": "navigation"
+          "group": "navigation@3"
         },
         {
           "command": "lowcodeStudio.exportConfigXlsx",
@@ -242,6 +266,11 @@
           "command": "lowcodeStudio.dryRunScenario",
           "when": "resourceFilename =~ /\\.lcs\\.json$/",
           "group": "navigation"
+        },
+        {
+          "command": "lowcodeStudio.connectStudioWeb",
+          "when": "resourceFilename =~ /\\.lcs\\.json$/",
+          "group": "navigation"
         }
       ],
       "commandPalette": [
@@ -261,6 +290,21 @@
         "command": "lowcodeStudio.dryRun",
         "key": "f5",
         "when": "resourceFilename =~ /\\.lcs\\.json$/"
+      },
+      {
+        "command": "lowcodeStudio.dryRunScenario",
+        "key": "shift+f5",
+        "when": "resourceFilename =~ /\\.lcs\\.json$/"
+      },
+      {
+        "command": "lowcodeStudio.manageScenarios",
+        "key": "ctrl+shift+t",
+        "mac": "cmd+shift+t"
+      },
+      {
+        "command": "lowcodeStudio.connectStudioWeb",
+        "key": "ctrl+shift+u",
+        "mac": "cmd+shift+u"
       },
       {
         "command": "lowcodeStudio.validateWorkflow",
@@ -321,7 +365,7 @@
     "package": "npm run bundle && vsce package --no-dependencies",
     "lint": "tsc --noEmit",
     "docs:activities": "npm run compile && node scripts/generate-activities-md.js",
-    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && npm run docs:activities"
+    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && npm run docs:activities"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
