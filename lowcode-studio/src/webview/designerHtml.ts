@@ -704,7 +704,7 @@ export function getDesignerHtml(
       if (!els.projectTree) return;
       const projects = state.projects || [];
       if (!projects.length) {
-        els.projectTree.innerHTML = '<div class="project-empty">Open a folder or use <b>Open Local Project</b> to see projects here.</div>';
+        els.projectTree.innerHTML = '<div class="project-empty">Open a workflow from the current RPA project to browse its folders and files here.</div>';
         return;
       }
       function nodeHtml(node, depth) {

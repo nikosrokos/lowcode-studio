@@ -87,6 +87,15 @@ export interface ProjectManifest {
    * Portable = cross-platform / cloud-friendly.
    */
   uipathTargetFramework?: 'Windows' | 'Portable';
+  /**
+   * Linked Studio Web Local Workspace solution (sync-on-save target).
+   */
+  studioWebLocal?: {
+    solutionDir: string;
+    projectFolder: string;
+    solutionId: string;
+    projectId: string;
+  };
 }
 
 export function createEmptyWorkflow(

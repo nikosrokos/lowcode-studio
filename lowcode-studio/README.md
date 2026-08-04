@@ -1,12 +1,12 @@
 # LowCode Studio
 
-**Version 0.6.10** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.6.11** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.6.10-0ea5e9)
+![version](https://img.shields.io/badge/version-0.6.11-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
@@ -17,15 +17,15 @@ Built for UiPath practitioners who design, framework, develop, deploy, and test 
 ```
 Design on Mac (REFramework)
    → Dry Run / Scenarios   (F5 / Shift+F5)
-   → Connect to Studio Web (Cmd+Shift+U)
-   → Import at studio.uipath.com
-   → Publish to Orchestrator
+   → Connect Local Workspace (Cmd+Shift+U)
+   → Open folder in Studio Web → Local Workspace
+   → Save in LCS (auto-sync) → Publish
 ```
 
 | Priority | What | Shortcut |
 |---|---|---|
 | **1. Test** | Dry Run + **Manage Scenarios** | F5 / **Shift+F5** / Cmd+Shift+T |
-| **2. Ship** | **Connect to Studio Web** | **Cmd+Shift+U** |
+| **2. Ship** | **Studio Web Local Workspace** (sync on Save) | **Cmd+Shift+U** |
 | Design | **Insert (⌘K)** / Blueprint / REFramework | **⌘K** in designer |
 | Config | Config.json ↔ Config.xlsx | — |
 
@@ -45,7 +45,13 @@ Design on Mac (REFramework)
 2. **Project Explorer** — title actions with tooltips (Open, Scenarios, Connect, Validate…)  
 3. **Extract Table Data** — smart page → DataTable extraction for Windows UI automation
 
-## What’s in 0.6.10
+## What’s in 0.6.11
+
+- **Studio Web Local Workspace** — create/open a `.uipx` solution folder; **Save** syncs `.xaml` (no routine `.uip` export)
+- Designer **Project** tab shows folders/files of the **current** RPA project only
+- Legacy one-off `.uip` export still available from the Connect picker
+
+### Also in 0.6.10
 
 - **Export .uip** creates only the `.uip` package (no `.uis`)
 - Export uses the **selected / open project** — no more packing the wrong sibling project
@@ -127,7 +133,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.10.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.11.vsix` → reload.
 
 ## Easy path
 
@@ -139,7 +145,7 @@ In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.
 2. Edit `Framework/Process.lcs.json`
 3. Tune `Data/Config.json` (or import classic `Config.xlsx`)
 4. **Shift+F5** → run scenarios (or **Manage Scenarios** to add a quick smoke test)
-5. **Validate Packages** (optional) → **Connect to Studio Web** → **Reveal .uip** → Import in [studio.uipath.com](https://studio.uipath.com)
+5. **Validate Packages** (optional) → **Connect / Open Studio Web Local Workspace** → open that folder in Studio Web Local Workspace → **Save** to sync
 
 ```
 MyREFramework/
@@ -163,14 +169,14 @@ MyREFramework/
 
 Last scenario is remembered for one-click re-run.
 
-### Connect to Studio Web (key feature)
+### Studio Web Local Workspace (key feature)
 
 | Step | Action |
 |---|---|
-| 1 | **Connect to Studio Web** (exports Windows `.uip` + `.uis`) |
-| 2 | **Reveal .uip** / Open Checklist (`OPEN_IN_STUDIO_WEB.md`) |
-| 3 | Import in Studio Web **or** open in Studio Desktop (Windows) |
-| 4 | Refine selectors on Windows → publish → run on Windows robot |
+| 1 | **Connect / Open Studio Web Local Workspace** (create or open a `.uipx` solution) |
+| 2 | **Reveal Solution** → Studio Web → **Local Workspace** → Open solution → Allow |
+| 3 | **Save** in LowCode Studio — `.xaml` syncs into the linked folder |
+| 4 | Publish from Studio Web → run on a Windows robot |
 
 Git tenants: commit the `*.StudioWeb` folder into the repo Studio Web tracks, then pull in Studio Web. Full notes: [docs/STUDIO_WEB.md](docs/STUDIO_WEB.md).
 

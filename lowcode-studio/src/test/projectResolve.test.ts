@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import {
+  buildCurrentProjectTree,
   buildDesignerProjectTree,
   findAllLcsProjects,
   findProjectRoot,
@@ -11,6 +12,8 @@ import {
 
 function writeProject(dir: string, name: string): void {
   fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(path.join(dir, 'Framework'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'Data'), { recursive: true });
   fs.writeFileSync(
     path.join(dir, 'project.json'),
     JSON.stringify({ name, schemaVersion: '1.0', main: 'Main.lcs.json' }, null, 2),
@@ -31,6 +34,22 @@ function writeProject(dir: string, name: string): void {
     ),
     'utf8'
   );
+  fs.writeFileSync(
+    path.join(dir, 'Framework', 'Init.lcs.json'),
+    JSON.stringify(
+      {
+        schemaVersion: '1.0',
+        name: 'Init',
+        type: 'Sequence',
+        activities: [],
+        variables: []
+      },
+      null,
+      2
+    ),
+    'utf8'
+  );
+  fs.writeFileSync(path.join(dir, 'Data', 'Config.json'), '{}\n', 'utf8');
 }
 
 function run(): void {
@@ -42,25 +61,30 @@ function run(): void {
 
   const all = findAllLcsProjects([root]);
   assert.deepStrictEqual(all, [project1, project2].sort((a, b) => a.localeCompare(b)));
-
-  // Must not silently prefer LIFO last sibling — both must be discoverable
   assert.ok(all.includes(project1));
   assert.ok(all.includes(project2));
 
-  fs.mkdirSync(path.join(project1, 'Framework'), { recursive: true });
   assert.strictEqual(findProjectRoot(path.join(project1, 'Framework')), project1);
   assert.strictEqual(findProjectRoot(path.dirname(path.join(project1, 'Main.lcs.json'))), project1);
-
   assert.ok(isLcsProjectDir(project1));
   assert.ok(!isLcsProjectDir(root));
 
+  // Designer rail: only current project folders/files
+  const current = buildCurrentProjectTree(project1);
+  assert.ok(current.some((e) => e.kind === 'folder' && e.name === 'Framework'));
+  assert.ok(current.some((e) => e.kind === 'folder' && e.name === 'Data'));
+  assert.ok(current.some((e) => e.kind === 'workflow' && e.name === 'Main'));
+  assert.ok(current.some((e) => e.kind === 'file' && e.name === 'project.json'));
+  assert.ok(!current.some((e) => e.path === project2 || e.name === 'project2'));
+
+  const framework = current.find((e) => e.name === 'Framework');
+  assert.ok(framework?.children?.some((c) => c.kind === 'workflow' && c.name === 'Init'));
+
+  // Active-focused wrapper still returns a single project
   const tree = buildDesignerProjectTree([root], project1);
-  assert.strictEqual(tree.length, 2);
-  const active = tree.find((p) => p.path === project1);
-  const other = tree.find((p) => p.path === project2);
-  assert.ok(active?.active);
-  assert.ok(!other?.active);
-  assert.ok(active?.children?.some((c) => c.kind === 'workflow'));
+  assert.strictEqual(tree.length, 1);
+  assert.strictEqual(tree[0].path, project1);
+  assert.ok(tree[0].active);
 
   fs.rmSync(root, { recursive: true, force: true });
   console.log('projectResolve.test.ts: all assertions passed');

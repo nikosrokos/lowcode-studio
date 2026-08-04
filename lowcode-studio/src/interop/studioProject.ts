@@ -226,9 +226,14 @@ export function importUiPathNupkg(
   }
 }
 
-export function exportToStudioWebProject(
+/**
+ * Write / overwrite a UiPath-compatible project folder from an LCS project.
+ * Used by Studio Web Local Workspace sync and classic folder export.
+ */
+export function writeUiPathProjectToDir(
   lcsProjectDir: string,
-  destinationParent?: string
+  outDir: string,
+  options: { writeReadme?: boolean } = {}
 ): ExportedStudioWebProject {
   const manifestPath = path.join(lcsProjectDir, 'project.json');
   if (!fs.existsSync(manifestPath)) {
@@ -245,10 +250,6 @@ export function exportToStudioWebProject(
   };
 
   const projectName = sanitizeName(manifest.name || path.basename(lcsProjectDir));
-  const outDir = uniqueDir(
-    destinationParent || path.join(lcsProjectDir, '..'),
-    `${projectName}.StudioWeb`
-  );
   fs.mkdirSync(outDir, { recursive: true });
 
   const workflowRels =
@@ -305,7 +306,6 @@ export function exportToStudioWebProject(
   );
   written.push('project.json');
 
-  // Copy config + scenario files (Studio Web resources / team handoff)
   for (const rel of [
     'Data/Config.json',
     'Data/Config.xlsx',
@@ -322,22 +322,18 @@ export function exportToStudioWebProject(
     written.push(rel);
   }
 
-  const depList = Object.entries(dependencies)
-    .map(([name, ver]) => `- \`${name}\`: ${ver}`)
-    .join('\n');
+  if (options.writeReadme !== false) {
+    const depList = Object.entries(dependencies)
+      .map(([name, ver]) => `- \`${name}\`: ${ver}`)
+      .join('\n');
 
-  fs.writeFileSync(
-    path.join(outDir, 'README_STUDIO_WEB.md'),
-    `# ${projectName} — Studio export (Windows)
+    fs.writeFileSync(
+      path.join(outDir, 'README_STUDIO_WEB.md'),
+      `# ${projectName} — Studio Web local project (Windows)
 
-Exported from **LowCode Studio** as a **Windows** UiPath project (\`targetFramework: ${targetFramework}\`).
+Synced from **LowCode Studio** as a **Windows** UiPath project (\`targetFramework: ${targetFramework}\`).
 
-## Run on a Windows machine
-
-1. Open the project in **UiPath Studio Desktop (Windows)** or import the \`.uip\` in Studio Web and run on a **Windows robot**
-2. Restore NuGet packages from \`project.json\`
-3. UI activities use **classic Windows selectors** (\`<html>/<webctrl>\`, \`<wnd>\`, …) — capture/refine them on Windows with UI Explorer
-4. Publish to Orchestrator and run from a Windows unattended/attended robot
+Open this solution folder in Studio Web → **Local Workspace**, or in Studio Desktop (Windows).
 
 Main entry: \`${mainXaml}\`
 
@@ -345,9 +341,10 @@ Main entry: \`${mainXaml}\`
 
 ${depList}
 `,
-    'utf8'
-  );
-  written.push('README_STUDIO_WEB.md');
+      'utf8'
+    );
+    written.push('README_STUDIO_WEB.md');
+  }
 
   return {
     targetDir: outDir,
@@ -355,6 +352,23 @@ ${depList}
     files: written,
     dependencies
   };
+}
+
+export function exportToStudioWebProject(
+  lcsProjectDir: string,
+  destinationParent?: string
+): ExportedStudioWebProject {
+  const manifestPath = path.join(lcsProjectDir, 'project.json');
+  if (!fs.existsSync(manifestPath)) {
+    throw new Error('Open/select a LowCode Studio project folder (with project.json).');
+  }
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as { name?: string };
+  const projectName = sanitizeName(manifest.name || path.basename(lcsProjectDir));
+  const outDir = uniqueDir(
+    destinationParent || path.join(lcsProjectDir, '..'),
+    `${projectName}.StudioWeb`
+  );
+  return writeUiPathProjectToDir(lcsProjectDir, outDir);
 }
 
 export function exportSingleWorkflowToXamlFile(
