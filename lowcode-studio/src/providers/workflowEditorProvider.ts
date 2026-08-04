@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { getActivityCatalog } from '../models/activities';
 import {
   parseWorkflow,
@@ -165,10 +167,48 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           }
           break;
         }
+        case 'openWorkflow': {
+          await this.openInvokedWorkflow(document, String(message.workflowPath || ''));
+          break;
+        }
         case 'ready':
           break;
       }
     });
+  }
+
+  private async openInvokedWorkflow(
+    document: vscode.TextDocument,
+    workflowPath: string
+  ): Promise<void> {
+    const relative = workflowPath.trim().replace(/\\/g, '/');
+    if (!relative) {
+      vscode.window.showWarningMessage('Invoke Workflow has no workflow path set.');
+      return;
+    }
+
+    const projectRoot = findProjectRoot(path.dirname(document.uri.fsPath));
+    const candidates = [
+      path.isAbsolute(relative) ? relative : undefined,
+      projectRoot ? path.join(projectRoot, relative) : undefined,
+      path.join(path.dirname(document.uri.fsPath), relative)
+    ].filter((p): p is string => Boolean(p));
+
+    const resolved = candidates.find((p) => fs.existsSync(p));
+    if (!resolved) {
+      vscode.window.showErrorMessage(
+        `Could not find invoked workflow: ${relative}`
+      );
+      return;
+    }
+
+    const uri = vscode.Uri.file(resolved);
+    await vscode.commands.executeCommand(
+      'vscode.openWith',
+      uri,
+      WorkflowEditorProvider.viewType,
+      { preview: false, viewColumn: vscode.ViewColumn.Beside }
+    );
   }
 
   private async updateTextDocument(
@@ -218,4 +258,29 @@ function escapeHtml(text: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function findProjectRoot(startDir: string): string | undefined {
+  let current = startDir;
+  for (let i = 0; i < 12; i++) {
+    const candidate = path.join(current, 'project.json');
+    if (fs.existsSync(candidate)) {
+      try {
+        const content = JSON.parse(fs.readFileSync(candidate, 'utf8')) as {
+          schemaVersion?: string;
+        };
+        if (content.schemaVersion === '1.0') {
+          return current;
+        }
+      } catch {
+        // keep walking
+      }
+    }
+    const parent = path.dirname(current);
+    if (parent === current) {
+      break;
+    }
+    current = parent;
+  }
+  return undefined;
 }

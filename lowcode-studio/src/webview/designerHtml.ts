@@ -97,15 +97,26 @@ export function getDesignerHtml(
     .panel h2 {
       margin: 0; padding: 14px 14px 8px; font-size: 11px; text-transform: uppercase;
       letter-spacing: .08em; color: var(--muted); font-weight: 700;
+      display: flex; align-items: center; gap: 8px;
     }
+    .panel h2 .grow { flex: 1; }
+    .panel-tools { display: flex; gap: 4px; padding: 0 12px 8px; }
+    .panel-tools .btn { padding: 4px 8px; font-size: 11px; }
     .search {
       margin: 0 12px 10px; width: calc(100% - 24px);
       background: var(--input-bg); color: var(--text);
       border: 1px solid var(--input-border); border-radius: 8px;
       padding: 8px 10px; font-size: 12px;
     }
-    .cat { padding: 0 8px 12px; }
-    .cat-title { font-size: 11px; color: var(--muted); padding: 6px 8px; font-weight: 600; }
+    .cat { padding: 0 8px 8px; }
+    .cat-title {
+      font-size: 11px; color: var(--muted); padding: 6px 8px; font-weight: 700;
+      display: flex; align-items: center; gap: 6px; cursor: pointer; border-radius: 6px;
+      user-select: none;
+    }
+    .cat-title:hover { background: var(--hover); color: var(--text); }
+    .cat-title .chev { width: 12px; font-size: 10px; opacity: .8; }
+    .cat.collapsed .cat-items { display: none; }
     .activity-item {
       display: flex; align-items: center; gap: 8px;
       padding: 8px 10px; margin: 2px 0; border-radius: 8px;
@@ -119,8 +130,23 @@ export function getDesignerHtml(
       font-size: 10px; color: var(--muted); font-family: var(--mono);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .canvas-wrap { position: relative; overflow: auto; padding: 20px 20px 80px; }
-    .canvas-help { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+    .canvas-wrap { position: relative; overflow: auto; padding: 12px 16px 80px; }
+    .canvas-bar {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin-bottom: 10px; position: sticky; top: 0; z-index: 3;
+      padding: 6px 0; background: color-mix(in srgb, var(--bg) 88%, transparent);
+      backdrop-filter: blur(6px);
+    }
+    .canvas-help { color: var(--muted); font-size: 12px; flex: 1; min-width: 180px; }
+    .zoom-tools { display: flex; align-items: center; gap: 4px; }
+    .zoom-label {
+      min-width: 48px; text-align: center; font-size: 11px; font-family: var(--mono); color: var(--muted);
+    }
+    .canvas-zoom {
+      transform-origin: 0 0;
+      transition: transform .12s ease;
+      width: max-content; min-width: 100%;
+    }
     .sequence { max-width: 720px; margin: 0 auto; }
     .drop-zone {
       min-height: 18px; border-radius: 8px; border: 1px dashed transparent; margin: 2px 0;
@@ -134,6 +160,12 @@ export function getDesignerHtml(
       border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
       border-radius: var(--radius); box-shadow: var(--shadow);
       padding: 12px 14px 12px 16px; cursor: pointer; animation: rise .22s ease both;
+      transition: border-color .15s ease, box-shadow .15s ease, transform .12s ease;
+    }
+    .card:hover {
+      border-color: color-mix(in srgb, var(--focus) 55%, var(--border));
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--focus) 35%, transparent), var(--shadow);
+      transform: translateY(-1px);
     }
     .card.selected { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus), var(--shadow); }
     .card-accent { position: absolute; left: 0; top: 10px; bottom: 10px; width: 4px; border-radius: 0 3px 3px 0; }
@@ -161,12 +193,15 @@ export function getDesignerHtml(
     }
     .flow-stage {
       position: relative; min-width: 900px; min-height: 720px;
-      border: 1px dashed color-mix(in srgb, var(--border) 80%, transparent);
-      border-radius: 12px;
-      background:
-        linear-gradient(color-mix(in srgb, var(--muted) 12%, transparent) 1px, transparent 1px) 0 0 / 24px 24px,
-        linear-gradient(90deg, color-mix(in srgb, var(--muted) 12%, transparent) 1px, transparent 1px) 0 0 / 24px 24px,
-        color-mix(in srgb, var(--bg) 92%, transparent);
+      border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+      border-radius: 14px;
+      background-color: color-mix(in srgb, var(--bg) 94%, transparent);
+      background-image:
+        radial-gradient(circle, color-mix(in srgb, var(--muted) 28%, transparent) 1px, transparent 1.5px),
+        linear-gradient(color-mix(in srgb, var(--muted) 8%, transparent) 1px, transparent 1px),
+        linear-gradient(90deg, color-mix(in srgb, var(--muted) 8%, transparent) 1px, transparent 1px);
+      background-size: 20px 20px, 100px 100px, 100px 100px;
+      background-position: 0 0, 0 0, 0 0;
     }
     .flow-stage.drop-target { outline: 2px solid var(--focus); }
     .flow-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
@@ -177,8 +212,14 @@ export function getDesignerHtml(
       background: var(--card); border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
       border-radius: 12px; box-shadow: var(--shadow); padding: 10px 12px 12px;
       cursor: grab; user-select: none;
+      transition: border-color .15s ease, box-shadow .15s ease;
     }
-    .flow-node.selected { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus), var(--shadow); }
+    .flow-node:hover {
+      border-color: color-mix(in srgb, var(--focus) 55%, var(--border));
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--focus) 30%, transparent), var(--shadow);
+      z-index: 2;
+    }
+    .flow-node.selected { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus), var(--shadow); z-index: 3; }
     .flow-node.decision {
       width: 170px; height: 170px; border-radius: 16px;
       transform: rotate(45deg); display: flex; align-items: center; justify-content: center;
@@ -197,8 +238,22 @@ export function getDesignerHtml(
       transform: translateY(-50%); cursor: crosshair; pointer-events: auto;
     }
     .flow-node.decision .port { right: -8px; }
-    .props { padding: 0 14px 20px; }
+    .props { padding: 0 14px 12px; }
     .props .empty { color: var(--muted); font-size: 12px; line-height: 1.5; padding: 8px 0; }
+    .prop-section {
+      border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+      border-radius: 10px; margin-bottom: 10px; overflow: hidden;
+      background: color-mix(in srgb, var(--panel) 70%, transparent);
+    }
+    .prop-section-head {
+      display: flex; align-items: center; gap: 6px; width: 100%;
+      padding: 8px 10px; border: none; background: transparent; color: var(--text);
+      font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+      cursor: pointer; text-align: left;
+    }
+    .prop-section-head:hover { background: var(--hover); }
+    .prop-section-body { padding: 4px 10px 10px; }
+    .prop-section.collapsed .prop-section-body { display: none; }
     .field { margin-bottom: 12px; }
     .field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
     .field input, .field select, .field textarea {
@@ -207,6 +262,16 @@ export function getDesignerHtml(
       padding: 8px 10px; font-size: 12px; font-family: var(--mono);
     }
     .field textarea { min-height: 84px; resize: vertical; }
+    .hover-tip {
+      position: fixed; z-index: 20; max-width: 280px; pointer-events: none;
+      background: var(--panel); color: var(--text); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 10px; font-size: 11px; line-height: 1.4;
+      box-shadow: var(--shadow); opacity: 0; transform: translateY(4px);
+      transition: opacity .12s ease, transform .12s ease;
+    }
+    .hover-tip.show { opacity: 1; transform: translateY(0); }
+    .hover-tip .tip-title { font-weight: 700; margin-bottom: 2px; }
+    .hover-tip .tip-meta { color: var(--muted); font-family: var(--mono); word-break: break-all; }
     .toast {
       position: absolute; right: 18px; bottom: 18px;
       background: var(--panel); border: 1px solid var(--border);
@@ -236,20 +301,39 @@ export function getDesignerHtml(
     </div>
 
     <aside class="panel" id="toolbox">
-      <h2>Activities</h2>
+      <h2><span class="grow">Activities</span></h2>
+      <div class="panel-tools">
+        <button class="btn" id="btnExpandCats" type="button" title="Expand all categories">Expand</button>
+        <button class="btn" id="btnCollapseCats" type="button" title="Collapse all categories">Collapse</button>
+      </div>
       <input class="search" id="search" placeholder="Search activities..." />
       <div id="catalog"></div>
     </aside>
 
     <main class="canvas-wrap" id="canvasWrap">
-      <div class="canvas-help" id="canvasHelp"></div>
-      <div class="sequence" id="sequence"></div>
-      <div class="flow-stage" id="flowStage" style="display:none"></div>
+      <div class="canvas-bar">
+        <div class="canvas-help" id="canvasHelp"></div>
+        <div class="zoom-tools">
+          <button class="btn" id="btnZoomOut" type="button" title="Zoom out">−</button>
+          <span class="zoom-label" id="zoomLabel">100%</span>
+          <button class="btn" id="btnZoomIn" type="button" title="Zoom in">+</button>
+          <button class="btn" id="btnZoomReset" type="button" title="Reset zoom">100%</button>
+        </div>
+      </div>
+      <div class="canvas-zoom" id="canvasZoom">
+        <div class="sequence" id="sequence"></div>
+        <div class="flow-stage" id="flowStage" style="display:none"></div>
+      </div>
       <div class="toast" id="toast"></div>
+      <div class="hover-tip" id="hoverTip"></div>
     </main>
 
     <aside class="panel right">
-      <h2>Properties</h2>
+      <h2><span class="grow">Properties</span></h2>
+      <div class="panel-tools">
+        <button class="btn" id="btnExpandProps" type="button" title="Expand all property groups">Expand</button>
+        <button class="btn" id="btnCollapseProps" type="button" title="Collapse all property groups">Collapse</button>
+      </div>
       <div class="props" id="props"></div>
       <h2>Variables</h2>
       <div class="props" id="variablesPanel"></div>
@@ -271,13 +355,17 @@ export function getDesignerHtml(
       dragType: null,
       linkFrom: null,
       draggingId: null,
-      dragOffset: { x: 0, y: 0 }
+      dragOffset: { x: 0, y: 0 },
+      zoom: 1,
+      collapsedCats: {},
+      collapsedPropSections: {}
     };
 
     const els = {
       catalog: document.getElementById('catalog'),
       sequence: document.getElementById('sequence'),
       flowStage: document.getElementById('flowStage'),
+      canvasZoom: document.getElementById('canvasZoom'),
       props: document.getElementById('props'),
       variablesPanel: document.getElementById('variablesPanel'),
       connectionsPanel: document.getElementById('connectionsPanel'),
@@ -287,6 +375,8 @@ export function getDesignerHtml(
       canvasHelp: document.getElementById('canvasHelp'),
       search: document.getElementById('search'),
       toast: document.getElementById('toast'),
+      hoverTip: document.getElementById('hoverTip'),
+      zoomLabel: document.getElementById('zoomLabel'),
       btnDelete: document.getElementById('btnDelete'),
       btnLink: document.getElementById('btnLink'),
       btnAutoLayout: document.getElementById('btnAutoLayout')
@@ -355,6 +445,42 @@ export function getDesignerHtml(
       }
     }
 
+    function applyZoom() {
+      els.canvasZoom.style.transform = 'scale(' + state.zoom + ')';
+      els.zoomLabel.textContent = Math.round(state.zoom * 100) + '%';
+    }
+    function setZoom(next) {
+      state.zoom = Math.min(1.75, Math.max(0.5, Math.round(next * 100) / 100));
+      applyZoom();
+    }
+    function stagePoint(e) {
+      const rect = els.flowStage.getBoundingClientRect();
+      return {
+        x: (e.clientX - rect.left) / state.zoom,
+        y: (e.clientY - rect.top) / state.zoom
+      };
+    }
+    function showTip(html, clientX, clientY) {
+      els.hoverTip.innerHTML = html;
+      els.hoverTip.classList.add('show');
+      const pad = 12;
+      let left = clientX + pad;
+      let top = clientY + pad;
+      const tipRect = els.hoverTip.getBoundingClientRect();
+      if (left + tipRect.width > window.innerWidth - 8) left = clientX - tipRect.width - pad;
+      if (top + tipRect.height > window.innerHeight - 8) top = clientY - tipRect.height - pad;
+      els.hoverTip.style.left = left + 'px';
+      els.hoverTip.style.top = top + 'px';
+    }
+    function hideTip() {
+      els.hoverTip.classList.remove('show');
+    }
+    function tipHtml(node) {
+      return '<div class="tip-title">' + escapeHtml(node.displayName) + '</div>' +
+        '<div class="tip-meta">' + escapeHtml(node.type) + '</div>' +
+        (summary(node) ? '<div class="tip-meta" style="margin-top:4px">' + escapeHtml(summary(node)) + '</div>' : '');
+    }
+
     function renderCatalog() {
       const q = els.search.value.trim().toLowerCase();
       const groups = {};
@@ -364,21 +490,44 @@ export function getDesignerHtml(
         (groups[a.category] ||= []).push(a);
       }
       els.catalog.innerHTML = Object.entries(groups).map(([cat, items]) => {
-        return '<div class="cat"><div class="cat-title">' + escapeHtml(cat) + '</div>' +
+        const collapsed = !!state.collapsedCats[cat] && !q;
+        return '<div class="cat' + (collapsed ? ' collapsed' : '') + '" data-cat="' + escapeAttr(cat) + '">' +
+          '<div class="cat-title"><span class="chev">' + (collapsed ? '▸' : '▾') + '</span>' + escapeHtml(cat) +
+          ' <span style="opacity:.55;font-weight:500">(' + items.length + ')</span></div>' +
+          '<div class="cat-items">' +
           items.map(a => (
-            '<div class="activity-item" draggable="true" data-type="' + escapeAttr(a.type) + '">' +
+            '<div class="activity-item" draggable="true" data-type="' + escapeAttr(a.type) + '" data-tip="' + escapeAttr(a.displayName + ' — ' + a.type) + '">' +
               '<span class="dot" style="background:' + a.color + '"></span>' +
               '<div class="meta"><div class="title">' + escapeHtml(a.displayName) + '</div>' +
               '<div class="type">' + escapeHtml(a.type) + '</div></div></div>'
-          )).join('') + '</div>';
+          )).join('') + '</div></div>';
       }).join('');
 
+      els.catalog.querySelectorAll('.cat-title').forEach(el => {
+        el.addEventListener('click', () => {
+          const cat = el.parentElement.getAttribute('data-cat');
+          state.collapsedCats[cat] = !state.collapsedCats[cat];
+          renderCatalog();
+        });
+      });
       els.catalog.querySelectorAll('.activity-item').forEach(el => {
         el.addEventListener('dragstart', (e) => {
           state.dragType = el.getAttribute('data-type');
           e.dataTransfer.setData('text/plain', state.dragType);
           e.dataTransfer.effectAllowed = 'copy';
+          hideTip();
         });
+        el.addEventListener('mouseenter', (e) => {
+          const def = findDef(el.getAttribute('data-type'));
+          if (!def) return;
+          showTip('<div class="tip-title">' + escapeHtml(def.displayName) + '</div><div class="tip-meta">' + escapeHtml(def.type) + '</div>', e.clientX, e.clientY);
+        });
+        el.addEventListener('mousemove', (e) => {
+          const def = findDef(el.getAttribute('data-type'));
+          if (!def) return;
+          showTip('<div class="tip-title">' + escapeHtml(def.displayName) + '</div><div class="tip-meta">' + escapeHtml(def.type) + '</div>', e.clientX, e.clientY);
+        });
+        el.addEventListener('mouseleave', hideTip);
         el.addEventListener('dblclick', () => {
           const node = createActivity(el.getAttribute('data-type'));
           if (!node) return;
@@ -438,9 +587,13 @@ export function getDesignerHtml(
       const wrap = document.createElement('div');
       const card = document.createElement('div');
       card.className = 'card' + (state.selectedId === node.id ? ' selected' : '');
+      const openBtn = node.type === 'REFramework.InvokeWorkflow'
+        ? '<button class="icon-btn" data-act="open" title="Open workflow in new tab">↗</button>'
+        : '';
       card.innerHTML =
         '<div class="card-accent" style="background:' + color + '"></div>' +
         '<div class="card-actions">' +
+          openBtn +
           '<button class="icon-btn" data-act="up" title="Move up">↑</button>' +
           '<button class="icon-btn" data-act="down" title="Move down">↓</button>' +
           '<button class="icon-btn" data-act="dup" title="Duplicate">⧉</button>' +
@@ -448,15 +601,32 @@ export function getDesignerHtml(
         '<div class="card-head"><span class="step">#' + stepNo + '</span>' +
         '<div class="card-title">' + escapeHtml(node.displayName) + '</div></div>' +
         '<div class="card-summary">' + escapeHtml(summary(node)) + '</div>';
+      card.addEventListener('mouseenter', (e) => showTip(tipHtml(node), e.clientX, e.clientY));
+      card.addEventListener('mousemove', (e) => showTip(tipHtml(node), e.clientX, e.clientY));
+      card.addEventListener('mouseleave', hideTip);
       card.addEventListener('click', (e) => {
         if (e.target.closest('[data-act]')) return;
         state.selectedId = node.id;
+        hideTip();
         renderAll();
+      });
+      card.addEventListener('dblclick', (e) => {
+        if (node.type === 'REFramework.InvokeWorkflow' && node.properties?.workflowPath) {
+          e.stopPropagation();
+          vscode.postMessage({ type: 'openWorkflow', workflowPath: String(node.properties.workflowPath) });
+        }
       });
       card.querySelectorAll('[data-act]').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           const act = btn.getAttribute('data-act');
+          if (act === 'open') {
+            vscode.postMessage({
+              type: 'openWorkflow',
+              workflowPath: String(node.properties?.workflowPath || '')
+            });
+            return;
+          }
           const hit = walkFind(state.workflow.activities, node.id);
           if (!hit) return;
           if (act === 'up' && hit.index > 0) {
@@ -577,11 +747,29 @@ export function getDesignerHtml(
           if (e.target.classList.contains('port')) return;
           state.selectedId = node.id;
           state.draggingId = node.id;
-          state.dragOffset = { x: e.clientX - (node.x || 0), y: e.clientY - (node.y || 0) };
+          const pt = stagePoint(e);
+          state.dragOffset = { x: pt.x - (node.x || 0), y: pt.y - (node.y || 0) };
+          hideTip();
           renderProps();
           renderConnectionsPanel();
           document.querySelectorAll('.flow-node').forEach(n => n.classList.remove('selected'));
           el.classList.add('selected');
+        });
+
+        el.addEventListener('mouseenter', (e) => {
+          if (state.draggingId) return;
+          showTip(tipHtml(node), e.clientX, e.clientY);
+        });
+        el.addEventListener('mousemove', (e) => {
+          if (state.draggingId) return;
+          showTip(tipHtml(node), e.clientX, e.clientY);
+        });
+        el.addEventListener('mouseleave', hideTip);
+
+        el.addEventListener('dblclick', () => {
+          if (node.type === 'REFramework.InvokeWorkflow' && node.properties?.workflowPath) {
+            vscode.postMessage({ type: 'openWorkflow', workflowPath: String(node.properties.workflowPath) });
+          }
         });
 
         el.querySelector('.port')?.addEventListener('mousedown', (e) => {
@@ -616,8 +804,8 @@ export function getDesignerHtml(
         e.preventDefault();
         stage.classList.remove('drop-target');
         const type = e.dataTransfer.getData('text/plain') || state.dragType;
-        const rect = stage.getBoundingClientRect();
-        const node = createActivity(type, e.clientX - rect.left - 60, e.clientY - rect.top - 20);
+        const pt = stagePoint(e);
+        const node = createActivity(type, pt.x - 60, pt.y - 20);
         if (!node) return;
         state.workflow.activities.push(node);
         if (node.type === 'Flowchart.Start') state.workflow.startActivityId = node.id;
@@ -639,10 +827,10 @@ export function getDesignerHtml(
       if (!state.draggingId) return;
       const node = state.workflow.activities.find(a => a.id === state.draggingId);
       if (!node) return;
-      node.x = Math.max(0, e.clientX - state.dragOffset.x);
-      node.y = Math.max(0, e.clientY - state.dragOffset.y);
-      const el = [...document.querySelectorAll('.flow-node')].find(n => n.classList.contains('selected'));
-      // live move without full persist spam
+      const pt = stagePoint(e);
+      node.x = Math.max(0, pt.x - state.dragOffset.x);
+      node.y = Math.max(0, pt.y - state.dragOffset.y);
+      hideTip();
       const map = new Map(state.workflow.activities.map(a => [a.id, a]));
       document.querySelectorAll('.flow-node').forEach((dom, idx) => {
         const n = state.workflow.activities[idx];
@@ -685,6 +873,34 @@ export function getDesignerHtml(
       }
     });
 
+    function propSection(id, title, bodyHtml) {
+      const collapsed = !!state.collapsedPropSections[id];
+      return '<div class="prop-section' + (collapsed ? ' collapsed' : '') + '" data-section="' + escapeAttr(id) + '">' +
+        '<button type="button" class="prop-section-head"><span class="chev">' + (collapsed ? '▸' : '▾') + '</span> ' +
+        escapeHtml(title) + '</button>' +
+        '<div class="prop-section-body">' + bodyHtml + '</div></div>';
+    }
+    function fieldHtml(label, inner, required) {
+      return '<div class="field"><label>' + escapeHtml(label) + (required ? ' *' : '') + '</label>' + inner + '</div>';
+    }
+    function renderPropInput(p, val) {
+      if (p.type === 'enum') {
+        return '<select data-prop="' + escapeAttr(p.name) + '">' +
+          (p.options || []).map(o => '<option value="' + escapeAttr(o) + '"' + (String(val) === o ? ' selected' : '') + '>' + escapeHtml(o) + '</option>').join('') +
+          '</select>';
+      }
+      if (p.type === 'boolean') {
+        return '<select data-prop="' + escapeAttr(p.name) + '"><option value="true"' + (val === true || val === 'true' ? ' selected' : '') + '>true</option><option value="false"' + (val === false || val === 'false' ? ' selected' : '') + '>false</option></select>';
+      }
+      if (p.type === 'multiline') {
+        return '<textarea data-prop="' + escapeAttr(p.name) + '">' + escapeHtml(String(val)) + '</textarea>';
+      }
+      if (p.type === 'number') {
+        return '<input type="number" data-prop="' + escapeAttr(p.name) + '" value="' + escapeAttr(String(val)) + '" />';
+      }
+      return '<input data-prop="' + escapeAttr(p.name) + '" value="' + escapeAttr(String(val)) + '" />';
+    }
+
     function renderProps() {
       const hit = state.selectedId ? walkFind(state.workflow.activities, state.selectedId) : null;
       els.btnDelete.disabled = !hit;
@@ -694,11 +910,12 @@ export function getDesignerHtml(
       }
       const node = hit.node;
       const def = findDef(node.type);
-      let html = '<div class="field"><label>Display Name</label><input id="prop_displayName" value="' + escapeAttr(node.displayName) + '" /></div>';
-      html += '<div class="field"><label>Type</label><input value="' + escapeAttr(node.type) + '" disabled /></div>';
       const currentColor = node.color || def?.color || '#64748B';
       const presets = ['#3B82F6','#8B5CF6','#F59E0B','#10B981','#EF4444','#0EA5E9','#EC4899','#64748B','#22C55E','#A855F7'];
-      html += '<div class="field"><label>Container color</label>' +
+
+      let general = fieldHtml('Display Name', '<input id="prop_displayName" value="' + escapeAttr(node.displayName) + '" />');
+      general += fieldHtml('Type', '<input value="' + escapeAttr(node.type) + '" disabled />');
+      general += '<div class="field"><label>Container color</label>' +
         '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">' +
         presets.map(c => '<button type="button" class="icon-btn" data-color="' + c + '" title="' + c + '" style="background:' + c + ';border-color:transparent;width:22px;height:22px;"></button>').join('') +
         '</div>' +
@@ -707,29 +924,37 @@ export function getDesignerHtml(
         '<input id="prop_color_hex" value="' + escapeAttr(currentColor) + '" placeholder="#RRGGBB" />' +
         '<button class="btn" id="btnResetColor" type="button">Reset</button>' +
         '</div></div>';
+
+      let activity = '';
       for (const p of (def?.properties || [])) {
         const val = node.properties?.[p.name] ?? '';
-        html += '<div class="field"><label>' + escapeHtml(p.label) + (p.required ? ' *' : '') + '</label>';
-        if (p.type === 'enum') {
-          html += '<select data-prop="' + escapeAttr(p.name) + '">' +
-            (p.options || []).map(o => '<option value="' + escapeAttr(o) + '"' + (String(val) === o ? ' selected' : '') + '>' + escapeHtml(o) + '</option>').join('') +
-            '</select>';
-        } else if (p.type === 'boolean') {
-          html += '<select data-prop="' + escapeAttr(p.name) + '"><option value="true"' + (val === true || val === 'true' ? ' selected' : '') + '>true</option><option value="false"' + (val === false || val === 'false' ? ' selected' : '') + '>false</option></select>';
-        } else if (p.type === 'multiline') {
-          html += '<textarea data-prop="' + escapeAttr(p.name) + '">' + escapeHtml(String(val)) + '</textarea>';
-        } else if (p.type === 'number') {
-          html += '<input type="number" data-prop="' + escapeAttr(p.name) + '" value="' + escapeAttr(String(val)) + '" />';
-        } else {
-          html += '<input data-prop="' + escapeAttr(p.name) + '" value="' + escapeAttr(String(val)) + '" />';
+        activity += fieldHtml(p.label, renderPropInput(p, val), p.required);
+        if (node.type === 'REFramework.InvokeWorkflow' && p.name === 'workflowPath') {
+          activity += '<div class="field"><button class="btn primary" id="btnOpenWorkflow" type="button">Open Workflow in New Tab</button></div>';
         }
-        html += '</div>';
       }
+      if (!activity) activity = '<div class="empty">No activity-specific properties.</div>';
+
+      let flow = '';
       if (isFlow()) {
-        html += '<div class="field"><label>Set as Start</label><button class="btn" id="btnSetStart">Use as flowchart start</button></div>';
+        flow += fieldHtml('Position', '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><input value="x=' + Math.round(node.x || 0) + '" disabled /><input value="y=' + Math.round(node.y || 0) + '" disabled /></div>');
+        flow += '<div class="field"><button class="btn" id="btnSetStart" type="button">Use as flowchart start</button></div>';
       }
+
+      let html = propSection('general', 'General', general);
+      html += propSection('activity', 'Activity', activity);
+      if (flow) html += propSection('flow', 'Flowchart', flow);
       els.props.innerHTML = html;
-      document.getElementById('prop_displayName').addEventListener('change', (e) => {
+
+      els.props.querySelectorAll('.prop-section-head').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const section = btn.parentElement.getAttribute('data-section');
+          state.collapsedPropSections[section] = !state.collapsedPropSections[section];
+          renderProps();
+        });
+      });
+
+      document.getElementById('prop_displayName')?.addEventListener('change', (e) => {
         node.displayName = e.target.value || node.displayName;
         persist(true);
       });
@@ -770,6 +995,12 @@ export function getDesignerHtml(
         state.workflow.startActivityId = node.id;
         toast('Start node set');
         persist(false);
+      });
+      document.getElementById('btnOpenWorkflow')?.addEventListener('click', () => {
+        vscode.postMessage({
+          type: 'openWorkflow',
+          workflowPath: String(node.properties?.workflowPath || '')
+        });
       });
     }
 
@@ -901,8 +1132,9 @@ export function getDesignerHtml(
       els.btnLink.style.display = isFlow() ? '' : 'none';
       els.btnAutoLayout.style.display = isFlow() ? '' : 'none';
       els.canvasHelp.textContent = isFlow()
-        ? 'Flowchart mode: drop activities on the grid, drag nodes, and use the blue port to create True/False/Next links.'
-        : 'Sequence mode: drag activities onto the sequence. Click a step to edit properties.';
+        ? 'Flowchart mode: drop on the grid, drag nodes, use blue ports for links. Hover for details. Zoom with +/−.'
+        : 'Sequence mode: drag activities onto the sequence. Hover for details. Double-click Invoke Workflow to open it.';
+      applyZoom();
       renderCatalog();
       if (isFlow()) renderFlowchart(); else renderSequence();
       renderProps();
@@ -922,6 +1154,32 @@ export function getDesignerHtml(
       persist(false);
     });
     els.search.addEventListener('input', renderCatalog);
+    document.getElementById('btnExpandCats')?.addEventListener('click', () => {
+      state.collapsedCats = {};
+      renderCatalog();
+    });
+    document.getElementById('btnCollapseCats')?.addEventListener('click', () => {
+      const cats = new Set(state.catalog.map(a => a.category));
+      state.collapsedCats = {};
+      for (const c of cats) state.collapsedCats[c] = true;
+      renderCatalog();
+    });
+    document.getElementById('btnExpandProps')?.addEventListener('click', () => {
+      state.collapsedPropSections = {};
+      renderProps();
+    });
+    document.getElementById('btnCollapseProps')?.addEventListener('click', () => {
+      state.collapsedPropSections = { general: true, activity: true, flow: true };
+      renderProps();
+    });
+    document.getElementById('btnZoomIn')?.addEventListener('click', () => setZoom(state.zoom + 0.1));
+    document.getElementById('btnZoomOut')?.addEventListener('click', () => setZoom(state.zoom - 0.1));
+    document.getElementById('btnZoomReset')?.addEventListener('click', () => setZoom(1));
+    document.getElementById('canvasWrap')?.addEventListener('wheel', (e) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      setZoom(state.zoom + (e.deltaY < 0 ? 0.1 : -0.1));
+    }, { passive: false });
     document.getElementById('btnSave').addEventListener('click', () => {
       vscode.postMessage({ type: 'save' });
       toast('Saved');

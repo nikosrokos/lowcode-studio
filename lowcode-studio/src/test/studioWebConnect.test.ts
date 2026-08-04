@@ -2,6 +2,7 @@ import assert from 'assert';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import AdmZip from 'adm-zip';
 import { generateREFrameworkProject } from '../templates/reframework';
 import { connectToStudioWeb, studioWebSyncGuideMarkdown } from '../interop/studioWebConnect';
 import {
@@ -35,12 +36,31 @@ function run(): void {
     fs.existsSync(path.join(connected.targetDir, 'Data', 'Test', 'scenarios.json')),
     'scenarios should be copied for handoff'
   );
+
+  assert.ok(connected.archives, 'archives should be returned');
+  assert.ok(fs.existsSync(connected.archives.uipPath), '.uip package missing');
+  assert.ok(fs.existsSync(connected.archives.uisPath), '.uis package missing');
+  assert.ok(connected.archives.uipPath.endsWith('.uip'));
+  assert.ok(connected.archives.uisPath.endsWith('.uis'));
+
+  const uip = new AdmZip(connected.archives.uipPath);
+  const uipNames = uip.getEntries().map((e) => e.entryName.replace(/\\/g, '/'));
+  assert.ok(uipNames.some((n) => n === 'project.json' || n.endsWith('/project.json')));
+  assert.ok(uipNames.some((n) => n === 'Main.xaml' || n.endsWith('/Main.xaml')));
+
+  const uis = new AdmZip(connected.archives.uisPath);
+  const uisNames = uis.getEntries().map((e) => e.entryName.replace(/\\/g, '/'));
+  assert.ok(uisNames.some((n) => n.endsWith('.uipx')));
+  assert.ok(uisNames.some((n) => n.includes('projects/') && n.endsWith('project.json')));
+
   const guide = fs.readFileSync(connected.guidePath, 'utf8');
   assert.ok(guide.includes('studio.uipath.com'));
-  assert.ok(guide.includes('Fast path'));
+  assert.ok(guide.includes('.uip'));
+  assert.ok(guide.includes('.uis'));
 
   const md = studioWebSyncGuideMarkdown();
   assert.ok(md.includes('Connect to Studio Web'));
+  assert.ok(md.includes('.uip'));
   assert.ok(md.includes('Shift+F5') || md.includes('Dry Run'));
 
   // Scenario manage helpers
@@ -55,6 +75,8 @@ function run(): void {
 
   fs.rmSync(dir, { recursive: true, force: true });
   fs.rmSync(connected.targetDir, { recursive: true, force: true });
+  fs.rmSync(connected.archives.uipPath, { force: true });
+  fs.rmSync(connected.archives.uisPath, { force: true });
   console.log('studioWebConnect.test.ts: all assertions passed');
 }
 
