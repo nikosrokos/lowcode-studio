@@ -1,18 +1,18 @@
 # LowCode Studio
 
-**Version 0.5.1** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.5.2** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally in your editor — with import/export paths to Studio Web.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.5.1-0ea5e9)
+![version](https://img.shields.io/badge/version-0.5.2-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
 **Full activity list:** [docs/ACTIVITIES.md](docs/ACTIVITIES.md)
 
-## In action (v0.5.1)
+## In action (v0.5.2)
 
 ### 1. Sequence designer + custom container colors
 
@@ -34,11 +34,12 @@ Built for UiPath practitioners who design, framework, develop, deploy, and test 
 
 ![REFramework Process with Invoke Code](docs/images/vscode-reframework-process-activities.png)
 
-## What’s in 0.5.1
+## What’s in 0.5.2
 
 - Visual **Sequence** + **Flowchart** designer (`.lcs.json`)
 - **Custom container colors** per activity
 - One-click **REFramework** template with **scenario dry-runs** (`Data/Test/scenarios.json`)
+- **Config.xlsx bridge** — classic Settings / Constants / Assets ↔ `Data/Config.json` (both shipped with new REF projects)
 - **Register Custom Activity** — project (`activities.custom.json`) or user library
 - **Import** UiPath project folders / `.nupkg` (XAML → `.lcs.json`)
 - **Top-use activities** — Invoke Code, Multiple Assign, Switch, Throw, Terminate Workflow, Add/Filter/ForEach Row DataTable, Get Attribute, Wait Element, Deserialize/Serialize JSON
@@ -60,7 +61,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.5.1.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.5.2.vsix` → reload.
 
 ## Easy path (REFramework)
 
@@ -80,10 +81,20 @@ MyREFramework/
     SetTransactionStatus.lcs.json
     ...
   Data/
-    Config.json
+    Config.json            ← Mac-friendly source of truth
+    Config.xlsx            ← classic REFramework twin
     Test/scenarios.json    ← simulated tests (variables + expects)
   activities.custom.json   ← project custom activities
 ```
+
+### Config.xlsx bridge (classic REFramework)
+
+| Command | Direction |
+|---|---|
+| **Export Config.xlsx** | `Config.json` → Excel (`Settings` / `Constants` / `Assets` / extras like `Endpoints`) |
+| **Import Config.xlsx** | classic Excel → `Config.json` |
+
+Assets sheet columns: **Name | Asset | OrchestratorFolder**. Dry-run prefers `Config.json` when both exist; if only `.xlsx` is present it is loaded automatically.
 
 ### Simulated tests (Config + scenarios)
 
@@ -91,7 +102,7 @@ Yes — for REFramework on Mac, use **variables/config files + simulated scenari
 
 | Piece | Purpose |
 |---|---|
-| `Data/Config.json` | Shared settings (`MaxTransactions`, retries, endpoints) |
+| `Data/Config.json` / `Config.xlsx` | Shared settings (`MaxTransactions`, retries, endpoints) |
 | `Data/Test/scenarios.json` | Named dry-runs with seeded variables + assertions |
 | **Dry Run REFramework Scenario** | Pick a scenario (or All) and see PASS/FAIL in Output |
 
@@ -146,6 +157,7 @@ See the full property-level list in [docs/ACTIVITIES.md](docs/ACTIVITIES.md).
 | Validate Workflow | Cmd+Shift+V |
 | Dry Run | F5 |
 | Dry Run REFramework Scenario | — |
+| Export / Import Config.xlsx | — |
 | Register / Manage Custom Activities | — |
 | Getting Started | — |
 
@@ -157,16 +169,16 @@ See the full property-level list in [docs/ACTIVITIES.md](docs/ACTIVITIES.md).
 - **Python activities** (`UiPath.Python.Activities` pack) + **ACTIVITIES.md** coverage catalog
 - **Custom activity registration** (project + user) + **REFramework scenario dry-runs**
 - **Invoke Code + top-use activities** (Multiple Assign, DataTable helpers, JSON, Get Attribute, Switch, Throw, …)
+- **Config.xlsx bridge** for classic REFramework (JSON ↔ Excel)
 
 ### Near term
 1. **Import polish** — clearer placeholder UI for `Imported.*` activities + one-click “replace with…”
 2. **Git-friendly Studio Web sync docs** — short guide for tenants using Git with Studio Web
-3. **Config.xlsx bridge** — optional convert/export for classic REFramework Excel config
 
 ### Next
-4. **Validation against Studio packages** — warn when an activity needs a package not listed in dependencies
-5. **Deeper modern UI** — Use Application/Browser scope variables, anchors, CV activities (best-effort)
-6. **Marketplace publish** of the VSIX
+3. **Validation against Studio packages** — warn when an activity needs a package not listed in dependencies
+4. **Deeper modern UI** — Use Application/Browser scope variables, anchors, CV activities (best-effort)
+5. **Marketplace publish** of the VSIX
 
 ### Later (only if needed)
 7. Optional Orchestrator API publish from VS Code (today: publish stays in Studio Web — by design)

@@ -1,6 +1,6 @@
 # LowCode Studio for VS Code / Cursor
 
-**v0.5.1** — Studio-like low-code RPA for Mac users without UiPath Studio Desktop.
+**v0.5.2** — Studio-like low-code RPA for Mac users without UiPath Studio Desktop.
 
 **Repo:** https://github.com/nikosrokos/lowcode-studio
 
@@ -28,22 +28,20 @@ npm test
 npm run package
 ```
 
-**Extensions: Install from VSIX…** → `lowcode-studio-0.5.1.vsix`
+**Extensions: Install from VSIX…** → `lowcode-studio-0.5.2.vsix`
 
-Activity coverage catalog: [`lowcode-studio/docs/ACTIVITIES.md`](lowcode-studio/docs/ACTIVITIES.md) (**57** activities)
+Activity coverage catalog: [`lowcode-studio/docs/ACTIVITIES.md`](lowcode-studio/docs/ACTIVITIES.md)
 
-## Highlights in 0.5.1
+## Highlights in 0.5.2
 
-- **Invoke Code**, Multiple Assign, Switch, Throw, DataTable helpers, Get Attribute, Wait Element, JSON serialize/deserialize
-- **Custom activity registration** — project (`activities.custom.json`) or user library
-- **REFramework scenario dry-runs** — `Data/Config.json` + `Data/Test/scenarios.json`
-- Richer XAML import/export + Python activities + Studio Web package deps
+- **Config.xlsx bridge** — classic REFramework Settings/Constants/Assets ↔ `Data/Config.json`
+- Invoke Code + top-use activities, custom activity registration, scenario dry-runs
+- XAML import/export, Python activities, Studio Web package deps
 
 ## Next steps (roadmap)
 
 1. Import polish for `Imported.*` placeholders  
 2. Studio Web Git sync guide  
-3. Config.xlsx bridge for classic REFramework  
-4. Package validation warnings  
-5. Deeper modern UI scopes  
-6. Marketplace publish  
+3. Package validation warnings  
+4. Deeper modern UI scopes  
+5. Marketplace publish  
