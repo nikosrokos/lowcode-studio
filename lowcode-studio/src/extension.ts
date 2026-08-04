@@ -77,11 +77,18 @@ import {
   exportJsonToXlsx,
   importXlsxToJson
 } from './interop/configBridge';
+import {
+  findAllLcsProjects,
+  findProjectRoot,
+  isLcsProjectDir
+} from './interop/projectResolve';
+import { ProjectTreeItem } from './providers/projectTreeProvider';
 
 let editorProvider: WorkflowEditorProvider;
 let variablesProvider: VariablesTreeProvider;
 let projectProvider: ProjectTreeProvider;
 let activityProvider: ActivityTreeProvider;
+let projectsTreeView: vscode.TreeView<ProjectTreeItem>;
 let outputChannel: vscode.OutputChannel;
 let extensionContext: vscode.ExtensionContext;
 
@@ -94,16 +101,23 @@ export function activate(context: vscode.ExtensionContext): void {
   activityProvider = new ActivityTreeProvider();
   refreshCustomActivityOverlay();
 
+  projectsTreeView = vscode.window.createTreeView('lowcodeStudio.projects', {
+    treeDataProvider: projectProvider,
+    showCollapseAll: true
+  });
   context.subscriptions.push(
-    vscode.window.createTreeView('lowcodeStudio.projects', {
-      treeDataProvider: projectProvider,
-      showCollapseAll: true
-    }),
+    projectsTreeView,
     vscode.window.createTreeView('lowcodeStudio.activities', {
       treeDataProvider: activityProvider
     }),
     vscode.window.createTreeView('lowcodeStudio.variables', {
       treeDataProvider: variablesProvider
+    }),
+    projectsTreeView.onDidChangeSelection((e) => {
+      const dir = projectDirFromTreeItem(e.selection[0]);
+      if (dir) {
+        void setActiveProjectDir(dir);
+      }
     })
   );
 
@@ -333,8 +347,21 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('lowcodeStudio.exportStudioWeb', () =>
       exportStudioWebCommand()
     ),
-    vscode.commands.registerCommand('lowcodeStudio.connectStudioWeb', () =>
-      connectStudioWebCommand()
+    vscode.commands.registerCommand('lowcodeStudio.connectStudioWeb', (item?: ProjectTreeItem) =>
+      connectStudioWebCommand(item)
+    ),
+    vscode.commands.registerCommand(
+      'lowcodeStudio.setActiveProject',
+      async (item?: ProjectTreeItem | string) => {
+        const dir = typeof item === 'string' ? item : projectDirFromTreeItem(item);
+        if (dir && isLcsProjectDir(dir)) {
+          await setActiveProjectDir(dir);
+          void vscode.window.setStatusBarMessage(
+            `LowCode Studio: active project → ${path.basename(dir)}`,
+            2500
+          );
+        }
+      }
     ),
     vscode.commands.registerCommand('lowcodeStudio.exportConfigXlsx', () =>
       exportConfigXlsxCommand()
@@ -443,8 +470,7 @@ async function openLocalProjectCommand(): Promise<void> {
     }
   }
 
-  await extensionContext.workspaceState.update('lowcodeStudio.activeProjectDir', projectDir);
-  projectProvider.refresh();
+  await setActiveProjectDir(projectDir);
   refreshCustomActivityOverlay();
 
   const main = readProjectMainWorkflow(projectDir);
@@ -960,16 +986,78 @@ async function importConfigXlsxCommand(): Promise<void> {
   }
 }
 
-async function resolveLcsProjectDir(): Promise<string | undefined> {
+async function setActiveProjectDir(projectDir: string): Promise<void> {
+  await extensionContext.workspaceState.update('lowcodeStudio.activeProjectDir', projectDir);
+  projectProvider?.setActiveProject(projectDir);
+  projectProvider?.refresh();
+  editorProvider?.refreshProjectTree?.();
+}
+
+function projectDirFromTreeItem(item?: ProjectTreeItem): string | undefined {
+  if (!item || !item.resourcePath) {
+    return undefined;
+  }
+  if (item.contextValue === 'project') {
+    // resourcePath is project.json
+    return path.dirname(item.resourcePath);
+  }
+  if (
+    item.contextValue === 'folder' ||
+    item.contextValue === 'workflow' ||
+    item.contextValue === 'file'
+  ) {
+    const start = fs.existsSync(item.resourcePath) && fs.statSync(item.resourcePath).isDirectory()
+      ? item.resourcePath
+      : path.dirname(item.resourcePath);
+    return findProjectRoot(start);
+  }
+  return undefined;
+}
+
+function projectDirFromOpenDocument(): string | undefined {
+  const docPath =
+    editorProvider?.getActiveDocumentPath?.() ||
+    vscode.window.activeTextEditor?.document.uri.fsPath;
+  if (!docPath) {
+    return undefined;
+  }
+  return findProjectRoot(path.dirname(docPath));
+}
+
+async function resolveLcsProjectDir(
+  treeItem?: ProjectTreeItem
+): Promise<string | undefined> {
+  // 1) Explicit Project Explorer item (title action may pass nothing; context menu can)
+  const fromArg = projectDirFromTreeItem(treeItem);
+  if (fromArg && isLcsProjectDir(fromArg)) {
+    await setActiveProjectDir(fromArg);
+    return fromArg;
+  }
+
+  // 2) Current Project Explorer selection
+  const fromSelection = projectDirFromTreeItem(projectsTreeView?.selection?.[0]);
+  if (fromSelection && isLcsProjectDir(fromSelection)) {
+    await setActiveProjectDir(fromSelection);
+    return fromSelection;
+  }
+
+  // 3) Open designer / editor document's project
+  const fromDoc = projectDirFromOpenDocument();
+  if (fromDoc && isLcsProjectDir(fromDoc)) {
+    await setActiveProjectDir(fromDoc);
+    return fromDoc;
+  }
+
+  // 4) Remembered active project (only if still present)
   const remembered = extensionContext.workspaceState.get<string>(
     'lowcodeStudio.activeProjectDir'
   );
-  if (remembered && fs.existsSync(path.join(remembered, 'project.json'))) {
+  if (remembered && isLcsProjectDir(remembered)) {
     return remembered;
   }
 
-  const workspace = vscode.workspace.workspaceFolders?.[0];
-  if (!workspace) {
+  const roots = (vscode.workspace.workspaceFolders || []).map((f) => f.uri.fsPath);
+  if (!roots.length) {
     const open = await vscode.window.showInformationMessage(
       'No folder open. Open a local LowCode Studio project?',
       'Open Local Project'
@@ -980,17 +1068,44 @@ async function resolveLcsProjectDir(): Promise<string | undefined> {
     }
     return undefined;
   }
-  const projectJson = findNearestProject(workspace.uri.fsPath);
-  if (projectJson) {
-    return path.dirname(projectJson);
+
+  // 5) Discover projects — never silently pick the wrong sibling
+  const all = findAllLcsProjects(roots);
+  if (all.length === 1) {
+    await setActiveProjectDir(all[0]);
+    return all[0];
   }
-  const picked = await vscode.window.showOpenDialog({
+  if (all.length > 1) {
+    const picked = await vscode.window.showQuickPick(
+      all.map((p) => ({
+        label: path.basename(p),
+        description: p,
+        projectDir: p
+      })),
+      {
+        title: 'Select LowCode Studio project',
+        placeHolder: 'Multiple projects found — choose which to export'
+      }
+    );
+    if (!picked) {
+      return undefined;
+    }
+    await setActiveProjectDir(picked.projectDir);
+    return picked.projectDir;
+  }
+
+  const folderPick = await vscode.window.showOpenDialog({
     canSelectFiles: false,
     canSelectFolders: true,
     canSelectMany: false,
     openLabel: 'Select LowCode Studio project folder'
   });
-  return picked?.[0]?.fsPath;
+  const chosen = folderPick?.[0]?.fsPath;
+  if (chosen && isLcsProjectDir(chosen)) {
+    await setActiveProjectDir(chosen);
+    return chosen;
+  }
+  return chosen;
 }
 
 async function exportStudioWebCommand(): Promise<void> {
@@ -1027,8 +1142,8 @@ async function exportStudioWebCommand(): Promise<void> {
   }
 }
 
-async function connectStudioWebCommand(): Promise<void> {
-  const projectDir = await resolveLcsProjectDir();
+async function connectStudioWebCommand(treeItem?: ProjectTreeItem): Promise<void> {
+  const projectDir = await resolveLcsProjectDir(treeItem);
   if (!projectDir) {
     return;
   }
@@ -1096,7 +1211,7 @@ async function connectStudioWebCommand(): Promise<void> {
     const result = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: 'Connecting to Studio Web (packaging .uip / .uis)…'
+        title: `Exporting .uip for ${path.basename(projectDir)}…`
       },
       async () => connectToStudioWeb(projectDir)
     );
@@ -1119,9 +1234,9 @@ async function connectStudioWebCommand(): Promise<void> {
     channel.clear();
     channel.appendLine('Connect to Studio Web');
     channel.appendLine('─'.repeat(48));
+    channel.appendLine(`Project: ${projectDir}`);
     channel.appendLine(`Export: ${result.targetDir}`);
     channel.appendLine(`Package (.uip): ${result.archives.uipPath}`);
-    channel.appendLine(`Solution (.uis): ${result.archives.uisPath}`);
     channel.appendLine(`Main:   ${result.mainXaml}`);
     channel.appendLine('');
     if (windowsTodoReport) {
