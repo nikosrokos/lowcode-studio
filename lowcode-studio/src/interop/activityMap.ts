@@ -125,6 +125,16 @@ const MAP: Array<{
     xamlNamespace: 'uia'
   },
   {
+    lcsType: 'UI.UseApplicationBrowser',
+    xamlLocalNames: [
+      'UseApplicationBrowser',
+      'NApplicationCard',
+      'ApplicationCard',
+      'UseBrowser'
+    ],
+    xamlNamespace: 'uia'
+  },
+  {
     lcsType: 'UI.GetAttribute',
     xamlLocalNames: ['GetAttribute', 'NGetAttribute'],
     xamlNamespace: 'uia'

@@ -403,6 +403,13 @@ function emitPseudo(list: ActivityNode[], lines: string[], depth: number) {
       case 'UI.Click':
         lines.push(`${pad}Click(${JSON.stringify(activity.properties.selector)})`);
         break;
+      case 'UI.UseApplicationBrowser':
+        lines.push(
+          `${pad}UseApplicationBrowser(${JSON.stringify(activity.properties.urlOrPath || '')})`
+        );
+        emitPseudo(activity.children || [], lines, depth + 1);
+        lines.push(`${pad}End UseApplicationBrowser`);
+        break;
       case 'UI.ExtractTableData':
         lines.push(
           `${pad}${activity.properties.result || 'extractedTable'} = ExtractTableData(${JSON.stringify(activity.properties.selector)}, smart=${activity.properties.smartExtraction !== false})`
@@ -477,6 +484,8 @@ function summarize(activity: ActivityNode, variables: Record<string, unknown>): 
       return `${activity.properties.to} := ${activity.properties.value}`;
     case 'UI.Click':
       return `Click ${String(activity.properties.selector).slice(0, 40)}`;
+    case 'UI.UseApplicationBrowser':
+      return `Use ${activity.properties.mode || 'Browser'}: ${activity.properties.urlOrPath}`;
     case 'UI.ExtractTableData':
       return `ExtractTable -> ${activity.properties.result || 'extractedTable'}`;
     case 'UI.TypeInto':
@@ -752,6 +761,11 @@ function executeStub(
     }
     case 'UI.OpenApplication':
       log.push(`${indent}OpenApplication ${activity.properties.pathOrUrl}`);
+      break;
+    case 'UI.UseApplicationBrowser':
+      log.push(
+        `${indent}UseApplicationBrowser ${activity.properties.mode || 'Browser'} ${activity.properties.urlOrPath || ''}`
+      );
       break;
     case 'UI.Click':
       log.push(`${indent}Click selector=${JSON.stringify(activity.properties.selector)}`);

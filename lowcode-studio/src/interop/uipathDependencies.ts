@@ -60,6 +60,7 @@ const ACTIVITY_TO_PACKAGES: Record<string, string[]> = {
   'UI.SelectItem': ['UiPath.UIAutomation.Activities'],
   'UI.TakeScreenshot': ['UiPath.UIAutomation.Activities'],
   'UI.OpenApplication': ['UiPath.UIAutomation.Activities'],
+  'UI.UseApplicationBrowser': ['UiPath.UIAutomation.Activities'],
   'UI.GetAttribute': ['UiPath.UIAutomation.Activities'],
   'UI.WaitElement': ['UiPath.UIAutomation.Activities'],
   'UI.ExtractTableData': ['UiPath.UIAutomation.Activities'],

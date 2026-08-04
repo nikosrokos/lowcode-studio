@@ -1,12 +1,12 @@
 # LowCode Studio
 
-**Version 0.6.4** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.6.5** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.6.4-0ea5e9)
+![version](https://img.shields.io/badge/version-0.6.5-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
@@ -45,7 +45,13 @@ Design on Mac (REFramework)
 2. **Project Explorer** — title actions with tooltips (Open, Scenarios, Connect, Validate…)  
 3. **Extract Table Data** — smart page → DataTable extraction for Windows UI automation
 
-## What’s in 0.6.4
+## What’s in 0.6.5
+
+- **Selector Builder** in the designer — templates + fields for classic `<html>/<webctrl>` / `<wnd>` selectors (Mac-friendly)
+- **Use Application/Browser** modern UI scope — nest Click / Type Into / Extract Table under an app/browser card
+- **Windows TODO checklist** on Connect to Studio Web — `WINDOWS_TODO.md` + Output report for handoff items
+
+### Also in 0.6.4
 
 - Project Explorer title actions with **tooltips** (`title` / `shortTitle`)
 - Properties panel can **float**, **resize** (width/height), or **collapse**
@@ -89,7 +95,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.4.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.5.vsix` → reload.
 
 ## Easy path (REFramework)
 
@@ -151,7 +157,7 @@ Export includes XAML, `project.json` (NuGet deps), Config.json/xlsx, and `scenar
 | Programming | Assign, Multiple Assign, **Invoke Code** |
 | Data | Build/Filter/ForEach Row, Add Row/Column, CSV |
 | System | Log, Throw, Terminate Workflow |
-| UI | Click, Type Into, Get Attribute, Wait Element, … |
+| UI | Use Application/Browser, Click, Type Into, Extract Table, … |
 | Messaging | HTTP, Email, Deserialize/Serialize JSON |
 | Python | Scope, Load/Run Script, Invoke Method, Get Object |
 | REFramework | Invoke Workflow, Set Transaction Status |
@@ -181,10 +187,11 @@ See [docs/ACTIVITIES.md](docs/ACTIVITIES.md). Invoke Code / UI steps are dry-run
 - Package validation warnings + Open Local Project + Project Explorer title actions
 - Windows project target + classic Windows UI selectors for robot execution
 - Floating/resizable properties panel, Extract Table Data, title-action tooltips
+- Selector Builder, Use Application/Browser scope, Windows TODO on Connect
 
 ### Next
 1. Import polish for `Imported.*` placeholders
-2. Deeper modern UI scopes
+2. Blueprints + Cmd+K activity palette
 3. Marketplace publish
 
 ## License

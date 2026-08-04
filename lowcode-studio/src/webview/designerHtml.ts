@@ -1,5 +1,6 @@
 import { ActivityDefinition } from '../models/activities';
 import { WorkflowDocument } from '../models/workflow';
+import { SELECTOR_TEMPLATES } from '../interop/selectorBuilder';
 
 export function getDesignerHtml(
   nonce: string,
@@ -9,6 +10,7 @@ export function getDesignerHtml(
 ): string {
   const workflowJson = JSON.stringify(workflow).replace(/</g, '\\u003c');
   const catalogJson = JSON.stringify(catalog).replace(/</g, '\\u003c');
+  const selectorTemplatesJson = JSON.stringify(SELECTOR_TEMPLATES).replace(/</g, '\\u003c');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -337,6 +339,26 @@ export function getDesignerHtml(
       padding: 8px 10px; font-size: 12px; font-family: var(--mono);
     }
     .field textarea { min-height: 84px; resize: vertical; }
+    .selector-builder {
+      margin-top: 8px; padding: 10px; border-radius: 8px;
+      border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+      background: color-mix(in srgb, var(--bg) 70%, transparent);
+    }
+    .selector-builder .sb-title {
+      font-size: 11px; font-weight: 700; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 8px;
+    }
+    .selector-builder .sb-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;
+    }
+    .selector-builder .sb-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .selector-builder .sb-preview {
+      margin: 0; padding: 8px 10px; border-radius: 6px; font-size: 11px;
+      font-family: var(--mono); white-space: pre-wrap; word-break: break-all;
+      background: var(--input-bg); border: 1px solid var(--input-border);
+      color: var(--muted); max-height: 96px; overflow: auto;
+    }
+    .selector-builder .field { margin-bottom: 0; }
     .hover-tip {
       position: fixed; z-index: 20; max-width: 280px; pointer-events: none;
       background: var(--panel); color: var(--text); border: 1px solid var(--border);
@@ -456,6 +478,8 @@ export function getDesignerHtml(
 
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
+    const SELECTOR_TEMPLATES = ${selectorTemplatesJson};
+
     let state = {
       workflow: ${workflowJson},
       catalog: ${catalogJson},
@@ -553,7 +577,13 @@ export function getDesignerHtml(
         case 'Programming.Assign': return (p.to || '') + ' := ' + (p.value || '');
         case 'Flowchart.FlowDecision': return String(p.condition || '');
         case 'REFramework.InvokeWorkflow': return String(p.workflowPath || '');
+        case 'UI.UseApplicationBrowser':
+          return (p.mode || 'Browser') + ' ' + String(p.urlOrPath || '').slice(0, 36);
         case 'UI.ExtractTableData': return '→ ' + (p.result || 'extractedTable');
+        case 'UI.Click':
+        case 'UI.TypeInto':
+        case 'UI.GetText':
+          return String(p.selector || '').replace(/\\s+/g, ' ').slice(0, 42);
         case 'ControlFlow.If':
         case 'ControlFlow.While': return 'when ' + (p.condition || '');
         case 'Messaging.HttpRequest': return (p.method || 'GET') + ' ' + (p.url || '');
@@ -562,6 +592,149 @@ export function getDesignerHtml(
           return first === undefined ? node.type : String(first).slice(0, 42);
         }
       }
+    }
+
+    function escSel(value) {
+      return String(value || '').replace(/'/g, "''");
+    }
+    function parseSelAttrs(raw) {
+      const out = {};
+      const re = /([:@\\w.-]+)\\s*=\\s*(?:'([^']*)'|"([^"]*)"|([^\\s"'=<>\`]+))/g;
+      let m;
+      while ((m = re.exec(raw || ''))) out[m[1].toLowerCase()] = m[2] ?? m[3] ?? m[4] ?? '';
+      return out;
+    }
+    function emptySelParts(kind) {
+      if (kind === 'desktop') {
+        return { kind: 'desktop', app: 'notepad.exe', title: '*', tag: '', id: '', aaname: '', cls: 'Notepad', name: '', idx: '' };
+      }
+      return { kind: 'browser', app: 'chrome.exe', title: '*', tag: 'BUTTON', id: '', aaname: '', cls: '', name: '', idx: '' };
+    }
+    function buildWindowsSelector(parts) {
+      const kind = parts.kind || 'browser';
+      if (kind === 'desktop') {
+        const attrs = ["app='" + escSel(parts.app || 'app.exe') + "'"];
+        if (parts.cls) attrs.push("cls='" + escSel(parts.cls) + "'");
+        if (parts.title) attrs.push("title='" + escSel(parts.title) + "'");
+        if (parts.name) attrs.push("name='" + escSel(parts.name) + "'");
+        if (parts.idx) attrs.push("idx='" + escSel(parts.idx) + "'");
+        return '<wnd ' + attrs.join(' ') + ' />';
+      }
+      const tag = String(parts.tag || '*').toUpperCase();
+      const web = ["tag='" + escSel(tag) + "'"];
+      if (parts.id) web.push("id='" + escSel(parts.id) + "'");
+      if (parts.aaname) web.push("aaname='" + escSel(parts.aaname) + "'");
+      if (parts.name) web.push("name='" + escSel(parts.name) + "'");
+      if (parts.cls) web.push("class='" + escSel(parts.cls) + "'");
+      if (parts.idx) web.push("idx='" + escSel(parts.idx) + "'");
+      if (!parts.id && !parts.aaname && !parts.name && tag === '*') web.push("id='element'");
+      return "<html app='" + escSel(parts.app || 'chrome.exe') + "' title='" + escSel(parts.title || '*') + "' />\\n<webctrl " + web.join(' ') + ' />';
+    }
+    function parseWindowsSelector(raw) {
+      const text = String(raw || '').trim();
+      if (!text) return emptySelParts('browser');
+      if (/<wnd\\b/i.test(text)) {
+        const m = text.match(/<wnd\\b([^>]*)\\/?>/i);
+        const attrs = parseSelAttrs(m && m[1] || '');
+        return { kind: 'desktop', app: attrs.app || 'app.exe', title: attrs.title || '*', tag: '', id: '', aaname: attrs.aaname || '', cls: attrs.cls || '', name: attrs.name || '', idx: attrs.idx || '' };
+      }
+      const html = text.match(/<html\\b([^>]*)\\/?>/i);
+      const web = text.match(/<webctrl\\b([^>]*)\\/?>/i);
+      const htmlAttrs = parseSelAttrs(html && html[1] || '');
+      const webAttrs = parseSelAttrs(web && web[1] || '');
+      return {
+        kind: 'browser',
+        app: htmlAttrs.app || 'chrome.exe',
+        title: htmlAttrs.title || '*',
+        tag: String(webAttrs.tag || 'BUTTON').toUpperCase(),
+        id: webAttrs.id || '',
+        aaname: webAttrs.aaname || '',
+        cls: webAttrs.class || webAttrs.cls || '',
+        name: webAttrs.name || '',
+        idx: webAttrs.idx || ''
+      };
+    }
+    function selectorBuilderHtml(propName, currentValue) {
+      const parts = parseWindowsSelector(currentValue);
+      const tplOpts = SELECTOR_TEMPLATES.map(t =>
+        '<option value="' + escapeAttr(t.id) + '">' + escapeHtml(t.label) + '</option>'
+      ).join('');
+      const kindOpts = ['browser', 'desktop'].map(k =>
+        '<option value="' + k + '"' + (parts.kind === k ? ' selected' : '') + '>' + k + '</option>'
+      ).join('');
+      return '<div class="selector-builder" data-sel-for="' + escapeAttr(propName) + '">' +
+        '<div class="sb-title">Selector Builder</div>' +
+        fieldHtml('Template', '<select data-sb="template"><option value="">— choose template —</option>' + tplOpts + '</select>') +
+        '<div class="sb-grid" style="margin-top:8px">' +
+          fieldHtml('Kind', '<select data-sb="kind">' + kindOpts + '</select>') +
+          fieldHtml('App', '<input data-sb="app" value="' + escapeAttr(parts.app) + '" />') +
+          fieldHtml('Title', '<input data-sb="title" value="' + escapeAttr(parts.title) + '" />') +
+          fieldHtml('Tag', '<input data-sb="tag" value="' + escapeAttr(parts.tag) + '" />') +
+          fieldHtml('Id', '<input data-sb="id" value="' + escapeAttr(parts.id) + '" />') +
+          fieldHtml('aaname', '<input data-sb="aaname" value="' + escapeAttr(parts.aaname) + '" />') +
+          fieldHtml('Class / cls', '<input data-sb="cls" value="' + escapeAttr(parts.cls) + '" />') +
+          fieldHtml('Name', '<input data-sb="name" value="' + escapeAttr(parts.name) + '" />') +
+          fieldHtml('Index', '<input data-sb="idx" value="' + escapeAttr(parts.idx) + '" />') +
+        '</div>' +
+        '<div class="sb-actions">' +
+          '<button class="btn primary" type="button" data-sb-apply>Apply to selector</button>' +
+        '</div>' +
+        '<pre class="sb-preview" data-sb-preview>' + escapeHtml(buildWindowsSelector(parts)) + '</pre>' +
+      '</div>';
+    }
+    function wireSelectorBuilder(root, node, propName) {
+      const box = root.querySelector('.selector-builder[data-sel-for="' + propName + '"]');
+      if (!box) return;
+      const preview = box.querySelector('[data-sb-preview]');
+      const readParts = () => ({
+        kind: box.querySelector('[data-sb="kind"]').value || 'browser',
+        app: box.querySelector('[data-sb="app"]').value || '',
+        title: box.querySelector('[data-sb="title"]').value || '',
+        tag: box.querySelector('[data-sb="tag"]').value || '',
+        id: box.querySelector('[data-sb="id"]').value || '',
+        aaname: box.querySelector('[data-sb="aaname"]').value || '',
+        cls: box.querySelector('[data-sb="cls"]').value || '',
+        name: box.querySelector('[data-sb="name"]').value || '',
+        idx: box.querySelector('[data-sb="idx"]').value || ''
+      });
+      const refreshPreview = () => {
+        if (preview) preview.textContent = buildWindowsSelector(readParts());
+      };
+      box.querySelectorAll('[data-sb]').forEach(el => {
+        el.addEventListener('input', refreshPreview);
+        el.addEventListener('change', () => {
+          if (el.getAttribute('data-sb') === 'template' && el.value) {
+            const tpl = SELECTOR_TEMPLATES.find(t => t.id === el.value);
+            if (tpl) {
+              const base = emptySelParts(tpl.kind);
+              const merged = Object.assign({}, base, tpl.parts, { kind: tpl.kind });
+              Object.keys(merged).forEach(k => {
+                const input = box.querySelector('[data-sb="' + k + '"]');
+                if (input) input.value = merged[k] == null ? '' : String(merged[k]);
+              });
+              refreshPreview();
+            }
+          } else if (el.getAttribute('data-sb') === 'kind') {
+            const next = emptySelParts(el.value);
+            Object.keys(next).forEach(k => {
+              const input = box.querySelector('[data-sb="' + k + '"]');
+              if (input && k !== 'kind') input.value = next[k];
+            });
+            refreshPreview();
+          } else {
+            refreshPreview();
+          }
+        });
+      });
+      box.querySelector('[data-sb-apply]')?.addEventListener('click', () => {
+        const built = buildWindowsSelector(readParts());
+        const target = root.querySelector('[data-prop="' + propName + '"]');
+        if (target) target.value = built;
+        node.properties[propName] = built;
+        refreshPreview();
+        toast('Selector applied');
+        persist(true);
+      });
     }
 
     function applyPropsPanelLayout() {
@@ -1098,9 +1271,14 @@ export function getDesignerHtml(
         '</div></div>';
 
       let activity = '';
+      const selectorProps = [];
       for (const p of (def?.properties || [])) {
         const val = node.properties?.[p.name] ?? '';
         activity += fieldHtml(p.label, renderPropInput(p, val), p.required);
+        if (p.name === 'selector') {
+          activity += selectorBuilderHtml(p.name, val);
+          selectorProps.push(p.name);
+        }
         if (node.type === 'REFramework.InvokeWorkflow' && p.name === 'workflowPath') {
           activity += '<div class="field"><button class="btn primary" id="btnOpenWorkflow" type="button">Open Workflow in New Tab</button></div>';
         }
@@ -1174,6 +1352,7 @@ export function getDesignerHtml(
           workflowPath: String(node.properties?.workflowPath || '')
         });
       });
+      selectorProps.forEach(propName => wireSelectorBuilder(els.props, node, propName));
     }
 
     function renderVariables() {
