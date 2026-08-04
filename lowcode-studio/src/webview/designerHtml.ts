@@ -1,16 +1,27 @@
 import { ActivityDefinition } from '../models/activities';
 import { WorkflowDocument } from '../models/workflow';
 import { SELECTOR_TEMPLATES } from '../interop/selectorBuilder';
+import { ActivityPaletteState } from '../interop/activityPalette';
+import { PropertySuggestions } from '../interop/propertySuggestions';
 
 export function getDesignerHtml(
   nonce: string,
   cspSource: string,
   workflow: WorkflowDocument,
-  catalog: ActivityDefinition[]
+  catalog: ActivityDefinition[],
+  suggestions: PropertySuggestions = {
+    variables: [],
+    configKeys: [],
+    configExpressions: [],
+    workflowPaths: []
+  },
+  palette: ActivityPaletteState = { favorites: [], recent: [] }
 ): string {
   const workflowJson = JSON.stringify(workflow).replace(/</g, '\\u003c');
   const catalogJson = JSON.stringify(catalog).replace(/</g, '\\u003c');
   const selectorTemplatesJson = JSON.stringify(SELECTOR_TEMPLATES).replace(/</g, '\\u003c');
+  const suggestionsJson = JSON.stringify(suggestions).replace(/</g, '\\u003c');
+  const paletteJson = JSON.stringify(palette).replace(/</g, '\\u003c');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -410,6 +421,51 @@ export function getDesignerHtml(
       from { opacity: 0; transform: translateY(6px); }
       to { opacity: 1; transform: translateY(0); }
     }
+    .palette-overlay {
+      display: none; position: fixed; inset: 0; z-index: 40;
+      background: rgba(0,0,0,.35); align-items: flex-start; justify-content: center;
+      padding-top: 12vh;
+    }
+    .palette-overlay.show { display: flex; }
+    .palette {
+      width: min(560px, 92vw); max-height: 70vh; display: flex; flex-direction: column;
+      background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+      box-shadow: var(--shadow); overflow: hidden; animation: rise .16s ease both;
+    }
+    .palette-head { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    .palette-head input {
+      width: 100%; background: var(--input-bg); color: var(--text);
+      border: 1px solid var(--input-border); border-radius: 8px;
+      padding: 10px 12px; font-size: 13px; font-family: var(--sans);
+    }
+    .palette-hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
+    .palette-list { overflow: auto; padding: 6px; }
+    .palette-section {
+      font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+      color: var(--muted); padding: 8px 8px 4px;
+    }
+    .palette-item {
+      display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; align-items: center;
+      width: 100%; text-align: left; border: 1px solid transparent; border-radius: 8px;
+      background: transparent; color: var(--text); padding: 8px 10px; cursor: pointer;
+    }
+    .palette-item:hover, .palette-item.active {
+      background: var(--hover); border-color: color-mix(in srgb, var(--focus) 40%, transparent);
+    }
+    .palette-item .pi-name { font-size: 13px; font-weight: 600; }
+    .palette-item .pi-meta { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+    .palette-item .pi-pin {
+      border: 1px solid var(--border); background: var(--input-bg); color: var(--muted);
+      border-radius: 6px; width: 28px; height: 28px; cursor: pointer;
+    }
+    .palette-item .pi-pin.on { color: #f59e0b; border-color: #f59e0b; }
+    .suggest-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+    .suggest-chips button {
+      border: 1px solid var(--border); background: var(--input-bg); color: var(--muted);
+      border-radius: 999px; padding: 2px 8px; font-size: 10px; cursor: pointer;
+      font-family: var(--mono); max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+    }
+    .suggest-chips button:hover { color: var(--text); border-color: var(--focus); }
   </style>
 </head>
 <body>
@@ -422,6 +478,7 @@ export function getDesignerHtml(
       <button class="btn" id="btnLink" title="Connect two flowchart nodes" style="display:none">Link</button>
       <button class="btn" id="btnAutoLayout" style="display:none">Auto Layout</button>
       <button class="btn" id="btnPropsPanel" title="Show / focus properties panel" style="display:none">Properties</button>
+      <button class="btn" id="btnInsert" title="Insert activity (⌘K / Ctrl+K)">Insert</button>
       <button class="btn" id="btnValidate">Validate</button>
       <button class="btn" id="btnDryRun" title="Run All dry-run">Dry Run</button>
       <button class="btn" id="btnStepThrough" title="Step through activities on the canvas">Step Through</button>
@@ -462,6 +519,16 @@ export function getDesignerHtml(
       <div class="toast" id="toast"></div>
       <div class="hover-tip" id="hoverTip"></div>
     </main>
+
+    <div class="palette-overlay" id="paletteOverlay">
+      <div class="palette" role="dialog" aria-label="Insert activity">
+        <div class="palette-head">
+          <input id="paletteSearch" placeholder="Search activities… (favorites · recent · all)" autocomplete="off" />
+          <div class="palette-hint">Enter insert · ↑↓ navigate · ⌘/Ctrl+⇧+P pin favorite (max 10) · Esc close</div>
+        </div>
+        <div class="palette-list" id="paletteList"></div>
+      </div>
+    </div>
 
     <aside class="panel right" id="propsPanel">
       <div class="panel-resize-x" id="propsResizeX" title="Drag to resize width"></div>
@@ -520,6 +587,8 @@ export function getDesignerHtml(
     let state = {
       workflow: ${workflowJson},
       catalog: ${catalogJson},
+      suggestions: ${suggestionsJson},
+      palette: ${paletteJson},
       selectedId: null,
       dragType: null,
       linkFrom: null,
@@ -532,7 +601,10 @@ export function getDesignerHtml(
       propsWidth: 300,
       propsHeight: Math.round(window.innerHeight * 0.7),
       propsFloatPos: { x: null, y: null },
-      playback: null // { steps, index, timer, doneIds }
+      playback: null, // { steps, index, timer, doneIds }
+      paletteOpen: false,
+      paletteQuery: '',
+      paletteActive: 0
     };
 
     const els = {
@@ -1269,7 +1341,42 @@ export function getDesignerHtml(
     function fieldHtml(label, inner, required) {
       return '<div class="field"><label>' + escapeHtml(label) + (required ? ' *' : '') + '</label>' + inner + '</div>';
     }
-    function renderPropInput(p, val) {
+    function suggestionListFor(node, p) {
+      const s = state.suggestions || {};
+      const name = p.name || '';
+      const type = p.type || '';
+      if (node.type === 'REFramework.InvokeWorkflow' && name === 'workflowPath') {
+        return s.workflowPaths || [];
+      }
+      if (name === 'to' || name === 'result' || name === 'item' || name === 'row' || name === 'dataTable' || name === 'values') {
+        return s.variables || [];
+      }
+      if (type === 'expression' || name === 'condition' || name === 'message' || name === 'text' || name === 'url' || name === 'value' || name === 'jsonString' || name === 'arrayRow' || name === 'subject' || name === 'body') {
+        const vars = s.variables || [];
+        const cfg = s.configExpressions || [];
+        return [...vars, ...cfg].slice(0, 40);
+      }
+      if (name.toLowerCase().includes('config') || name === 'path' || name === 'workbookPath' || name === 'file') {
+        return [...(s.configKeys || []), ...(s.workflowPaths || [])].slice(0, 40);
+      }
+      return [];
+    }
+    function suggestChipsHtml(node, p) {
+      const list = suggestionListFor(node, p).slice(0, 8);
+      if (!list.length) return '';
+      return '<div class="suggest-chips" data-suggest-for="' + escapeAttr(p.name) + '">' +
+        list.map(v => '<button type="button" data-suggest-value="' + escapeAttr(v) + '" title="' + escapeAttr(v) + '">' + escapeHtml(v) + '</button>').join('') +
+        '</div>';
+    }
+    function renderPropInput(p, val, node) {
+      const listId = 'dl_' + p.name;
+      const suggestions = suggestionListFor(node, p);
+      const datalist = suggestions.length
+        ? '<datalist id="' + escapeAttr(listId) + '">' +
+          suggestions.map(v => '<option value="' + escapeAttr(v) + '"></option>').join('') +
+          '</datalist>'
+        : '';
+      const listAttr = suggestions.length ? ' list="' + escapeAttr(listId) + '"' : '';
       if (p.type === 'enum') {
         return '<select data-prop="' + escapeAttr(p.name) + '">' +
           (p.options || []).map(o => '<option value="' + escapeAttr(o) + '"' + (String(val) === o ? ' selected' : '') + '>' + escapeHtml(o) + '</option>').join('') +
@@ -1279,15 +1386,16 @@ export function getDesignerHtml(
         return '<select data-prop="' + escapeAttr(p.name) + '"><option value="true"' + (val === true || val === 'true' ? ' selected' : '') + '>true</option><option value="false"' + (val === false || val === 'false' ? ' selected' : '') + '>false</option></select>';
       }
       if (p.type === 'multiline') {
-        return '<textarea data-prop="' + escapeAttr(p.name) + '">' + escapeHtml(String(val)) + '</textarea>';
+        return '<textarea data-prop="' + escapeAttr(p.name) + '">' + escapeHtml(String(val)) + '</textarea>' + suggestChipsHtml(node, p);
       }
       if (p.type === 'number') {
         return '<input type="number" data-prop="' + escapeAttr(p.name) + '" value="' + escapeAttr(String(val)) + '" />';
       }
-      return '<input data-prop="' + escapeAttr(p.name) + '" value="' + escapeAttr(String(val)) + '" />';
+      return '<input data-prop="' + escapeAttr(p.name) + '" value="' + escapeAttr(String(val)) + '"' + listAttr + ' />' + datalist + suggestChipsHtml(node, p);
     }
 
     function renderProps() {
+      syncSuggestionVariables();
       const hit = state.selectedId ? walkFind(state.workflow.activities, state.selectedId) : null;
       els.btnDelete.disabled = !hit;
       if (!hit) {
@@ -1315,7 +1423,7 @@ export function getDesignerHtml(
       const selectorProps = [];
       for (const p of (def?.properties || [])) {
         const val = node.properties?.[p.name] ?? '';
-        activity += fieldHtml(p.label, renderPropInput(p, val), p.required);
+        activity += fieldHtml(p.label, renderPropInput(p, val, node), p.required);
         if (p.name === 'selector') {
           activity += selectorBuilderHtml(p.name, val);
           selectorProps.push(p.name);
@@ -1394,6 +1502,18 @@ export function getDesignerHtml(
         });
       });
       selectorProps.forEach(propName => wireSelectorBuilder(els.props, node, propName));
+      els.props.querySelectorAll('[data-suggest-value]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const prop = btn.closest('[data-suggest-for]')?.getAttribute('data-suggest-for');
+          const value = btn.getAttribute('data-suggest-value') || '';
+          if (!prop) return;
+          const input = els.props.querySelector('[data-prop="' + prop + '"]');
+          if (input) input.value = value;
+          node.properties[prop] = value;
+          toast('Applied ' + value);
+          persist(true);
+        });
+      });
     }
 
     function renderVariables() {
@@ -1812,12 +1932,12 @@ export function getDesignerHtml(
         renderAll();
       }
       if (msg.type === 'insertActivity' && msg.activityType) {
-        const node = createActivity(msg.activityType);
-        if (!node) return;
-        state.workflow.activities.push(node);
-        state.selectedId = node.id;
-        persist(true);
-        toast('Added ' + node.displayName);
+        insertActivityType(msg.activityType, false);
+      }
+      if (msg.type === 'openActivityPalette') openPalette();
+      if (msg.type === 'paletteState' && msg.palette) {
+        state.palette = msg.palette;
+        if (state.paletteOpen) renderPaletteList();
       }
       if (msg.type === 'toast' && msg.message) toast(msg.message);
       if (msg.type === 'dryRunPlayback' && msg.result) {
@@ -1828,8 +1948,171 @@ export function getDesignerHtml(
       }
     });
 
+    function syncSuggestionVariables() {
+      state.suggestions = state.suggestions || {};
+      state.suggestions.variables = (state.workflow.variables || []).map(v => v.name).filter(Boolean);
+    }
+    function paletteEntries() {
+      const fav = new Set(state.palette?.favorites || []);
+      const recent = (state.palette?.recent || []).filter(t => !fav.has(t));
+      const byType = new Map(state.catalog.map(a => [a.type, a]));
+      const q = (state.paletteQuery || '').trim().toLowerCase();
+      const match = (a) => {
+        if (!q) return true;
+        return (a.displayName + ' ' + a.type + ' ' + a.category + ' ' + (a.description || '')).toLowerCase().includes(q);
+      };
+      const entries = [];
+      for (const type of (state.palette?.favorites || [])) {
+        const a = byType.get(type);
+        if (a && match(a)) entries.push({ def: a, section: 'Favorites', pinned: true });
+      }
+      for (const type of recent) {
+        const a = byType.get(type);
+        if (a && match(a)) entries.push({ def: a, section: 'Recent', pinned: false });
+      }
+      const used = new Set([...(state.palette?.favorites || []), ...recent]);
+      const rest = state.catalog
+        .filter(a => !used.has(a.type) && !(a.category === 'Flowchart' && !isFlow()) && match(a))
+        .sort((a, b) => (a.category + a.displayName).localeCompare(b.category + b.displayName));
+      for (const a of rest) entries.push({ def: a, section: 'All', pinned: false });
+      return entries;
+    }
+    function renderPaletteList() {
+      const list = document.getElementById('paletteList');
+      if (!list) return;
+      const entries = paletteEntries();
+      if (state.paletteActive >= entries.length) state.paletteActive = Math.max(0, entries.length - 1);
+      if (!entries.length) {
+        list.innerHTML = '<div class="empty" style="padding:12px">No activities match.</div>';
+        return;
+      }
+      let html = '';
+      let lastSection = '';
+      entries.forEach((e, i) => {
+        if (e.section !== lastSection) {
+          lastSection = e.section;
+          html += '<div class="palette-section">' + escapeHtml(e.section) + '</div>';
+        }
+        html += '<div class="palette-item' + (i === state.paletteActive ? ' active' : '') + '" data-palette-idx="' + i + '" data-type="' + escapeAttr(e.def.type) + '" role="option">' +
+          '<div><div class="pi-name">' + escapeHtml(e.def.displayName) + '</div>' +
+          '<div class="pi-meta">' + escapeHtml(e.def.category) + ' · ' + escapeHtml(e.def.type) + '</div></div>' +
+          '<button type="button" class="pi-pin' + (e.pinned ? ' on' : '') + '" data-pin="' + escapeAttr(e.def.type) + '" title="Pin favorite">' + (e.pinned ? '★' : '☆') + '</button>' +
+          '</div>';
+      });
+      list.innerHTML = html;
+      list.querySelectorAll('.palette-item').forEach(row => {
+        row.addEventListener('click', (ev) => {
+          if (ev.target.closest('[data-pin]')) return;
+          insertActivityType(row.getAttribute('data-type'), true);
+        });
+        row.addEventListener('mousemove', () => {
+          state.paletteActive = Number(row.getAttribute('data-palette-idx') || 0);
+          list.querySelectorAll('.palette-item').forEach((el, i) => el.classList.toggle('active', i === state.paletteActive));
+        });
+      });
+      list.querySelectorAll('[data-pin]').forEach(btn => {
+        btn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          vscode.postMessage({ type: 'toggleFavorite', activityType: btn.getAttribute('data-pin') });
+        });
+      });
+      const active = list.querySelector('.palette-item.active');
+      if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest' });
+    }
+    function openPalette() {
+      state.paletteOpen = true;
+      state.paletteQuery = '';
+      state.paletteActive = 0;
+      const overlay = document.getElementById('paletteOverlay');
+      const input = document.getElementById('paletteSearch');
+      if (overlay) overlay.classList.add('show');
+      if (input) { input.value = ''; input.focus(); }
+      renderPaletteList();
+    }
+    function closePalette() {
+      state.paletteOpen = false;
+      const overlay = document.getElementById('paletteOverlay');
+      if (overlay) overlay.classList.remove('show');
+    }
+    function insertActivityType(type, fromPalette) {
+      const node = createActivity(type);
+      if (!node) return;
+      syncSuggestionVariables();
+      if (isFlow()) {
+        node.x = 220;
+        node.y = 120 + state.workflow.activities.length * 24;
+        state.workflow.activities.push(node);
+      } else if (state.selectedId) {
+        const hit = walkFind(state.workflow.activities, state.selectedId);
+        if (hit) {
+          const def = findDef(hit.node.type);
+          if (def?.container && Array.isArray(hit.node.children)) {
+            hit.node.children.push(node);
+          } else {
+            hit.list.splice(hit.index + 1, 0, node);
+          }
+        } else {
+          state.workflow.activities.push(node);
+        }
+      } else {
+        state.workflow.activities.push(node);
+      }
+      state.selectedId = node.id;
+      if (fromPalette) closePalette();
+      persist(true);
+      toast('Added ' + node.displayName);
+      vscode.postMessage({ type: 'activityUsed', activityType: type });
+    }
+
+    document.getElementById('btnInsert')?.addEventListener('click', () => openPalette());
+    document.getElementById('paletteOverlay')?.addEventListener('click', (e) => {
+      if (e.target.id === 'paletteOverlay') closePalette();
+    });
+    document.getElementById('paletteSearch')?.addEventListener('input', (e) => {
+      state.paletteQuery = e.target.value || '';
+      state.paletteActive = 0;
+      renderPaletteList();
+    });
+    document.addEventListener('keydown', (e) => {
+      const meta = e.metaKey || e.ctrlKey;
+      if (meta && !e.shiftKey && !e.altKey && String(e.key).toLowerCase() === 'k') {
+        // Designer-local Cmd/Ctrl+K insert palette (does not steal VS Code chord outside webview)
+        e.preventDefault();
+        if (state.paletteOpen) closePalette();
+        else openPalette();
+        return;
+      }
+      if (!state.paletteOpen) return;
+      const entries = paletteEntries();
+      if (e.key === 'Escape') { e.preventDefault(); closePalette(); return; }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        state.paletteActive = Math.min(entries.length - 1, state.paletteActive + 1);
+        renderPaletteList();
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        state.paletteActive = Math.max(0, state.paletteActive - 1);
+        renderPaletteList();
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const hit = entries[state.paletteActive];
+        if (hit) insertActivityType(hit.def.type, true);
+        return;
+      }
+      if (meta && e.shiftKey && String(e.key).toLowerCase() === 'p') {
+        e.preventDefault();
+        const hit = entries[state.paletteActive];
+        if (hit) vscode.postMessage({ type: 'toggleFavorite', activityType: hit.def.type });
+      }
+    });
+
     restorePropsPanelState();
     applyPropsPanelLayout();
+    syncSuggestionVariables();
     renderAll();
     vscode.postMessage({ type: 'ready' });
   </script>

@@ -45,9 +45,11 @@ import {
   writeWindowsTodoFile
 } from './interop/windowsTodo';
 import {
+  getActivityCatalog,
   getActivityDefinition,
   setCustomActivityOverlay
 } from './models/activities';
+import { buildPaletteEntries } from './interop/activityPalette';
 import {
   createCustomActivityDraft,
   CUSTOM_ACTIVITIES_FILENAME,
@@ -285,12 +287,13 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand(
       'lowcodeStudio.insertActivity',
-      (activityType?: string) => {
+      async (activityType?: string) => {
         const type =
           typeof activityType === 'string'
             ? activityType
             : undefined;
         if (!type) {
+          await activityPaletteCommand();
           return;
         }
         const def = getActivityDefinition(type);
@@ -299,6 +302,9 @@ export function activate(context: vscode.ExtensionContext): void {
         }
         editorProvider.insertActivity(type);
       }
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.activityPalette', () =>
+      activityPaletteCommand()
     ),
     vscode.commands.registerCommand('lowcodeStudio.exportPseudocode', async () => {
       const doc = await getActiveWorkflowDocument();
@@ -533,6 +539,32 @@ async function validatePackagesCommand(): Promise<void> {
       err instanceof Error ? err.message : 'Package validation failed'
     );
   }
+}
+
+async function activityPaletteCommand(): Promise<void> {
+  // Prefer in-designer Cmd+K palette when the webview is open
+  if (editorProvider.activeWorkflow) {
+    editorProvider.openActivityPalette();
+    return;
+  }
+
+  const state = editorProvider.getPaletteState();
+  const entries = buildPaletteEntries(state, getActivityCatalog());
+  const items = entries.map((e) => ({
+    label: `${e.pinned ? '$(star-full) ' : ''}${e.displayName}`,
+    description: `${e.section} · ${e.category}`,
+    detail: e.type,
+    type: e.type
+  }));
+  const picked = await vscode.window.showQuickPick(items, {
+    matchOnDescription: true,
+    matchOnDetail: true,
+    placeHolder: 'Insert activity (pin favorites in the designer with ⌘K)'
+  });
+  if (!picked) {
+    return;
+  }
+  editorProvider.insertActivity(picked.type);
 }
 
 async function newProject(
