@@ -5,6 +5,7 @@ import {
 } from '../models/workflow';
 import { isUiActivity, xamlInfoForLcsType } from './activityMap';
 import { emitTargetXaml, selectorAttribute } from './selectorRoundTrip';
+import { interactionModeAttribute } from './inputMethod';
 import {
   applyWindowsSelectorsToActivityProps,
   netTfmForTarget,
@@ -382,7 +383,8 @@ ${pad}</ui:RetryScope>`;
     const open = escapeAttr(String(props.open || 'IfNotOpen'));
     const close = escapeAttr(String(props.close || 'Never'));
     const selAttr = selectorAttribute(props);
-    return `${pad}<uia:NApplicationCard DisplayName="${escapeAttr(activity.displayName)}" Url="${url}" OpenMode="${open}" CloseMode="${close}" BrowserType="${browser}" AttachMode="${mode === 'Application' ? 'Application' : 'Browser'}"${selAttr}>
+    const inputAttr = interactionModeAttribute(props, 'Simulate');
+    return `${pad}<uia:NApplicationCard DisplayName="${escapeAttr(activity.displayName)}" Url="${url}" OpenMode="${open}" CloseMode="${close}" BrowserType="${browser}" AttachMode="${mode === 'Application' ? 'Application' : 'Browser'}"${inputAttr}${selAttr}>
 ${pad}  <uia:NApplicationCard.Body>
 ${pad}    <Sequence>
 ${kids}
@@ -516,8 +518,22 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
                       : 'uia:NClick';
 
   const extra: string[] = [];
+  if (activity.type === 'UI.Click') {
+    const clickType = String(props.clickType || 'Single');
+    extra.push(`ClickType="${escapeAttr(clickType)}"`);
+    if (clickType === 'Right') {
+      extra.push(`MouseButton="Right"`);
+    } else {
+      extra.push(`MouseButton="Left"`);
+    }
+  }
   if (activity.type === 'UI.TypeInto') {
     extra.push(`Text="[${escapeAttr(String(props.text ?? '""'))}]"`);
+    if (props.emptyField !== false && props.emptyField !== 'false') {
+      extra.push(`EmptyField="True"`);
+    } else {
+      extra.push(`EmptyField="False"`);
+    }
   }
   if (activity.type === 'UI.SelectItem') {
     extra.push(`Item="[${escapeAttr(String(props.item ?? '""'))}]"`);
@@ -536,6 +552,23 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
   }
   if (activity.type === 'UI.WaitElement') {
     extra.push(`TimeoutMS="${Number(props.timeoutMs ?? 30000)}"`);
+  }
+
+  const supportsInputMethod =
+    activity.type === 'UI.Click' ||
+    activity.type === 'UI.TypeInto' ||
+    activity.type === 'UI.Hover' ||
+    activity.type === 'UI.Check' ||
+    activity.type === 'UI.SelectItem';
+  if (supportsInputMethod) {
+    const fallback =
+      activity.type === 'UI.Click' || activity.type === 'UI.TypeInto'
+        ? 'Simulate'
+        : 'Same as App/Browser';
+    const inputAttr = interactionModeAttribute(props, fallback).trim();
+    if (inputAttr) {
+      extra.push(inputAttr);
+    }
   }
 
   const openTag =

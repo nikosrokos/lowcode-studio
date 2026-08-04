@@ -882,15 +882,17 @@ function executeStub(
       break;
     case 'UI.UseApplicationBrowser':
       log.push(
-        `${indent}UseApplicationBrowser ${activity.properties.mode || 'Browser'} ${activity.properties.urlOrPath || ''}`
+        `${indent}UseApplicationBrowser ${activity.properties.mode || 'Browser'} input=${activity.properties.inputMethod || 'Simulate'} ${activity.properties.urlOrPath || ''}`
       );
       break;
     case 'UI.Click':
-      log.push(`${indent}Click selector=${JSON.stringify(activity.properties.selector)}`);
+      log.push(
+        `${indent}Click input=${activity.properties.inputMethod || (activity.properties.simulateClick === false ? 'Hardware Events' : 'Simulate')} selector=${JSON.stringify(activity.properties.selector)}`
+      );
       break;
     case 'UI.TypeInto':
       log.push(
-        `${indent}TypeInto text=${resolveExpression(String(activity.properties.text ?? ''), variables)}`
+        `${indent}TypeInto input=${activity.properties.inputMethod || 'Simulate'} text=${resolveExpression(String(activity.properties.text ?? ''), variables)}`
       );
       break;
     case 'UI.GetText': {

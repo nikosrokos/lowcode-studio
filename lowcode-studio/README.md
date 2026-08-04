@@ -1,12 +1,12 @@
 # LowCode Studio
 
-**Version 0.6.8** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.6.9** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.6.8-0ea5e9)
+![version](https://img.shields.io/badge/version-0.6.9-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
@@ -45,7 +45,13 @@ Design on Mac (REFramework)
 2. **Project Explorer** — title actions with tooltips (Open, Scenarios, Connect, Validate…)  
 3. **Extract Table Data** — smart page → DataTable extraction for Windows UI automation
 
-## What’s in 0.6.8
+## What’s in 0.6.9
+
+- **Input Method** on UI activities (Click, Type Into, Hover, Check, Select Item, Use Application/Browser)
+- Choose **Simulate**, **Chromium API**, **Window Messages**, **Hardware Events**, **Same as App/Browser**, or scope **Background** before Connect
+- Exports as modern `InteractionMode` (`DebuggerApi` = Chromium API) on Studio Web XAML
+
+### Also in 0.6.8
 
 - **Cmd+K activity palette** in the designer — search Favorites / Recent / All; pin up to 10 favorites (★)
 - Shortcuts: **⌘K** (in designer), **⌘⇧A**, or **⌘K ⌘I**; also **Insert** toolbar button
@@ -115,7 +121,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.8.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.9.vsix` → reload.
 
 ## Easy path
 
@@ -218,6 +224,7 @@ See [docs/ACTIVITIES.md](docs/ACTIVITIES.md). Invoke Code / UI steps are dry-run
 - Stronger Mac dry-run (fixtures, step-through, scenario diffs)
 - Robot blueprint gallery (scrape→Excel, login→email, API→table)
 - Cmd+K activity palette (favorites/recent) + smart property suggestions
+- UI Input Method (Simulate / Chromium API / Window Messages / Hardware Events) exported to Studio Web
 
 ### Next
 1. Import polish for `Imported.*` placeholders
