@@ -80,6 +80,11 @@ const ACTIVITY_TO_PACKAGES: Record<string, string[]> = {
   'Flowchart.FlowDecision': ['UiPath.System.Activities']
 };
 
+/** Packages explicitly mapped for an activity type (empty if unknown). */
+export function packagesForActivityType(activityType: string): string[] {
+  return ACTIVITY_TO_PACKAGES[activityType] ? [...ACTIVITY_TO_PACKAGES[activityType]] : [];
+}
+
 export function collectActivityTypes(docs: WorkflowDocument[]): string[] {
   const types = new Set<string>();
   const walk = (list: ActivityNode[]) => {

@@ -254,6 +254,26 @@ export function getDesignerHtml(
     .prop-section-head:hover { background: var(--hover); }
     .prop-section-body { padding: 4px 10px 10px; }
     .prop-section.collapsed .prop-section-body { display: none; }
+    .side-section {
+      margin: 0 10px 10px; border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+      border-radius: 10px; overflow: hidden;
+      background: color-mix(in srgb, var(--panel) 70%, transparent);
+    }
+    .side-section-head {
+      display: flex; align-items: center; gap: 6px; width: 100%;
+      padding: 8px 10px; border: none; background: transparent; color: var(--text);
+      font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+      cursor: pointer; text-align: left;
+    }
+    .side-section-head:hover { background: var(--hover); }
+    .side-section-head .grow { flex: 1; }
+    .side-section-head .count {
+      font-size: 10px; font-weight: 600; color: var(--muted);
+      min-width: 18px; text-align: center;
+      border: 1px solid var(--border); border-radius: 999px; padding: 1px 6px;
+    }
+    .side-section-body { padding: 0 10px 4px; }
+    .side-section.collapsed .side-section-body { display: none; }
     .field { margin-bottom: 12px; }
     .field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
     .field input, .field select, .field textarea {
@@ -335,14 +355,32 @@ export function getDesignerHtml(
         <button class="btn" id="btnCollapseProps" type="button" title="Collapse all property groups">Collapse</button>
       </div>
       <div class="props" id="props"></div>
-      <h2>Variables</h2>
-      <div class="props" id="variablesPanel"></div>
-      <div style="padding:0 14px 18px;display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn" id="btnAddVar">Add Variable</button>
-        <button class="btn danger" id="btnDelete" disabled>Delete</button>
+      <div class="side-section collapsed" id="variablesSection" data-section="variables">
+        <button type="button" class="side-section-head" id="btnToggleVariables">
+          <span class="chev">▸</span>
+          <span class="grow">Variables</span>
+          <span class="count" id="variablesCount">0</span>
+        </button>
+        <div class="side-section-body">
+          <div class="props" id="variablesPanel"></div>
+          <div style="padding:0 0 12px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn" id="btnAddVar">Add Variable</button>
+          </div>
+        </div>
       </div>
-      <h2 id="connHeading" style="display:none">Connections</h2>
-      <div class="props" id="connectionsPanel" style="display:none"></div>
+      <div class="side-section" id="connectionsSection" data-section="connections" style="display:none">
+        <button type="button" class="side-section-head" id="btnToggleConnections">
+          <span class="chev">▾</span>
+          <span class="grow">Connections</span>
+          <span class="count" id="connectionsCount">0</span>
+        </button>
+        <div class="side-section-body">
+          <div class="props" id="connectionsPanel"></div>
+        </div>
+      </div>
+      <div style="padding:0 14px 18px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn danger" id="btnDelete" disabled>Delete activity</button>
+      </div>
     </aside>
   </div>
 
@@ -369,7 +407,10 @@ export function getDesignerHtml(
       props: document.getElementById('props'),
       variablesPanel: document.getElementById('variablesPanel'),
       connectionsPanel: document.getElementById('connectionsPanel'),
-      connHeading: document.getElementById('connHeading'),
+      connectionsSection: document.getElementById('connectionsSection'),
+      variablesSection: document.getElementById('variablesSection'),
+      variablesCount: document.getElementById('variablesCount'),
+      connectionsCount: document.getElementById('connectionsCount'),
       workflowName: document.getElementById('workflowName'),
       workflowType: document.getElementById('workflowType'),
       canvasHelp: document.getElementById('canvasHelp'),
@@ -1006,6 +1047,7 @@ export function getDesignerHtml(
 
     function renderVariables() {
       const vars = state.workflow.variables || [];
+      if (els.variablesCount) els.variablesCount.textContent = String(vars.length);
       if (!vars.length) {
         els.variablesPanel.innerHTML = '<div class="empty">No variables yet.</div>';
         return;
@@ -1048,13 +1090,12 @@ export function getDesignerHtml(
 
     function renderConnectionsPanel() {
       if (!isFlow()) {
-        els.connHeading.style.display = 'none';
-        els.connectionsPanel.style.display = 'none';
+        if (els.connectionsSection) els.connectionsSection.style.display = 'none';
         return;
       }
-      els.connHeading.style.display = '';
-      els.connectionsPanel.style.display = '';
+      if (els.connectionsSection) els.connectionsSection.style.display = '';
       const conns = state.workflow.connections || [];
+      if (els.connectionsCount) els.connectionsCount.textContent = String(conns.length);
       if (!conns.length) {
         els.connectionsPanel.innerHTML = '<div class="empty">No links yet. Drag a blue port to another node.</div>';
         return;
@@ -1079,6 +1120,13 @@ export function getDesignerHtml(
           persist(true);
         });
       });
+    }
+
+    function toggleSideSection(sectionEl) {
+      if (!sectionEl) return;
+      sectionEl.classList.toggle('collapsed');
+      const chev = sectionEl.querySelector('.chev');
+      if (chev) chev.textContent = sectionEl.classList.contains('collapsed') ? '▸' : '▾';
     }
 
     function autoLayout() {
@@ -1171,6 +1219,12 @@ export function getDesignerHtml(
     document.getElementById('btnCollapseProps')?.addEventListener('click', () => {
       state.collapsedPropSections = { general: true, activity: true, flow: true };
       renderProps();
+    });
+    document.getElementById('btnToggleVariables')?.addEventListener('click', () => {
+      toggleSideSection(els.variablesSection);
+    });
+    document.getElementById('btnToggleConnections')?.addEventListener('click', () => {
+      toggleSideSection(els.connectionsSection);
     });
     document.getElementById('btnZoomIn')?.addEventListener('click', () => setZoom(state.zoom + 0.1));
     document.getElementById('btnZoomOut')?.addEventListener('click', () => setZoom(state.zoom - 0.1));

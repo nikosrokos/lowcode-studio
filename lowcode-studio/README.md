@@ -1,12 +1,12 @@
 # LowCode Studio
 
-**Version 0.6.1** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.6.2** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.6.1-0ea5e9)
+![version](https://img.shields.io/badge/version-0.6.2-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
@@ -51,7 +51,14 @@ Design on Mac (REFramework)
 
 ![REFramework Process with Invoke Code](docs/images/vscode-reframework-process-activities.png)
 
-## What’s in 0.6.1
+## What’s in 0.6.2
+
+- **Variables panel collapsed** by default in the designer (expand when needed)
+- **Package validation warnings** — Validate Packages + pre-check on Connect to Studio Web
+- **Project Explorer title actions** — Open Local Project · Scenarios · Connect · Validate · Refresh (create/import in `…` menu)
+- **Open Local Project** — browse to a folder with `project.json` and open the main workflow
+
+### Also in 0.6.1
 
 - **Studio Web packages** — Connect exports **`.uip`** (Import project) + **`.uis`** (solution/CLI)
 - **Project Explorer** grouped by folders (Framework, Data, …)
@@ -61,8 +68,7 @@ Design on Mac (REFramework)
 ### Also in 0.6.0
 
 - **Connect to Studio Web** — guided export + checklist + open studio.uipath.com ([guide](docs/STUDIO_WEB.md))
-- **Dry Run Scenarios** as a first-class path — Shift+F5, last-scenario recall, Manage Scenarios (add / duplicate / open)
-- Project Explorer actions: ▶ Dry Run Scenarios · ✎ Manage Scenarios · ☁ Connect to Studio Web
+- **Dry Run Scenarios** as a first-class path — Shift+F5, last-scenario recall, Manage Scenarios
 - Config.xlsx bridge, custom activities, Invoke Code + top-use activities, Python pack, XAML import/export
 - Activity catalog: [docs/ACTIVITIES.md](docs/ACTIVITIES.md) (**57** activities)
 
@@ -76,15 +82,15 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.1.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.2.vsix` → reload.
 
 ## Easy path (REFramework)
 
-1. **New REFramework Project**
+1. **Open Local Project** (Project Explorer title) *or* **New REFramework Project**
 2. Edit `Framework/Process.lcs.json`
 3. Tune `Data/Config.json` (or import classic `Config.xlsx`)
 4. **Shift+F5** → run scenarios (or **Manage Scenarios** to add a quick smoke test)
-5. **Connect to Studio Web** → **Reveal .uip** → Import in [studio.uipath.com](https://studio.uipath.com)
+5. **Validate Packages** (optional) → **Connect to Studio Web** → **Reveal .uip** → Import in [studio.uipath.com](https://studio.uipath.com)
 
 ```
 MyREFramework/
@@ -165,12 +171,12 @@ See [docs/ACTIVITIES.md](docs/ACTIVITIES.md). Invoke Code / UI steps are dry-run
 - Scenario dry-runs + Manage Scenarios UX
 - **Connect to Studio Web** guided handoff + Git notes
 - Config.xlsx bridge, custom activities, Invoke Code / top activities, Python pack
+- Package validation warnings + Open Local Project + Project Explorer title actions
 
 ### Next
 1. Import polish for `Imported.*` placeholders
-2. Package validation warnings
-3. Deeper modern UI scopes
-4. Marketplace publish
+2. Deeper modern UI scopes
+3. Marketplace publish
 
 ## License
 

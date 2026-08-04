@@ -31,6 +31,10 @@ import {
   studioWebSyncGuideMarkdown
 } from './interop/studioWebConnect';
 import {
+  formatPackageValidationReport,
+  validateProjectPackages
+} from './interop/packageValidation';
+import {
   getActivityDefinition,
   setCustomActivityOverlay
 } from './models/activities';
@@ -85,6 +89,13 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      projectProvider.refresh();
+      refreshCustomActivityOverlay();
+    })
+  );
+
   editorProvider = new WorkflowEditorProvider(context, (doc) => {
     variablesProvider.setWorkflow(doc);
   });
@@ -105,6 +116,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('lowcodeStudio.newREFramework', () =>
       newProject('reframework')
     ),
+    vscode.commands.registerCommand('lowcodeStudio.openLocalProject', () =>
+      openLocalProjectCommand()
+    ),
     vscode.commands.registerCommand('lowcodeStudio.newWorkflow', () => newWorkflow()),
     vscode.commands.registerCommand('lowcodeStudio.openDesigner', async () => {
       const editor = vscode.window.activeTextEditor;
@@ -118,6 +132,9 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.window.showInformationMessage('Open a .lcs.json file first.');
       }
     }),
+    vscode.commands.registerCommand('lowcodeStudio.validatePackages', () =>
+      validatePackagesCommand()
+    ),
     vscode.commands.registerCommand('lowcodeStudio.validateWorkflow', async () => {
       const doc = await getActiveWorkflowDocument();
       if (!doc) {
@@ -315,6 +332,166 @@ export function deactivate(): void {
   // no-op
 }
 
+async function openLocalProjectCommand(): Promise<void> {
+  const picked = await vscode.window.showOpenDialog({
+    canSelectFiles: false,
+    canSelectFolders: true,
+    canSelectMany: false,
+    openLabel: 'Open LowCode Studio Project',
+    title: 'Select a LowCode Studio project folder (contains project.json)'
+  });
+  const folderUri = picked?.[0];
+  if (!folderUri) {
+    return;
+  }
+
+  const projectDir = resolveLcsProjectFromFolder(folderUri.fsPath);
+  if (!projectDir) {
+    const importInstead = await vscode.window.showWarningMessage(
+      'No LowCode Studio project.json (schemaVersion 1.0) found in that folder.',
+      'Import as UiPath Project',
+      'Cancel'
+    );
+    if (importInstead === 'Import as UiPath Project') {
+      await importUiPathProjectCommand(folderUri);
+    }
+    return;
+  }
+
+  const alreadyOpen = vscode.workspace.workspaceFolders?.some(
+    (f) =>
+      projectDir === f.uri.fsPath ||
+      projectDir.startsWith(f.uri.fsPath + path.sep) ||
+      f.uri.fsPath.startsWith(projectDir + path.sep)
+  );
+
+  if (!alreadyOpen) {
+    const choice = await vscode.window.showInformationMessage(
+      `Open project "${path.basename(projectDir)}" in this window?`,
+      'Open Folder',
+      'Add to Workspace',
+      'Cancel'
+    );
+    if (!choice || choice === 'Cancel') {
+      return;
+    }
+    if (choice === 'Open Folder') {
+      await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(projectDir), {
+        forceNewWindow: false
+      });
+      return; // window reloads
+    }
+    const folders = vscode.workspace.workspaceFolders;
+    const index = folders?.length ?? 0;
+    const added = vscode.workspace.updateWorkspaceFolders(index, 0, {
+      uri: vscode.Uri.file(projectDir),
+      name: path.basename(projectDir)
+    });
+    if (!added) {
+      // Fallback: open folder
+      await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(projectDir), false);
+      return;
+    }
+  }
+
+  await extensionContext.workspaceState.update('lowcodeStudio.activeProjectDir', projectDir);
+  projectProvider.refresh();
+  refreshCustomActivityOverlay();
+
+  const main = readProjectMainWorkflow(projectDir);
+  if (main) {
+    const uri = vscode.Uri.file(main);
+    await vscode.commands.executeCommand(
+      'vscode.openWith',
+      uri,
+      WorkflowEditorProvider.viewType,
+      { preview: false }
+    );
+  }
+
+  void vscode.window.showInformationMessage(
+    `Opened LowCode Studio project "${path.basename(projectDir)}".`
+  );
+}
+
+function resolveLcsProjectFromFolder(folder: string): string | undefined {
+  const direct = path.join(folder, 'project.json');
+  if (fs.existsSync(direct)) {
+    try {
+      const content = JSON.parse(fs.readFileSync(direct, 'utf8')) as {
+        schemaVersion?: string;
+      };
+      if (content.schemaVersion === '1.0') {
+        return folder;
+      }
+    } catch {
+      // continue search
+    }
+  }
+  const nested = findNearestProject(folder);
+  return nested ? path.dirname(nested) : undefined;
+}
+
+function readProjectMainWorkflow(projectDir: string): string | undefined {
+  const manifestPath = path.join(projectDir, 'project.json');
+  try {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
+      main?: string;
+      workflows?: string[];
+    };
+    const candidates = [
+      manifest.main,
+      ...(manifest.workflows || []),
+      'Main.lcs.json',
+      'Framework/Process.lcs.json'
+    ].filter(Boolean) as string[];
+    for (const rel of candidates) {
+      const abs = path.join(projectDir, rel);
+      if (fs.existsSync(abs)) {
+        return abs;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return undefined;
+}
+
+async function validatePackagesCommand(): Promise<void> {
+  const projectDir = await resolveLcsProjectDir();
+  if (!projectDir) {
+    return;
+  }
+  try {
+    const result = validateProjectPackages(projectDir);
+    const report = formatPackageValidationReport(result);
+    const channel = getOutput();
+    channel.clear();
+    channel.appendLine(report);
+    channel.show(true);
+
+    const warnCount = result.warnings.filter((w) => w.severity === 'warning').length;
+    const infoCount = result.warnings.filter((w) => w.severity === 'info').length;
+    if (!result.warnings.length) {
+      void vscode.window.showInformationMessage(
+        `Packages OK — ${Object.keys(result.dependencies).length} NuGet deps for Studio Web.`
+      );
+      return;
+    }
+    const open = await vscode.window.showWarningMessage(
+      `Package validation: ${warnCount} warning(s), ${infoCount} info. See LowCode Studio output.`,
+      'Open Output'
+    );
+    if (open === 'Open Output') {
+      channel.show(true);
+    }
+  } catch (err) {
+    vscode.window.showErrorMessage(
+      err instanceof Error ? err.message : 'Package validation failed'
+    );
+  }
+}
+
 async function newProject(forcedTemplate?: 'blank' | 'reframework'): Promise<void> {
   const workspace = vscode.workspace.workspaceFolders?.[0];
   if (!workspace) {
@@ -489,19 +666,23 @@ async function newWorkflow(): Promise<void> {
   );
 }
 
-async function importUiPathProjectCommand(): Promise<void> {
+async function importUiPathProjectCommand(preselected?: vscode.Uri): Promise<void> {
   const workspace = vscode.workspace.workspaceFolders?.[0];
   if (!workspace) {
     vscode.window.showErrorMessage('Open a workspace folder first.');
     return;
   }
-  const picked = await vscode.window.showOpenDialog({
-    canSelectFiles: false,
-    canSelectFolders: true,
-    canSelectMany: false,
-    openLabel: 'Import UiPath project folder'
-  });
-  if (!picked?.[0]) {
+  let sourceUri = preselected;
+  if (!sourceUri) {
+    const picked = await vscode.window.showOpenDialog({
+      canSelectFiles: false,
+      canSelectFolders: true,
+      canSelectMany: false,
+      openLabel: 'Import UiPath project folder'
+    });
+    sourceUri = picked?.[0];
+  }
+  if (!sourceUri) {
     return;
   }
   try {
@@ -510,7 +691,7 @@ async function importUiPathProjectCommand(): Promise<void> {
         location: vscode.ProgressLocation.Notification,
         title: 'Importing UiPath project…'
       },
-      async () => importUiPathProjectFolder(picked[0].fsPath, workspace.uri.fsPath)
+      async () => importUiPathProjectFolder(sourceUri!.fsPath, workspace.uri.fsPath)
     );
     projectProvider.refresh();
     const mainUri = vscode.Uri.file(path.join(result.targetDir, result.mainWorkflow));
@@ -662,9 +843,23 @@ async function importConfigXlsxCommand(): Promise<void> {
 }
 
 async function resolveLcsProjectDir(): Promise<string | undefined> {
+  const remembered = extensionContext.workspaceState.get<string>(
+    'lowcodeStudio.activeProjectDir'
+  );
+  if (remembered && fs.existsSync(path.join(remembered, 'project.json'))) {
+    return remembered;
+  }
+
   const workspace = vscode.workspace.workspaceFolders?.[0];
   if (!workspace) {
-    vscode.window.showErrorMessage('Open a workspace folder first.');
+    const open = await vscode.window.showInformationMessage(
+      'No folder open. Open a local LowCode Studio project?',
+      'Open Local Project'
+    );
+    if (open === 'Open Local Project') {
+      await openLocalProjectCommand();
+      return extensionContext.workspaceState.get<string>('lowcodeStudio.activeProjectDir');
+    }
     return undefined;
   }
   const projectJson = findNearestProject(workspace.uri.fsPath);
@@ -720,6 +915,40 @@ async function connectStudioWebCommand(): Promise<void> {
     return;
   }
   try {
+    let packageReport = '';
+    try {
+      const pkg = validateProjectPackages(projectDir);
+      packageReport = formatPackageValidationReport(pkg);
+      const warnCount = pkg.warnings.filter((w) => w.severity === 'warning').length;
+      if (warnCount > 0) {
+        const proceed = await vscode.window.showWarningMessage(
+          `${warnCount} package validation warning(s) before Studio Web packaging.`,
+          'Continue',
+          'Show Warnings',
+          'Cancel'
+        );
+        if (!proceed || proceed === 'Cancel') {
+          return;
+        }
+        if (proceed === 'Show Warnings') {
+          const channel = getOutput();
+          channel.clear();
+          channel.appendLine(packageReport);
+          channel.show(true);
+          const again = await vscode.window.showWarningMessage(
+            'Continue packaging for Studio Web?',
+            'Continue',
+            'Cancel'
+          );
+          if (again !== 'Continue') {
+            return;
+          }
+        }
+      }
+    } catch {
+      // packaging can still proceed if validation cannot run
+    }
+
     const result = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
@@ -741,9 +970,26 @@ async function connectStudioWebCommand(): Promise<void> {
     channel.appendLine(`Solution (.uis): ${result.archives.uisPath}`);
     channel.appendLine(`Main:   ${result.mainXaml}`);
     channel.appendLine('');
+    if (packageReport) {
+      channel.appendLine(packageReport);
+      channel.appendLine('');
+    }
     channel.appendLine('Checklist:');
     result.checklist.forEach((c, i) => channel.appendLine(`  ${i + 1}. ${c}`));
     channel.show(true);
+
+    // Persist warnings next to export for handoff review
+    if (packageReport) {
+      try {
+        fs.writeFileSync(
+          path.join(result.targetDir, 'PACKAGE_WARNINGS.md'),
+          `# Package validation\n\n\`\`\`\n${packageReport}\n\`\`\`\n`,
+          'utf8'
+        );
+      } catch {
+        // ignore
+      }
+    }
 
     const next = await vscode.window.showInformationMessage(
       `Ready for Studio Web → ${path.basename(result.archives.uipPath)}`,
