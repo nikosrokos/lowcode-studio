@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 
+type ItemKind = 'project' | 'folder' | 'workflow' | 'file' | 'action' | 'info';
+
 export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeItem> {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
     ProjectTreeItem | undefined | null | void
@@ -54,82 +56,35 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
     }
 
     if (element.contextValue === 'project') {
-      try {
-        const manifest = JSON.parse(fs.readFileSync(element.resourcePath, 'utf8')) as {
-          workflows?: string[];
-          main?: string;
-          template?: string;
-        };
-        const dir = path.dirname(element.resourcePath);
-        const items: ProjectTreeItem[] = [];
+      const dir = path.dirname(element.resourcePath);
+      const items: ProjectTreeItem[] = [
+        actionItem('▶ Dry Run Scenarios', dir, 'lowcodeStudio.dryRunScenario', 'beaker'),
+        actionItem('✎ Manage Scenarios', dir, 'lowcodeStudio.manageScenarios', 'checklist'),
+        actionItem('☁ Connect to Studio Web', dir, 'lowcodeStudio.connectStudioWeb', 'cloud-upload')
+      ];
 
-        // Hero actions — dry-run + Studio Web first
+      // Group workflows + known folders
+      const folders = collectProjectFolders(dir);
+      for (const folder of folders) {
         items.push(
-          actionItem(
-            '▶ Dry Run Scenarios',
-            dir,
-            'lowcodeStudio.dryRunScenario',
-            'beaker',
-            'Run Data/Test/scenarios.json'
-          )
-        );
-        items.push(
-          actionItem(
-            '✎ Manage Scenarios',
-            dir,
-            'lowcodeStudio.manageScenarios',
-            'checklist',
-            'Add / duplicate / open scenarios'
-          )
-        );
-        items.push(
-          actionItem(
-            '☁ Connect to Studio Web',
-            dir,
-            'lowcodeStudio.connectStudioWeb',
-            'cloud-upload',
-            'Export Portable project + open studio.uipath.com'
-          )
-        );
-
-        const configJson = path.join(dir, 'Data', 'Config.json');
-        if (fs.existsSync(configJson)) {
-          items.push(fileItem('Data/Config.json', configJson, 'settings-gear'));
-        }
-        const scenarios = path.join(dir, 'Data', 'Test', 'scenarios.json');
-        if (fs.existsSync(scenarios)) {
-          items.push(fileItem('Data/Test/scenarios.json', scenarios, 'beaker'));
-        }
-
-        const workflows = manifest.workflows || [];
-        for (const wf of workflows) {
-          const full = path.join(dir, wf);
-          const item = new ProjectTreeItem(
-            wf,
-            full,
-            vscode.TreeItemCollapsibleState.None,
-            'workflow'
-          );
-          item.description = wf === manifest.main ? 'main' : undefined;
-          item.command = {
-            command: 'vscode.openWith',
-            title: 'Open Designer',
-            arguments: [vscode.Uri.file(full), 'lowcodeStudio.workflowEditor']
-          };
-          item.iconPath = new vscode.ThemeIcon('file-code');
-          items.push(item);
-        }
-        return items;
-      } catch {
-        return [
           new ProjectTreeItem(
-            'Invalid project.json',
-            element.resourcePath,
-            vscode.TreeItemCollapsibleState.None,
-            'info'
+            folder.name,
+            folder.path,
+            vscode.TreeItemCollapsibleState.Expanded,
+            'folder'
           )
-        ];
+        );
       }
+
+      // Root-level workflows / files
+      for (const file of listRootProjectFiles(dir)) {
+        items.push(fileTreeItem(file.label, file.path, file.kind));
+      }
+      return items;
+    }
+
+    if (element.contextValue === 'folder') {
+      return listFolderChildren(element.resourcePath);
     }
 
     return [];
@@ -162,7 +117,7 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
               results.push(full);
             }
           } catch {
-            // ignore non-studio project.json files
+            // ignore
           }
         }
       }
@@ -176,12 +131,15 @@ export class ProjectTreeItem extends vscode.TreeItem {
     label: string,
     public readonly resourcePath: string,
     collapsibleState: vscode.TreeItemCollapsibleState,
-    contextValue: 'project' | 'workflow' | 'info' | 'action' | 'file'
+    contextValue: ItemKind
   ) {
     super(label, collapsibleState);
     this.contextValue = contextValue;
     if (contextValue === 'project') {
       this.iconPath = new vscode.ThemeIcon('root-folder');
+      this.tooltip = resourcePath;
+    } else if (contextValue === 'folder') {
+      this.iconPath = new vscode.ThemeIcon('folder');
       this.tooltip = resourcePath;
     }
   }
@@ -191,8 +149,7 @@ function actionItem(
   label: string,
   projectDir: string,
   command: string,
-  icon: string,
-  tooltip: string
+  icon: string
 ): ProjectTreeItem {
   const item = new ProjectTreeItem(
     label,
@@ -202,22 +159,154 @@ function actionItem(
   );
   item.command = { command, title: label };
   item.iconPath = new vscode.ThemeIcon(icon);
-  item.tooltip = tooltip;
   return item;
 }
 
-function fileItem(label: string, fullPath: string, icon: string): ProjectTreeItem {
+function fileTreeItem(
+  label: string,
+  fullPath: string,
+  kind: 'workflow' | 'file'
+): ProjectTreeItem {
   const item = new ProjectTreeItem(
     label,
     fullPath,
     vscode.TreeItemCollapsibleState.None,
-    'file'
+    kind
   );
-  item.command = {
-    command: 'vscode.open',
-    title: 'Open',
-    arguments: [vscode.Uri.file(fullPath)]
-  };
-  item.iconPath = new vscode.ThemeIcon(icon);
+  if (kind === 'workflow') {
+    item.command = {
+      command: 'vscode.openWith',
+      title: 'Open Designer',
+      arguments: [vscode.Uri.file(fullPath), 'lowcodeStudio.workflowEditor']
+    };
+    item.iconPath = new vscode.ThemeIcon('file-code');
+  } else {
+    item.command = {
+      command: 'vscode.open',
+      title: 'Open',
+      arguments: [vscode.Uri.file(fullPath)]
+    };
+    item.iconPath = new vscode.ThemeIcon(
+      fullPath.endsWith('.xlsx')
+        ? 'file-binary'
+        : fullPath.endsWith('scenarios.json')
+          ? 'beaker'
+          : 'settings-gear'
+    );
+  }
   return item;
+}
+
+function collectProjectFolders(projectDir: string): Array<{ name: string; path: string }> {
+  const preferred = ['Framework', 'Data', 'Tests', 'Test', 'Library', 'Libraries'];
+  const found: Array<{ name: string; path: string }> = [];
+  for (const name of preferred) {
+    const full = path.join(projectDir, name);
+    if (fs.existsSync(full) && fs.statSync(full).isDirectory()) {
+      found.push({ name, path: full });
+    }
+  }
+  // Any other first-level dirs with workflows/config
+  try {
+    for (const entry of fs.readdirSync(projectDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+      if (preferred.includes(entry.name) || entry.name.startsWith('.')) {
+        continue;
+      }
+      if (entry.name === 'node_modules' || entry.name === 'out' || entry.name.endsWith('.StudioWeb')) {
+        continue;
+      }
+      const full = path.join(projectDir, entry.name);
+      if (dirHasProjectContent(full)) {
+        found.push({ name: entry.name, path: full });
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return found;
+}
+
+function dirHasProjectContent(dir: string): boolean {
+  try {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isFile() && (entry.name.endsWith('.lcs.json') || entry.name.endsWith('.json') || entry.name.endsWith('.xlsx'))) {
+        return true;
+      }
+      if (entry.isDirectory()) {
+        return true;
+      }
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+function listRootProjectFiles(
+  projectDir: string
+): Array<{ label: string; path: string; kind: 'workflow' | 'file' }> {
+  const results: Array<{ label: string; path: string; kind: 'workflow' | 'file' }> = [];
+  try {
+    for (const entry of fs.readdirSync(projectDir, { withFileTypes: true })) {
+      if (!entry.isFile()) {
+        continue;
+      }
+      const full = path.join(projectDir, entry.name);
+      if (entry.name.endsWith('.lcs.json')) {
+        results.push({ label: entry.name, path: full, kind: 'workflow' });
+      } else if (
+        entry.name === 'activities.custom.json' ||
+        entry.name === 'project.json'
+      ) {
+        results.push({ label: entry.name, path: full, kind: 'file' });
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return results.sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function listFolderChildren(folderPath: string): ProjectTreeItem[] {
+  const items: ProjectTreeItem[] = [];
+  let entries: fs.Dirent[] = [];
+  try {
+    entries = fs.readdirSync(folderPath, { withFileTypes: true });
+  } catch {
+    return items;
+  }
+
+  const dirs = entries
+    .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const files = entries
+    .filter((e) => e.isFile())
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  for (const d of dirs) {
+    const full = path.join(folderPath, d.name);
+    items.push(
+      new ProjectTreeItem(d.name, full, vscode.TreeItemCollapsibleState.Expanded, 'folder')
+    );
+  }
+  for (const f of files) {
+    if (f.name === '.gitkeep') {
+      continue;
+    }
+    const full = path.join(folderPath, f.name);
+    if (f.name.endsWith('.lcs.json')) {
+      items.push(fileTreeItem(f.name, full, 'workflow'));
+    } else if (
+      f.name.endsWith('.json') ||
+      f.name.endsWith('.xlsx') ||
+      f.name.endsWith('.md') ||
+      f.name.endsWith('.csv')
+    ) {
+      items.push(fileTreeItem(f.name, full, 'file'));
+    }
+  }
+  return items;
 }

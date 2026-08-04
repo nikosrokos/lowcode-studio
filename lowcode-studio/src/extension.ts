@@ -723,7 +723,7 @@ async function connectStudioWebCommand(): Promise<void> {
     const result = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: 'Connecting to Studio Web (exporting Portable project)…'
+        title: 'Connecting to Studio Web (packaging .uip / .uis)…'
       },
       async () => connectToStudioWeb(projectDir)
     );
@@ -737,6 +737,8 @@ async function connectStudioWebCommand(): Promise<void> {
     channel.appendLine('Connect to Studio Web');
     channel.appendLine('─'.repeat(48));
     channel.appendLine(`Export: ${result.targetDir}`);
+    channel.appendLine(`Package (.uip): ${result.archives.uipPath}`);
+    channel.appendLine(`Solution (.uis): ${result.archives.uisPath}`);
     channel.appendLine(`Main:   ${result.mainXaml}`);
     channel.appendLine('');
     channel.appendLine('Checklist:');
@@ -744,17 +746,24 @@ async function connectStudioWebCommand(): Promise<void> {
     channel.show(true);
 
     const next = await vscode.window.showInformationMessage(
-      `Ready for Studio Web → ${path.basename(result.targetDir)}`,
-      'Open Folder',
+      `Ready for Studio Web → ${path.basename(result.archives.uipPath)}`,
+      'Reveal .uip',
       'Open Studio Web',
+      'Open Folder',
       'Open Checklist',
       'Show Guide'
     );
-    if (next === 'Open Folder') {
-      await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(result.targetDir));
+    if (next === 'Reveal .uip') {
+      await vscode.commands.executeCommand(
+        'revealFileInOS',
+        vscode.Uri.file(result.archives.uipPath)
+      );
     }
     if (next === 'Open Studio Web') {
       await vscode.env.openExternal(vscode.Uri.parse(STUDIO_WEB_URL));
+    }
+    if (next === 'Open Folder') {
+      await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(result.targetDir));
     }
     if (next === 'Open Checklist') {
       const doc = await vscode.workspace.openTextDocument(result.guidePath);
