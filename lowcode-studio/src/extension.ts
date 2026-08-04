@@ -12,7 +12,12 @@ import {
   stringifyWorkflow,
   WorkflowDocument
 } from './models/workflow';
-import { dryRunWorkflow, toPseudocode, validateWorkflow } from './commands/simulator';
+import {
+  dryRunWorkflow,
+  formatDryRunReport,
+  toPseudocode,
+  validateWorkflow
+} from './commands/simulator';
 import {
   createQuickScenario,
   duplicateScenario,
@@ -53,6 +58,12 @@ import {
   CustomActivityDefinition
 } from './models/customActivities';
 import { generateREFrameworkProject } from './templates/reframework';
+import {
+  BlueprintId,
+  generateBlueprintProject,
+  getBlueprint,
+  ROBOT_BLUEPRINTS
+} from './templates/blueprints';
 import {
   exportToStudioWebProject,
   importUiPathNupkg,
@@ -121,6 +132,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('lowcodeStudio.newREFramework', () =>
       newProject('reframework')
     ),
+    vscode.commands.registerCommand('lowcodeStudio.newBlueprint', () =>
+      newProject('blueprint')
+    ),
     vscode.commands.registerCommand('lowcodeStudio.openLocalProject', () =>
       openLocalProjectCommand()
     ),
@@ -168,22 +182,46 @@ export function activate(context: vscode.ExtensionContext): void {
       if (!doc) {
         return;
       }
+      const mode = await vscode.window.showQuickPick(
+        [
+          {
+            label: 'Run All',
+            description: 'Full dry-run with step diffs in Output',
+            mode: 'all' as const
+          },
+          {
+            label: 'Step Through',
+            description: 'Highlight each activity in the designer',
+            mode: 'step' as const
+          }
+        ],
+        { placeHolder: 'Dry Run mode' }
+      );
+      if (!mode) {
+        return;
+      }
       const result = dryRunWorkflow(doc);
       const channel = getOutput();
       channel.clear();
-      channel.appendLine(`Dry Run — ${doc.name}`);
-      channel.appendLine('─'.repeat(48));
+      channel.appendLine(formatDryRunReport(result, `Dry Run — ${doc.name}`));
+      channel.appendLine('');
+      channel.appendLine('Log:');
       for (const line of result.log) {
         channel.appendLine(line);
       }
-      channel.appendLine('─'.repeat(48));
-      channel.appendLine(JSON.stringify(result.variables, null, 2));
       channel.show(true);
-      vscode.window.showInformationMessage(
-        result.ok
-          ? `Dry run completed (${result.steps.length} steps).`
-          : 'Dry run finished with errors.'
-      );
+      if (mode.mode === 'step') {
+        editorProvider.playDryRun(result);
+        vscode.window.showInformationMessage(
+          `Step-through ready (${result.steps.length} steps). Use Step / Continue in the designer.`
+        );
+      } else {
+        vscode.window.showInformationMessage(
+          result.ok
+            ? `Dry run completed (${result.steps.length} steps${result.warnings.length ? `, ${result.warnings.length} warning(s)` : ''}).`
+            : 'Dry run finished with errors.'
+        );
+      }
     }),
     vscode.commands.registerCommand('lowcodeStudio.dryRunScenario', () =>
       dryRunScenarioCommand()
@@ -497,7 +535,9 @@ async function validatePackagesCommand(): Promise<void> {
   }
 }
 
-async function newProject(forcedTemplate?: 'blank' | 'reframework'): Promise<void> {
+async function newProject(
+  forcedTemplate?: 'blank' | 'reframework' | 'blueprint'
+): Promise<void> {
   const workspace = vscode.workspace.workspaceFolders?.[0];
   if (!workspace) {
     vscode.window.showErrorMessage('Open a folder in VS Code / Cursor first.');
@@ -510,14 +550,19 @@ async function newProject(forcedTemplate?: 'blank' | 'reframework'): Promise<voi
       await vscode.window.showQuickPick(
         [
           {
-            label: 'Blank Project',
-            description: 'Empty Sequence or Flowchart',
-            value: 'blank' as const
+            label: 'Robot Blueprint',
+            description: 'One-click scaffolds: scrape→Excel, login→email, API→table',
+            value: 'blueprint' as const
           },
           {
             label: 'REFramework',
             description: 'UiPath-style Init → Get Data → Process → End (recommended)',
             value: 'reframework' as const
+          },
+          {
+            label: 'Blank Project',
+            description: 'Empty Sequence or Flowchart',
+            value: 'blank' as const
           }
         ],
         { placeHolder: 'Choose a project template' }
@@ -528,9 +573,34 @@ async function newProject(forcedTemplate?: 'blank' | 'reframework'): Promise<voi
     return;
   }
 
+  let blueprintId: BlueprintId | undefined;
+  if (templatePick === 'blueprint') {
+    const pick = await vscode.window.showQuickPick(
+      ROBOT_BLUEPRINTS.map((b) => ({
+        label: b.label,
+        description: b.description,
+        detail: b.detail,
+        id: b.id,
+        defaultProjectName: b.defaultProjectName
+      })),
+      { placeHolder: 'Choose a robot blueprint' }
+    );
+    if (!pick) {
+      return;
+    }
+    blueprintId = pick.id;
+  }
+
+  const defaultName =
+    templatePick === 'reframework'
+      ? 'MyREFramework'
+      : templatePick === 'blueprint' && blueprintId
+        ? getBlueprint(blueprintId)?.defaultProjectName || 'MyRobot'
+        : 'MyAutomation';
+
   const name = await vscode.window.showInputBox({
     prompt: 'Project name',
-    value: templatePick === 'reframework' ? 'MyREFramework' : 'MyAutomation',
+    value: defaultName,
     validateInput: (v) => (v.trim() ? undefined : 'Name is required')
   });
   if (!name) {
@@ -546,16 +616,9 @@ async function newProject(forcedTemplate?: 'blank' | 'reframework'): Promise<voi
   fs.mkdirSync(projectDir, { recursive: true });
 
   if (templatePick === 'reframework') {
-    const files = generateREFrameworkProject(name.trim());
-    for (const file of files) {
-      const full = path.join(projectDir, file.relativePath);
-      fs.mkdirSync(path.dirname(full), { recursive: true });
-      if (Buffer.isBuffer(file.content)) {
-        fs.writeFileSync(full, file.content);
-      } else {
-        fs.writeFileSync(full, file.content, 'utf8');
-      }
-    }
+    writeGeneratedFiles(projectDir, generateREFrameworkProject(name.trim()));
+  } else if (templatePick === 'blueprint' && blueprintId) {
+    writeGeneratedFiles(projectDir, generateBlueprintProject(name.trim(), blueprintId));
   } else {
     const mainWorkflow = 'Main.lcs.json';
     const workflowType =
@@ -604,11 +667,29 @@ LowCode Studio project (Studio-like low-code workflows for VS Code / Cursor on M
     uri,
     WorkflowEditorProvider.viewType
   );
+  const blueprintLabel = blueprintId ? getBlueprint(blueprintId)?.label : undefined;
   vscode.window.showInformationMessage(
     templatePick === 'reframework'
       ? `Created REFramework project "${name.trim()}". Open Process.lcs.json to add business logic.`
-      : `Created project "${name.trim()}".`
+      : templatePick === 'blueprint'
+        ? `Created blueprint "${blueprintLabel}" → ${name.trim()}. Dry Run (F5) or Step Through next.`
+        : `Created project "${name.trim()}".`
   );
+}
+
+function writeGeneratedFiles(
+  projectDir: string,
+  files: { relativePath: string; content: string | Buffer }[]
+): void {
+  for (const file of files) {
+    const full = path.join(projectDir, file.relativePath);
+    fs.mkdirSync(path.dirname(full), { recursive: true });
+    if (Buffer.isBuffer(file.content)) {
+      fs.writeFileSync(full, file.content);
+    } else {
+      fs.writeFileSync(full, file.content, 'utf8');
+    }
+  }
 }
 
 async function newWorkflow(): Promise<void> {
@@ -1599,7 +1680,7 @@ A **Studio-like low-code designer** for VS Code and Cursor — built for Mac use
 ## The easy loop (keys of this extension)
 
 \`\`\`
-1. New REFramework Project
+1. New Robot Blueprint (or REFramework)
 2. Dry Run / Scenarios   ← Shift+F5  (fastest local testing)
 3. Connect to Studio Web ← export + open studio.uipath.com
 4. Publish from Studio Web to Orchestrator
@@ -1609,15 +1690,15 @@ A **Studio-like low-code designer** for VS Code and Cursor — built for Mac use
 |---|---|---|
 | **1. Test** | Dry Run / Dry Run Scenarios / Manage Scenarios | F5 / **Shift+F5** |
 | **2. Ship** | **Connect to Studio Web** | — |
-| Design | New REFramework / Open Designer | — |
+| Design | **New Robot Blueprint** / REFramework / Open Designer | — |
 | Config | Import/Export Config.xlsx | — |
 
 ## Quick start
 
-1. **New REFramework Project**
-2. Edit \`Framework/Process.lcs.json\` for business logic
-3. Tune \`Data/Config.json\` (or import classic \`Config.xlsx\`)
-4. **Shift+F5** → pick a scenario (or All) — PASS/FAIL in Output
+1. **New Robot Blueprint** (scrape→Excel, login→email, API→table) *or* **New REFramework Project**
+2. Edit \`Main.lcs.json\` (blueprint) or \`Framework/Process.lcs.json\` (REFramework)
+3. Tune selectors / \`Data/Config.json\` as needed
+4. **F5** / **Shift+F5** → dry-run or scenarios — PASS/FAIL in Output
 5. **Connect to Studio Web** → Open Folder → Import in [studio.uipath.com](https://studio.uipath.com)
 
 Project Explorer shows **▶ Dry Run Scenarios**, **✎ Manage Scenarios**, and **☁ Connect to Studio Web** on every project.

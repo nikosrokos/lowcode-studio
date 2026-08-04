@@ -7,7 +7,12 @@ import {
   stringifyWorkflow,
   WorkflowDocument
 } from '../models/workflow';
-import { dryRunWorkflow, validateWorkflow } from '../commands/simulator';
+import {
+  DryRunResult,
+  dryRunWorkflow,
+  formatDryRunReport,
+  validateWorkflow
+} from '../commands/simulator';
 import { getDesignerHtml } from '../webview/designerHtml';
 
 export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
@@ -42,6 +47,19 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
     this.activePanel.webview.postMessage({
       type: 'insertActivity',
       activityType
+    });
+  }
+
+  playDryRun(result: DryRunResult): void {
+    if (!this.activePanel) {
+      vscode.window.showInformationMessage(
+        'Open a .lcs.json workflow in the LowCode Studio designer to step through.'
+      );
+      return;
+    }
+    this.activePanel.webview.postMessage({
+      type: 'dryRunPlayback',
+      result
     });
   }
 
@@ -138,23 +156,40 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           break;
         }
         case 'dryRun': {
-          const result = dryRunWorkflow(message.workflow as WorkflowDocument);
+          const result = dryRunWorkflow(message.workflow as WorkflowDocument, {
+            fixtures: message.fixtures
+          });
           const channel = vscode.window.createOutputChannel('LowCode Studio');
           channel.clear();
-          channel.appendLine(`Dry Run — ${document.fileName}`);
-          channel.appendLine('─'.repeat(48));
+          channel.appendLine(
+            formatDryRunReport(result, `Dry Run — ${document.fileName}`)
+          );
+          channel.appendLine('');
+          channel.appendLine('Log:');
           for (const line of result.log) {
             channel.appendLine(line);
           }
-          channel.appendLine('─'.repeat(48));
-          channel.appendLine('Variables snapshot:');
-          channel.appendLine(JSON.stringify(result.variables, null, 2));
           channel.show(true);
-          vscode.window.showInformationMessage(
-            result.ok
-              ? `Dry run completed (${result.steps.length} steps).`
-              : 'Dry run finished with errors. See output.'
-          );
+          const stepThrough = Boolean(message.stepThrough);
+          if (stepThrough) {
+            webviewPanel.webview.postMessage({
+              type: 'dryRunPlayback',
+              result
+            });
+            vscode.window.showInformationMessage(
+              `Step-through ready (${result.steps.length} steps). Use Step / Continue in the designer.`
+            );
+          } else {
+            webviewPanel.webview.postMessage({
+              type: 'dryRunDone',
+              result
+            });
+            vscode.window.showInformationMessage(
+              result.ok
+                ? `Dry run completed (${result.steps.length} steps${result.warnings.length ? `, ${result.warnings.length} warning(s)` : ''}).`
+                : 'Dry run finished with errors. See output.'
+            );
+          }
           break;
         }
         case 'variablesChanged': {

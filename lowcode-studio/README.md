@@ -1,12 +1,12 @@
 # LowCode Studio
 
-**Version 0.6.5** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.6.7** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.6.5-0ea5e9)
+![version](https://img.shields.io/badge/version-0.6.7-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
@@ -26,7 +26,7 @@ Design on Mac (REFramework)
 |---|---|---|
 | **1. Test** | Dry Run + **Manage Scenarios** | F5 / **Shift+F5** / Cmd+Shift+T |
 | **2. Ship** | **Connect to Studio Web** | **Cmd+Shift+U** |
-| Design | New REFramework / Designer | — |
+| Design | **Robot Blueprint** / REFramework / Designer | — |
 | Config | Config.json ↔ Config.xlsx | — |
 
 ## In action
@@ -45,7 +45,21 @@ Design on Mac (REFramework)
 2. **Project Explorer** — title actions with tooltips (Open, Scenarios, Connect, Validate…)  
 3. **Extract Table Data** — smart page → DataTable extraction for Windows UI automation
 
-## What’s in 0.6.5
+## What’s in 0.6.7
+
+- **Robot blueprints** — one-click scaffolds beyond REFramework:
+  - Web scrape → Excel
+  - Login → Extract table → Email
+  - API → DataTable → Process
+- Command **New Robot Blueprint** + Project Explorer create menu; each ships with scenarios/fixtures
+
+### Also in 0.6.6
+
+- **Stronger Mac dry-run** — UI/HTTP/table fixtures, per-step variable diffs, empty-selector warnings
+- **Step Through** in the designer — highlight each activity, Step / Continue / Stop, Δ variables strip
+- Scenario reports show **expected vs actual** (including DataTable side-by-side) when assertions fail
+
+### Also in 0.6.5
 
 - **Selector Builder** in the designer — templates + fields for classic `<html>/<webctrl>` / `<wnd>` selectors (Mac-friendly)
 - **Use Application/Browser** modern UI scope — nest Click / Type Into / Extract Table under an app/browser card
@@ -95,9 +109,13 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.5.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.7.vsix` → reload.
 
-## Easy path (REFramework)
+## Easy path
+
+**Fastest start:** **New Robot Blueprint** → pick scrape→Excel / login→email / API→table → **F5**.
+
+**REFramework path:**
 
 1. **Open Local Project** (Project Explorer title) *or* **New REFramework Project**
 2. Edit `Framework/Process.lcs.json`
@@ -119,7 +137,8 @@ MyREFramework/
 
 | Piece | Purpose |
 |---|---|
-| **F5** | Dry-run the open workflow |
+| **F5** | Dry-run the open workflow (Run All or Step Through) |
+| **Step Through** | Designer button — highlight steps + variable deltas |
 | **Shift+F5** | Pick scenario / All / Add quick / Manage |
 | **Manage Scenarios** | Add MaxTransactions smoke tests, duplicate, open file |
 | `Data/Test/scenarios.json` | Named seeds + PASS/FAIL expects |
@@ -175,6 +194,7 @@ See [docs/ACTIVITIES.md](docs/ACTIVITIES.md). Invoke Code / UI steps are dry-run
 | Show Studio Web Guide | — |
 | Export for Studio Web | — |
 | Export / Import Config.xlsx | — |
+| **New Robot Blueprint** | — |
 | New REFramework Project | — |
 | Getting Started | — |
 
@@ -188,10 +208,12 @@ See [docs/ACTIVITIES.md](docs/ACTIVITIES.md). Invoke Code / UI steps are dry-run
 - Windows project target + classic Windows UI selectors for robot execution
 - Floating/resizable properties panel, Extract Table Data, title-action tooltips
 - Selector Builder, Use Application/Browser scope, Windows TODO on Connect
+- Stronger Mac dry-run (fixtures, step-through, scenario diffs)
+- Robot blueprint gallery (scrape→Excel, login→email, API→table)
 
 ### Next
 1. Import polish for `Imported.*` placeholders
-2. Blueprints + Cmd+K activity palette
+2. Cmd+K activity palette + favorites
 3. Marketplace publish
 
 ## License

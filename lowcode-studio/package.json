@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Mac-first low-code RPA for VS Code/Cursor: REFramework design, scenario dry-runs (Shift+F5), and the easiest Connect to Studio Web handoff for Orchestrator publish.",
-  "version": "0.6.5",
+  "version": "0.6.7",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -86,6 +86,13 @@
         "title": "New REFramework Project \u2014 Init \u2192 Get Data \u2192 Process template",
         "icon": "$(type-hierarchy)",
         "shortTitle": "REFramework",
+        "category": "LowCode Studio"
+      },
+      {
+        "command": "lowcodeStudio.newBlueprint",
+        "title": "New Robot Blueprint \u2014 scrape\u2192Excel, login\u2192email, API\u2192table",
+        "icon": "$(symbol-misc)",
+        "shortTitle": "Blueprint",
         "category": "LowCode Studio"
       },
       {
@@ -263,21 +270,27 @@
           "tooltip": "Refresh Project Explorer"
         },
         {
-          "command": "lowcodeStudio.newREFramework",
+          "command": "lowcodeStudio.newBlueprint",
           "when": "view == lowcodeStudio.projects",
           "group": "1_create@1",
+          "tooltip": "New Robot Blueprint \u2014 scrape\u2192Excel, login\u2192email, API\u2192table"
+        },
+        {
+          "command": "lowcodeStudio.newREFramework",
+          "when": "view == lowcodeStudio.projects",
+          "group": "1_create@2",
           "tooltip": "New REFramework Project \u2014 Init \u2192 Get Data \u2192 Process template"
         },
         {
           "command": "lowcodeStudio.newProject",
           "when": "view == lowcodeStudio.projects",
-          "group": "1_create@2",
+          "group": "1_create@3",
           "tooltip": "New blank LowCode Studio project"
         },
         {
           "command": "lowcodeStudio.newWorkflow",
           "when": "view == lowcodeStudio.projects",
-          "group": "1_create@3",
+          "group": "1_create@4",
           "tooltip": "New Workflow \u2014 Sequence or Flowchart"
         },
         {
@@ -464,7 +477,7 @@
     "package": "npm run bundle && vsce package --no-dependencies",
     "lint": "tsc --noEmit",
     "docs:activities": "npm run compile && node scripts/generate-activities-md.js",
-    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && node out/test/windowsTarget.test.js && node out/test/extractTableData.test.js && node out/test/selectorBuilder.test.js && node out/test/windowsTodo.test.js && npm run docs:activities"
+    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && node out/test/windowsTarget.test.js && node out/test/extractTableData.test.js && node out/test/selectorBuilder.test.js && node out/test/windowsTodo.test.js && node out/test/strongDryRun.test.js && node out/test/blueprints.test.js && npm run docs:activities"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
