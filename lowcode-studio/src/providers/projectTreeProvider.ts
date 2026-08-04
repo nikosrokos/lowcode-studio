@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 
-type ItemKind = 'project' | 'folder' | 'workflow' | 'file' | 'action' | 'info';
+type ItemKind = 'project' | 'folder' | 'workflow' | 'file' | 'info';
 
 export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeItem> {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
@@ -10,10 +10,16 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
   >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-  constructor(private readonly workspaceRoot: string | undefined) {}
+  constructor(_workspaceRoot?: string) {
+    // workspace roots are read live so Open Local Project refreshes correctly
+  }
 
   refresh(): void {
     this._onDidChangeTreeData.fire();
+  }
+
+  private workspaceRoots(): string[] {
+    return (vscode.workspace.workspaceFolders || []).map((f) => f.uri.fsPath);
   }
 
   getTreeItem(element: ProjectTreeItem): vscode.TreeItem {
@@ -21,10 +27,11 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
   }
 
   getChildren(element?: ProjectTreeItem): ProjectTreeItem[] {
-    if (!this.workspaceRoot) {
+    const roots = this.workspaceRoots();
+    if (!roots.length) {
       return [
         new ProjectTreeItem(
-          'Open a folder to start a LowCode Studio project',
+          'Open Local Project (title bar) or File → Open Folder',
           '',
           vscode.TreeItemCollapsibleState.None,
           'info'
@@ -33,18 +40,19 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
     }
 
     if (!element) {
-      const projects = this.findProjects(this.workspaceRoot);
-      if (!projects.length) {
+      const projects = roots.flatMap((root) => this.findProjects(root));
+      const unique = [...new Set(projects)].sort();
+      if (!unique.length) {
         return [
           new ProjectTreeItem(
-            'No project yet — use New REFramework Project',
-            this.workspaceRoot,
+            'No project yet — Open Local Project or New REFramework',
+            roots[0],
             vscode.TreeItemCollapsibleState.None,
             'info'
           )
         ];
       }
-      return projects.map(
+      return unique.map(
         (p) =>
           new ProjectTreeItem(
             path.basename(path.dirname(p)),
@@ -57,11 +65,7 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
 
     if (element.contextValue === 'project') {
       const dir = path.dirname(element.resourcePath);
-      const items: ProjectTreeItem[] = [
-        actionItem('▶ Dry Run Scenarios', dir, 'lowcodeStudio.dryRunScenario', 'beaker'),
-        actionItem('✎ Manage Scenarios', dir, 'lowcodeStudio.manageScenarios', 'checklist'),
-        actionItem('☁ Connect to Studio Web', dir, 'lowcodeStudio.connectStudioWeb', 'cloud-upload')
-      ];
+      const items: ProjectTreeItem[] = [];
 
       // Group workflows + known folders
       const folders = collectProjectFolders(dir);
@@ -143,23 +147,6 @@ export class ProjectTreeItem extends vscode.TreeItem {
       this.tooltip = resourcePath;
     }
   }
-}
-
-function actionItem(
-  label: string,
-  projectDir: string,
-  command: string,
-  icon: string
-): ProjectTreeItem {
-  const item = new ProjectTreeItem(
-    label,
-    projectDir,
-    vscode.TreeItemCollapsibleState.None,
-    'action'
-  );
-  item.command = { command, title: label };
-  item.iconPath = new vscode.ThemeIcon(icon);
-  return item;
 }
 
 function fileTreeItem(

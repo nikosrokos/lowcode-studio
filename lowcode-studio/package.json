@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Mac-first low-code RPA for VS Code/Cursor: REFramework design, scenario dry-runs (Shift+F5), and the easiest Connect to Studio Web handoff for Orchestrator publish.",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -68,6 +68,11 @@
     },
     "commands": [
       {
+        "command": "lowcodeStudio.openLocalProject",
+        "title": "LowCode Studio: Open Local Project",
+        "icon": "$(folder-opened)"
+      },
+      {
         "command": "lowcodeStudio.newProject",
         "title": "LowCode Studio: New Project",
         "icon": "$(new-folder)"
@@ -85,6 +90,11 @@
       {
         "command": "lowcodeStudio.openDesigner",
         "title": "LowCode Studio: Open Designer"
+      },
+      {
+        "command": "lowcodeStudio.validatePackages",
+        "title": "LowCode Studio: Validate Packages",
+        "icon": "$(warning)"
       },
       {
         "command": "lowcodeStudio.validateWorkflow",
@@ -179,19 +189,9 @@
     "menus": {
       "view/title": [
         {
-          "command": "lowcodeStudio.newProject",
+          "command": "lowcodeStudio.openLocalProject",
           "when": "view == lowcodeStudio.projects",
-          "group": "navigation"
-        },
-        {
-          "command": "lowcodeStudio.newREFramework",
-          "when": "view == lowcodeStudio.projects",
-          "group": "navigation"
-        },
-        {
-          "command": "lowcodeStudio.importUiPathPackage",
-          "when": "view == lowcodeStudio.projects",
-          "group": "navigation"
+          "group": "navigation@0"
         },
         {
           "command": "lowcodeStudio.dryRunScenario",
@@ -199,34 +199,64 @@
           "group": "navigation@1"
         },
         {
-          "command": "lowcodeStudio.connectStudioWeb",
+          "command": "lowcodeStudio.manageScenarios",
           "when": "view == lowcodeStudio.projects",
           "group": "navigation@2"
         },
         {
-          "command": "lowcodeStudio.exportStudioWeb",
+          "command": "lowcodeStudio.connectStudioWeb",
           "when": "view == lowcodeStudio.projects",
           "group": "navigation@3"
         },
         {
-          "command": "lowcodeStudio.exportConfigXlsx",
+          "command": "lowcodeStudio.validatePackages",
           "when": "view == lowcodeStudio.projects",
-          "group": "navigation"
-        },
-        {
-          "command": "lowcodeStudio.importConfigXlsx",
-          "when": "view == lowcodeStudio.projects",
-          "group": "navigation"
-        },
-        {
-          "command": "lowcodeStudio.newWorkflow",
-          "when": "view == lowcodeStudio.projects",
-          "group": "navigation"
+          "group": "navigation@4"
         },
         {
           "command": "lowcodeStudio.refreshExplorer",
           "when": "view == lowcodeStudio.projects",
-          "group": "navigation"
+          "group": "navigation@5"
+        },
+        {
+          "command": "lowcodeStudio.newREFramework",
+          "when": "view == lowcodeStudio.projects",
+          "group": "1_create@1"
+        },
+        {
+          "command": "lowcodeStudio.newProject",
+          "when": "view == lowcodeStudio.projects",
+          "group": "1_create@2"
+        },
+        {
+          "command": "lowcodeStudio.newWorkflow",
+          "when": "view == lowcodeStudio.projects",
+          "group": "1_create@3"
+        },
+        {
+          "command": "lowcodeStudio.importUiPathProject",
+          "when": "view == lowcodeStudio.projects",
+          "group": "2_import@1"
+        },
+        {
+          "command": "lowcodeStudio.importUiPathPackage",
+          "when": "view == lowcodeStudio.projects",
+          "group": "2_import@2"
+        },
+        {
+          "command": "lowcodeStudio.exportStudioWeb",
+          "when": "view == lowcodeStudio.projects",
+          "group": "3_export@1"
+        },
+        {
+          "command": "lowcodeStudio.exportConfigXlsx",
+          "when": "view == lowcodeStudio.projects",
+          "group": "3_export@2"
+        },
+        {
+          "command": "lowcodeStudio.importConfigXlsx",
+          "when": "view == lowcodeStudio.projects",
+          "group": "3_export@3"
         },
         {
           "command": "lowcodeStudio.addVariable",
@@ -252,6 +282,11 @@
         }
       ],
       "editor/title": [
+        {
+          "command": "lowcodeStudio.validatePackages",
+          "when": "resourceFilename =~ /\\.lcs\\.json$/",
+          "group": "navigation"
+        },
         {
           "command": "lowcodeStudio.validateWorkflow",
           "when": "resourceFilename =~ /\\.lcs\\.json$/",
@@ -365,7 +400,7 @@
     "package": "npm run bundle && vsce package --no-dependencies",
     "lint": "tsc --noEmit",
     "docs:activities": "npm run compile && node scripts/generate-activities-md.js",
-    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && npm run docs:activities"
+    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && npm run docs:activities"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
