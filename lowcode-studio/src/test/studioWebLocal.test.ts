@@ -6,7 +6,8 @@ import { generateREFrameworkProject } from '../templates/reframework';
 import {
   getStudioWebLocalLink,
   linkStudioWebLocalWorkspace,
-  syncToStudioWebLocal
+  syncToStudioWebLocal,
+  validateStudioWebLocalOpenability
 } from '../interop/studioWebLocal';
 import { connectToStudioWeb } from '../interop/studioWebConnect';
 import { parseWorkflow, stringifyWorkflow } from '../models/workflow';
@@ -53,20 +54,40 @@ function run(): void {
     uipx.Projects?.some((p) => p.ProjectRelativePath === 'LocalSyncDemo/project.json')
   );
 
+  // Studio Web must be able to open the solution + RPA workflows on disk
+  const openability = validateStudioWebLocalOpenability(lcsDir);
+  assert.ok(
+    openability.ok,
+    `solution not openable: ${openability.errors.join('; ')}`
+  );
+  assert.ok(openability.workflows.includes('Main.xaml'));
+  assert.ok(openability.workflows.some((w) => w.startsWith('Framework/')));
+
   const stored = getStudioWebLocalLink(lcsDir);
   assert.ok(stored);
   assert.strictEqual(path.resolve(stored!.solutionDir), path.resolve(linked.link.solutionDir));
 
-  // Mutate workflow and sync — XAML should update without creating .uip
-  const mainLcs = path.join(lcsDir, 'Main.lcs.json');
-  const doc = parseWorkflow(fs.readFileSync(mainLcs, 'utf8'));
-  doc.description = 'synced-after-save';
-  fs.writeFileSync(mainLcs, stringifyWorkflow(doc), 'utf8');
+  // Mutate workflow and sync — the file Studio Web reads must change
+  const marker = `SAVE_SYNC_${Date.now()}`;
+  const processLcs = path.join(lcsDir, 'Framework', 'Process.lcs.json');
+  const processXaml = path.join(linked.targetDir, 'Framework', 'Process.xaml');
+  const before = fs.readFileSync(processXaml, 'utf8');
+  const doc = parseWorkflow(fs.readFileSync(processLcs, 'utf8'));
+  doc.activities.push({
+    id: 'act_marker',
+    type: 'System.LogMessage',
+    displayName: 'Sync Probe',
+    properties: { message: marker, level: 'Info' }
+  });
+  fs.writeFileSync(processLcs, stringifyWorkflow(doc), 'utf8');
 
   const synced = syncToStudioWebLocal(lcsDir);
   assert.strictEqual(synced.created, false);
-  const xaml = fs.readFileSync(path.join(synced.targetDir, 'Main.xaml'), 'utf8');
-  assert.ok(xaml.includes('Activity') || xaml.length > 20);
+  const after = fs.readFileSync(processXaml, 'utf8');
+  assert.notStrictEqual(before, after, 'Studio-readable Process.xaml must change on sync');
+  assert.ok(after.includes(marker), 'marker from Save must appear in Studio XAML');
+  const mainXaml = fs.readFileSync(path.join(synced.targetDir, 'Main.xaml'), 'utf8');
+  assert.ok(mainXaml.includes('Activity') || mainXaml.length > 20);
 
   // Connect helper with existing link
   const connected = connectToStudioWeb(lcsDir);

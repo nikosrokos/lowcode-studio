@@ -274,6 +274,109 @@ export function trySyncToStudioWebLocal(
   return syncToStudioWebLocal(lcsProjectDir);
 }
 
+export interface StudioWebOpenabilityReport {
+  ok: boolean;
+  solutionDir: string;
+  uipxPath?: string;
+  projectDir?: string;
+  mainXaml?: string;
+  workflows: string[];
+  errors: string[];
+}
+
+/**
+ * Validate that a linked (or just-created) solution has the files Studio Web
+ * Local Workspace needs to open the solution and its RPA workflows.
+ */
+export function validateStudioWebLocalOpenability(
+  lcsProjectDir: string
+): StudioWebOpenabilityReport {
+  const errors: string[] = [];
+  const link = getStudioWebLocalLink(lcsProjectDir);
+  if (!link) {
+    return {
+      ok: false,
+      solutionDir: '',
+      workflows: [],
+      errors: ['Project is not linked to a Studio Web Local Workspace']
+    };
+  }
+  const uipxPath = findUipx(link.solutionDir);
+  if (!uipxPath) {
+    errors.push(`Missing .uipx in ${link.solutionDir}`);
+  }
+  const projectDir = path.join(link.solutionDir, link.projectFolder);
+  const projectJson = path.join(projectDir, 'project.json');
+  if (!fs.existsSync(projectJson)) {
+    errors.push(`Missing project.json at ${projectJson}`);
+  }
+  let mainXaml = '';
+  const workflows: string[] = [];
+  if (fs.existsSync(projectJson)) {
+    try {
+      const pj = JSON.parse(fs.readFileSync(projectJson, 'utf8')) as { main?: string };
+      mainXaml = pj.main || 'Main.xaml';
+      const mainAbs = path.join(projectDir, mainXaml);
+      if (!fs.existsSync(mainAbs)) {
+        errors.push(`Main workflow missing: ${mainXaml}`);
+      } else {
+        const text = fs.readFileSync(mainAbs, 'utf8');
+        if (!text.includes('xmlns') || !text.includes('Activity')) {
+          errors.push(`Main workflow does not look like openable XAML: ${mainXaml}`);
+        }
+      }
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : 'Invalid project.json');
+    }
+  }
+  if (uipxPath) {
+    try {
+      const uipx = JSON.parse(fs.readFileSync(uipxPath, 'utf8')) as {
+        Projects?: Array<{ ProjectRelativePath?: string }>;
+      };
+      for (const p of uipx.Projects || []) {
+        const rel = String(p.ProjectRelativePath || '');
+        if (!rel || !fs.existsSync(path.join(link.solutionDir, rel))) {
+          errors.push(`uipx project path missing: ${rel || '(empty)'}`);
+        }
+      }
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : 'Invalid .uipx');
+    }
+  }
+  const stack = [projectDir];
+  while (stack.length && fs.existsSync(projectDir)) {
+    const current = stack.pop()!;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(full);
+      } else if (entry.isFile() && entry.name.endsWith('.xaml')) {
+        workflows.push(path.relative(projectDir, full).replace(/\\/g, '/'));
+      }
+    }
+  }
+  workflows.sort();
+  if (!workflows.length) {
+    errors.push('No .xaml workflows found in the linked project folder');
+  }
+  return {
+    ok: errors.length === 0,
+    solutionDir: link.solutionDir,
+    uipxPath,
+    projectDir,
+    mainXaml,
+    workflows,
+    errors
+  };
+}
+
 export function studioWebLocalGuideMarkdown(): string {
   return `# LowCode Studio ↔ Studio Web Local Workspace
 

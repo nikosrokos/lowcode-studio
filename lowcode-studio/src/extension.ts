@@ -37,7 +37,8 @@ import {
 } from './interop/studioWebConnect';
 import {
   getStudioWebLocalLink,
-  trySyncToStudioWebLocal
+  trySyncToStudioWebLocal,
+  validateStudioWebLocalOpenability
 } from './interop/studioWebLocal';
 import {
   formatPackageValidationReport,
@@ -1301,6 +1302,7 @@ async function connectStudioWebCommand(treeItem?: ProjectTreeItem): Promise<void
     }
 
     const solutionDir = result.local?.link.solutionDir || result.targetDir;
+    const openability = validateStudioWebLocalOpenability(projectDir);
     const channel = getOutput();
     channel.clear();
     channel.appendLine('Studio Web Local Workspace');
@@ -1309,10 +1311,24 @@ async function connectStudioWebCommand(treeItem?: ProjectTreeItem): Promise<void
     channel.appendLine(`Solution:    ${solutionDir}`);
     channel.appendLine(`Project dir: ${result.targetDir}`);
     channel.appendLine(`Main:        ${result.mainXaml}`);
+    channel.appendLine(
+      `Openable:    ${openability.ok ? 'yes' : 'NO'} (${openability.workflows.length} workflows)`
+    );
+    if (!openability.ok) {
+      openability.errors.forEach((e) => channel.appendLine(`  ! ${e}`));
+    } else {
+      openability.workflows.slice(0, 12).forEach((w) => channel.appendLine(`  · ${w}`));
+    }
     channel.appendLine('');
     channel.appendLine('Checklist:');
     result.checklist.forEach((c, i) => channel.appendLine(`  ${i + 1}. ${c}`));
     channel.show(true);
+
+    if (!openability.ok) {
+      void vscode.window.showWarningMessage(
+        `Local Workspace linked, but open checks failed: ${openability.errors[0]}`
+      );
+    }
 
     const next = await vscode.window.showInformationMessage(
       `Linked Local Workspace → ${path.basename(solutionDir)}. Save syncs automatically.`,
