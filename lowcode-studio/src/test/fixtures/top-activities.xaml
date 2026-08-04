@@ -1,0 +1,58 @@
+<Activity mc:Ignorable="sap sap2010"
+  xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities"
+  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation"
+  xmlns:sap2010="http://schemas.microsoft.com/netfx/2010/xaml/activities/presentation"
+  xmlns:scg="clr-namespace:System.Collections.Generic;assembly=System.Private.CoreLib"
+  xmlns:ui="http://schemas.uipath.com/workflow/activities"
+  xmlns:uia="http://schemas.uipath.com/workflow/activities/uix"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Sequence DisplayName="Top Activities">
+    <Sequence.Variables>
+      <Variable x:TypeArguments="x:String" Name="status" />
+      <Variable x:TypeArguments="x:String" Name="jsonText" />
+      <Variable x:TypeArguments="x:Object" Name="jsonObj" />
+      <Variable x:TypeArguments="x:String" Name="attributeValue" />
+    </Sequence.Variables>
+    <ui:MultipleAssign DisplayName="Multiple Assign">
+      <ui:MultipleAssign.Assignments>
+        <Assign>
+          <Assign.To>
+            <OutArgument x:TypeArguments="x:String">[status]</OutArgument>
+          </Assign.To>
+          <Assign.Value>
+            <InArgument x:TypeArguments="x:String">["Ready"]</InArgument>
+          </Assign.Value>
+        </Assign>
+      </ui:MultipleAssign.Assignments>
+    </ui:MultipleAssign>
+    <ui:InvokeCode DisplayName="Invoke Code" Language="CSharp" Code="Console.WriteLine(status);" />
+    <ui:BuildDataTable DisplayName="Build Data Table" />
+    <ui:AddDataRow DisplayName="Add Data Row" DataTable="[dt]" ArrayRow="[{&quot;A&quot;,&quot;1&quot;}]" />
+    <ui:AddDataColumn DisplayName="Add Data Column" DataTable="[dt]" ColumnName="Status" />
+    <ui:FilterDataTable DisplayName="Filter Data Table" DataTable="[dt]" FilterRowsDataTable="[filteredDt]" />
+    <ui:ForEachRow DataTable="[dt]" DisplayName="For Each Row">
+      <ui:ForEachRow.Body>
+        <ActivityAction>
+          <Sequence>
+            <ui:LogMessage DisplayName="Log Row" Level="TraceLevel.Info" Message="[&quot;row&quot;]" />
+          </Sequence>
+        </ActivityAction>
+      </ui:ForEachRow.Body>
+    </ui:ForEachRow>
+    <ui:ClearDataTable DisplayName="Clear Data Table" DataTable="[dt]" />
+    <ui:OutputDataTable DisplayName="Output Data Table" DataTable="[dt]" Text="[tableText]" />
+    <ui:DeserializeJson DisplayName="Deserialize JSON" JsonString="[{&quot;ok&quot;:true}]" />
+    <ui:SerializeJson DisplayName="Serialize JSON" JsonObject="[jsonObj]" />
+    <uia:NGetAttribute DisplayName="Get Attribute" Attribute="aaname" />
+    <uia:OnElementAppear DisplayName="Wait Element" TimeoutMS="5000" />
+    <Switch x:TypeArguments="x:String" Expression="[status]" DisplayName="Switch Status">
+      <Switch.Default>
+        <Sequence>
+          <ui:LogMessage DisplayName="Default" Level="TraceLevel.Info" Message="[&quot;default&quot;]" />
+        </Sequence>
+      </Switch.Default>
+    </Switch>
+    <Throw DisplayName="Throw Sample" Exception="[&quot;demo&quot;]" />
+  </Sequence>
+</Activity>

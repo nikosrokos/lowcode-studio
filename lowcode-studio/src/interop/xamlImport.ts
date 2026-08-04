@@ -503,6 +503,233 @@ function mapActivity(
     };
   }
 
+  if (localName === 'InvokeCode') {
+    return {
+      id: newId(),
+      type: 'Programming.InvokeCode',
+      displayName,
+      properties: {
+        code: cleanExpr(
+          raw['@_Code'] ||
+            extractArgument(raw, 'Code') ||
+            (typeof raw.Code === 'string' ? raw.Code : '') ||
+            'Console.WriteLine("Hello");'
+        ),
+        language: String(raw['@_Language'] || raw['@_CodeLanguage'] || 'CSharp')
+          .replace('CodeLanguage.', '')
+          .replace('InvokeCodeLanguage.', ''),
+        arguments: cleanExpr(
+          raw['@_Arguments'] || extractArgument(raw, 'Arguments') || ''
+        )
+      }
+    };
+  }
+
+  if (localName === 'MultipleAssign') {
+    const assignments = extractMultipleAssignLines(raw);
+    return {
+      id: newId(),
+      type: 'Programming.MultipleAssign',
+      displayName,
+      properties: {
+        assignments: assignments.length ? assignments.join('\n') : 'variable = ""'
+      }
+    };
+  }
+
+  if (localName === 'Throw') {
+    return {
+      id: newId(),
+      type: 'System.Throw',
+      displayName,
+      properties: {
+        exceptionType: String(
+          raw['@_ExceptionType'] ||
+            extractArgument(raw, 'Exception') ||
+            'System.Exception'
+        )
+          .replace(/^\[/, '')
+          .replace(/\]$/, ''),
+        message: cleanExpr(
+          raw['@_Exception'] ||
+            extractArgument(raw, 'Exception') ||
+            '"An error occurred"'
+        )
+      }
+    };
+  }
+
+  if (localName === 'TerminateWorkflow') {
+    return {
+      id: newId(),
+      type: 'System.TerminateWorkflow',
+      displayName,
+      properties: {
+        reason: cleanExpr(
+          raw['@_Reason'] || extractArgument(raw, 'Reason') || '"Terminated"'
+        )
+      }
+    };
+  }
+
+  if (localName === 'Switch') {
+    return {
+      id: newId(),
+      type: 'ControlFlow.Switch',
+      displayName,
+      properties: {
+        expression: cleanExpr(
+          raw['@_Expression'] || extractArgument(raw, 'Expression') || 'status'
+        ),
+        cases: 'Success,Failed,Default'
+      },
+      children: collectActivities(
+        raw['Default'] || raw['Switch.Default'] || raw,
+        warnings
+      )
+    };
+  }
+
+  if (localName === 'ForEachRow' || localName === 'ForEachRowX') {
+    return {
+      id: newId(),
+      type: 'Data.ForEachRow',
+      displayName,
+      properties: {
+        dataTable: stripBrackets(
+          cleanExpr(
+            raw['@_DataTable'] || extractArgument(raw, 'DataTable') || 'dt'
+          )
+        ),
+        row: stripBrackets(
+          cleanExpr(raw['@_CurrentIndex'] || extractArgument(raw, 'CurrentRow') || 'row')
+        )
+      },
+      children: collectActivities(raw['Body'] || raw['ForEachRow.Body'] || raw, warnings)
+    };
+  }
+
+  if (localName === 'AddDataRow') {
+    return {
+      id: newId(),
+      type: 'Data.AddDataRow',
+      displayName,
+      properties: {
+        dataTable: stripBrackets(
+          cleanExpr(raw['@_DataTable'] || extractArgument(raw, 'DataTable') || 'dt')
+        ),
+        arrayRow: cleanExpr(
+          raw['@_ArrayRow'] || extractArgument(raw, 'ArrayRow') || '[]'
+        )
+      }
+    };
+  }
+
+  if (localName === 'AddDataColumn') {
+    return {
+      id: newId(),
+      type: 'Data.AddDataColumn',
+      displayName,
+      properties: {
+        dataTable: stripBrackets(
+          cleanExpr(raw['@_DataTable'] || extractArgument(raw, 'DataTable') || 'dt')
+        ),
+        columnName: cleanExpr(
+          raw['@_ColumnName'] || extractArgument(raw, 'ColumnName') || 'NewColumn'
+        ),
+        columnType: String(raw['@_ColumnType'] || 'String')
+      }
+    };
+  }
+
+  if (localName === 'FilterDataTable') {
+    return {
+      id: newId(),
+      type: 'Data.FilterDataTable',
+      displayName,
+      properties: {
+        dataTable: stripBrackets(
+          cleanExpr(
+            raw['@_DataTable'] || extractArgument(raw, 'DataTable') || 'dt'
+          )
+        ),
+        columnName: cleanExpr(
+          raw['@_ColumnName'] || extractArgument(raw, 'ColumnName') || 'Status'
+        ),
+        value: cleanExpr(raw['@_Value'] || extractArgument(raw, 'Value') || '""'),
+        result: stripBrackets(
+          cleanExpr(
+            raw['@_FilterRowsDataTable'] ||
+              raw['@_DataTable'] ||
+              extractArgument(raw, 'FilterRowsDataTable') ||
+              'filteredDt'
+          )
+        )
+      }
+    };
+  }
+
+  if (localName === 'ClearDataTable') {
+    return {
+      id: newId(),
+      type: 'Data.ClearDataTable',
+      displayName,
+      properties: {
+        dataTable: stripBrackets(
+          cleanExpr(raw['@_DataTable'] || extractArgument(raw, 'DataTable') || 'dt')
+        )
+      }
+    };
+  }
+
+  if (localName === 'OutputDataTable') {
+    return {
+      id: newId(),
+      type: 'Data.OutputDataTable',
+      displayName,
+      properties: {
+        dataTable: stripBrackets(
+          cleanExpr(raw['@_DataTable'] || extractArgument(raw, 'DataTable') || 'dt')
+        ),
+        result: stripBrackets(
+          cleanExpr(raw['@_Text'] || extractArgument(raw, 'Text') || 'tableText')
+        )
+      }
+    };
+  }
+
+  if (localName === 'DeserializeJson' || localName === 'DeserializeJsonActivity') {
+    return {
+      id: newId(),
+      type: 'Messaging.DeserializeJson',
+      displayName,
+      properties: {
+        jsonString: cleanExpr(
+          raw['@_JsonString'] || extractArgument(raw, 'JsonString') || '"{}"'
+        ),
+        result: stripBrackets(
+          cleanExpr(raw['@_JsonObject'] || extractArgument(raw, 'JsonObject') || 'jsonObj')
+        )
+      }
+    };
+  }
+
+  if (localName === 'SerializeJson' || localName === 'SerializeJsonActivity') {
+    return {
+      id: newId(),
+      type: 'Messaging.SerializeJson',
+      displayName,
+      properties: {
+        value: stripBrackets(
+          cleanExpr(raw['@_JsonObject'] || extractArgument(raw, 'JsonObject') || 'jsonObj')
+        ),
+        result: stripBrackets(
+          cleanExpr(raw['@_JsonString'] || extractArgument(raw, 'JsonString') || 'jsonText')
+        )
+      }
+    };
+  }
+
   // Use Application/Browser — treat as open + nested body
   if (
     localName === 'UseApplicationBrowser' ||
@@ -542,14 +769,33 @@ function mapActivity(
       properties: props
     };
     // Containers that may carry body children
-    if (mapped === 'ControlFlow.RetryScope' || mapped === 'UI.OpenApplication') {
+    if (
+      mapped === 'ControlFlow.RetryScope' ||
+      mapped === 'UI.OpenApplication' ||
+      mapped === 'Data.ForEachRow' ||
+      mapped === 'ControlFlow.Switch' ||
+      mapped === 'UI.WaitElement'
+    ) {
       const kids = collectActivities(
-        raw['Body'] || raw['Activity'] || raw,
+        raw['Body'] || raw['Activity'] || raw['Default'] || raw,
         warnings
       );
       if (kids.length) {
         node.children = kids;
       }
+    }
+    if (mapped === 'UI.GetAttribute') {
+      node.properties.attribute = cleanExpr(
+        raw['@_Attribute'] || extractArgument(raw, 'Attribute') || 'aaname'
+      );
+      node.properties.result = stripBrackets(
+        cleanExpr(raw['@_Result'] || extractArgument(raw, 'Result') || 'attributeValue')
+      );
+    }
+    if (mapped === 'UI.WaitElement') {
+      const vanish = /vanish/i.test(localName);
+      node.properties.action = vanish ? 'Vanish' : 'Appear';
+      node.properties.timeoutMs = Number(raw['@_TimeoutMS'] || raw['@_Timeout'] || 30000);
     }
     return node;
   }
@@ -900,6 +1146,45 @@ function cleanLiteral(value: unknown): unknown {
 
 function stripBrackets(expr: string): string {
   return expr.replace(/^\[/, '').replace(/\]$/, '').trim();
+}
+
+/** Best-effort parse of UiPath MultipleAssign Assignments collection. */
+function extractMultipleAssignLines(raw: Record<string, unknown>): string[] {
+  const lines: string[] = [];
+  const block =
+    raw.Assignments ||
+    raw['MultipleAssign.Assignments'] ||
+    raw['AssignOperations'] ||
+    raw;
+  const walk = (node: unknown) => {
+    if (!node || typeof node !== 'object') {
+      return;
+    }
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    const obj = node as Record<string, unknown>;
+    const to = cleanExpr(
+      obj['@_To'] || extractArgument(obj, 'To') || obj.To || ''
+    );
+    const value = cleanExpr(
+      obj['@_Value'] || extractArgument(obj, 'Value') || obj.Value || ''
+    );
+    if (to && (value || value === '0' || value === 'false')) {
+      lines.push(`${stripBrackets(to)} = ${value}`);
+    }
+    for (const [k, v] of Object.entries(obj)) {
+      if (k.startsWith('@_') || k === '#text') {
+        continue;
+      }
+      if (k === 'Assign' || k.includes('Assign') || k === 'InArgument' || k === 'OutArgument') {
+        walk(v);
+      }
+    }
+  };
+  walk(block);
+  return lines;
 }
 
 function parseDurationMs(duration: string): number {

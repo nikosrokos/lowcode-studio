@@ -1,6 +1,6 @@
 # LowCode Studio for VS Code / Cursor
 
-**v0.5.0** — Studio-like low-code RPA for Mac users without UiPath Studio Desktop.
+**v0.5.1** — Studio-like low-code RPA for Mac users without UiPath Studio Desktop.
 
 **Repo:** https://github.com/nikosrokos/lowcode-studio
 
@@ -14,6 +14,10 @@ Full docs: [`lowcode-studio/README.md`](lowcode-studio/README.md)
 
 ![REFramework flowchart](lowcode-studio/docs/images/vscode-reframework-flowchart.png)
 
+![REFramework scenario testing](lowcode-studio/docs/images/vscode-reframework-testing.png)
+
+![REFramework Process + Invoke Code](lowcode-studio/docs/images/vscode-reframework-process-activities.png)
+
 ## Install
 
 ```bash
@@ -24,18 +28,16 @@ npm test
 npm run package
 ```
 
-**Extensions: Install from VSIX…** → `lowcode-studio-0.5.0.vsix`
+**Extensions: Install from VSIX…** → `lowcode-studio-0.5.1.vsix`
 
-Activity coverage catalog: [`lowcode-studio/docs/ACTIVITIES.md`](lowcode-studio/docs/ACTIVITIES.md)
+Activity coverage catalog: [`lowcode-studio/docs/ACTIVITIES.md`](lowcode-studio/docs/ACTIVITIES.md) (**57** activities)
 
-## Highlights in 0.5.0
+## Highlights in 0.5.1
 
+- **Invoke Code**, Multiple Assign, Switch, Throw, DataTable helpers, Get Attribute, Wait Element, JSON serialize/deserialize
 - **Custom activity registration** — project (`activities.custom.json`) or user library
 - **REFramework scenario dry-runs** — `Data/Config.json` + `Data/Test/scenarios.json`
-- Richer XAML import/export (Excel, Mail, modern UI, RetryScope, …)
-- **Python activities** (`UiPath.Python.Activities`): Scope, Load/Run Script, Invoke Method, Get Object
-- Selector round-trip (classic + modern encodings)
-- Studio Web export with activity package dependencies (incl. custom NuGet)
+- Richer XAML import/export + Python activities + Studio Web package deps
 
 ## Next steps (roadmap)
 
