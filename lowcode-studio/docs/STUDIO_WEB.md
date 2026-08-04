@@ -31,6 +31,7 @@ Design on Mac (LowCode Studio)
 | .NET TFM | `net8.0-windows` |
 | UI selectors | Classic `<html>/<webctrl>` (browser) or `<wnd>` (desktop) |
 | Activities | `UiPath.UIAutomation.Activities` modern (`uia:NClick`, …) |
+| Input method | Set in designer (**Simulate** / **Chromium API** / Window Messages / Hardware Events); exports as `InteractionMode` |
 
 Override per project with `"uipathTargetFramework": "Portable"` in LowCode Studio `project.json` only if you need cross-platform (not recommended for UI/web automation).
 

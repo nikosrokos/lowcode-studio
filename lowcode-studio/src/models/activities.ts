@@ -33,6 +33,39 @@ export interface ActivityDefinition {
   properties: ActivityPropertyDef[];
 }
 
+/** Modern UI input method — exports as InteractionMode on Studio XAML. */
+const UI_INPUT_METHOD_PROP: ActivityPropertyDef = {
+  name: 'inputMethod',
+  label: 'Input Method',
+  type: 'enum',
+  options: [
+    'Same as App/Browser',
+    'Simulate',
+    'Chromium API',
+    'Window Messages',
+    'Hardware Events'
+  ],
+  defaultValue: 'Same as App/Browser',
+  description:
+    'How the Windows robot interacts with the target: Simulate (background APIs), Chromium API (Chrome/Edge), Window Messages, Hardware Events, or inherit from Use Application/Browser.'
+};
+
+const SCOPE_INPUT_METHOD_PROP: ActivityPropertyDef = {
+  name: 'inputMethod',
+  label: 'Input Method',
+  type: 'enum',
+  options: [
+    'Simulate',
+    'Chromium API',
+    'Window Messages',
+    'Hardware Events',
+    'Background'
+  ],
+  defaultValue: 'Simulate',
+  description:
+    'Default input mode for nested UI activities. Background tries Simulate/Chromium API where possible.'
+};
+
 export const ACTIVITY_CATALOG: ActivityDefinition[] = [
   {
     type: 'System.LogMessage',
@@ -466,6 +499,7 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         options: ['Chrome', 'Edge', 'Firefox', 'IE'],
         defaultValue: 'Chrome'
       },
+      { ...SCOPE_INPUT_METHOD_PROP },
       {
         name: 'selector',
         label: 'Window Selector (Windows)',
@@ -519,12 +553,7 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         options: ['Single', 'Double', 'Right'],
         defaultValue: 'Single'
       },
-      {
-        name: 'simulateClick',
-        label: 'Simulate Click',
-        type: 'boolean',
-        defaultValue: true
-      }
+      { ...UI_INPUT_METHOD_PROP, defaultValue: 'Simulate' }
     ]
   },
   {
@@ -561,7 +590,8 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         label: 'Empty Field',
         type: 'boolean',
         defaultValue: true
-      }
+      },
+      { ...UI_INPUT_METHOD_PROP, defaultValue: 'Simulate' }
     ]
   },
   {
@@ -658,7 +688,8 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         type: 'enum',
         options: ['Check', 'Uncheck', 'Toggle'],
         defaultValue: 'Check'
-      }
+      },
+      { ...UI_INPUT_METHOD_PROP }
     ]
   },
   {
@@ -681,7 +712,8 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         label: 'Modern Selector',
         type: 'multiline',
         defaultValue: ''
-      }
+      },
+      { ...UI_INPUT_METHOD_PROP }
     ]
   },
   {
@@ -711,7 +743,8 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         type: 'expression',
         defaultValue: '"Option"',
         required: true
-      }
+      },
+      { ...UI_INPUT_METHOD_PROP }
     ]
   },
   {

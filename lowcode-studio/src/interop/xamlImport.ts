@@ -8,6 +8,7 @@ import {
 } from '../models/workflow';
 import { lcsTypeFromXamlName, unknownActivityType } from './activityMap';
 import { applySelectorProps, extractSelectorProps } from './selectorRoundTrip';
+import { fromXamlInteractionMode } from './inputMethod';
 
 export interface ImportWarning {
   message: string;
@@ -984,11 +985,39 @@ function pickCommonProps(
 
   if (mapped === 'UI.Click') {
     props.clickType = String(raw['@_ClickType'] || 'Single').replace('ClickType.', '');
-    props.simulateClick = String(raw['@_SimulateClick'] ?? 'true') !== 'False';
+    const interaction = fromXamlInteractionMode(String(raw['@_InteractionMode'] || ''));
+    if (interaction) {
+      props.inputMethod = interaction;
+    } else if (raw['@_SimulateClick'] != null) {
+      props.inputMethod =
+        String(raw['@_SimulateClick']) !== 'False' ? 'Simulate' : 'Hardware Events';
+      props.simulateClick = String(raw['@_SimulateClick']) !== 'False';
+    } else {
+      props.inputMethod = 'Simulate';
+    }
   }
 
   if (mapped === 'UI.TypeInto') {
     props.emptyField = String(raw['@_EmptyField'] ?? 'true') !== 'False';
+    const interaction = fromXamlInteractionMode(String(raw['@_InteractionMode'] || ''));
+    if (interaction) {
+      props.inputMethod = interaction;
+    } else if (raw['@_SimulateType'] != null) {
+      props.inputMethod =
+        String(raw['@_SimulateType']) !== 'False' ? 'Simulate' : 'Hardware Events';
+    }
+  }
+
+  if (
+    mapped === 'UI.Hover' ||
+    mapped === 'UI.Check' ||
+    mapped === 'UI.SelectItem' ||
+    mapped === 'UI.UseApplicationBrowser'
+  ) {
+    const interaction = fromXamlInteractionMode(String(raw['@_InteractionMode'] || ''));
+    if (interaction) {
+      props.inputMethod = interaction;
+    }
   }
 
   if (!Object.keys(props).length) {
