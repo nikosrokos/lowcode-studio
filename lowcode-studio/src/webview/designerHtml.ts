@@ -48,10 +48,13 @@ export function getDesignerHtml(
     }
     .app {
       display: grid;
-      grid-template-columns: 250px 1fr 300px;
+      grid-template-columns: 250px 1fr var(--props-width, 300px);
       grid-template-rows: 52px 1fr;
       height: 100%;
+      --props-width: 300px;
     }
+    .app.props-floating { grid-template-columns: 250px 1fr; }
+    .app.props-collapsed { grid-template-columns: 250px 1fr 40px; }
     .toolbar {
       grid-column: 1 / -1;
       display: flex;
@@ -92,8 +95,60 @@ export function getDesignerHtml(
       border-right: 1px solid var(--border);
       background: color-mix(in srgb, var(--panel) 96%, transparent);
       overflow: auto;
+      position: relative;
+      min-height: 0;
     }
-    .panel.right { border-right: none; border-left: 1px solid var(--border); }
+    .panel.right {
+      border-right: none; border-left: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .panel.right .panel-scroll { flex: 1; overflow: auto; min-height: 0; }
+    .panel.right .panel-resize-x {
+      position: absolute; left: 0; top: 0; bottom: 0; width: 5px; cursor: ew-resize;
+      z-index: 6; background: transparent;
+    }
+    .panel.right .panel-resize-x:hover,
+    .panel.right .panel-resize-x.dragging {
+      background: color-mix(in srgb, var(--focus) 55%, transparent);
+    }
+    .panel.right .panel-resize-y {
+      height: 6px; cursor: ns-resize; flex: 0 0 auto;
+      background: transparent; border-top: 1px solid var(--border);
+    }
+    .panel.right .panel-resize-y:hover,
+    .panel.right .panel-resize-y.dragging {
+      background: color-mix(in srgb, var(--focus) 45%, transparent);
+    }
+    .panel-chrome {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 10px 4px; flex: 0 0 auto;
+      cursor: default; user-select: none;
+    }
+    .panel.right.floating .panel-chrome { cursor: grab; }
+    .panel.right.floating .panel-chrome:active { cursor: grabbing; }
+    .panel-chrome h2 { padding: 0; margin: 0; flex: 1; }
+    .panel-chrome-actions { display: flex; gap: 4px; }
+    .panel.right.floating {
+      position: fixed; z-index: 30;
+      right: 18px; top: 64px;
+      width: var(--props-width, 340px);
+      height: var(--props-height, 70vh);
+      max-height: calc(100vh - 80px);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      background: color-mix(in srgb, var(--panel) 97%, transparent);
+      backdrop-filter: blur(10px);
+    }
+    .panel.right.collapsed-strip {
+      overflow: hidden; padding: 0;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: flex-start; gap: 8px; padding-top: 10px;
+    }
+    .panel.right.collapsed-strip > *:not(.collapsed-only) { display: none !important; }
+    .collapsed-only { display: none; }
+    .panel.right.collapsed-strip .collapsed-only { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+    .collapsed-only .btn { writing-mode: vertical-rl; padding: 10px 6px; }
     .panel h2 {
       margin: 0; padding: 14px 14px 8px; font-size: 11px; text-transform: uppercase;
       letter-spacing: .08em; color: var(--muted); font-weight: 700;
@@ -315,6 +370,7 @@ export function getDesignerHtml(
       <div class="spacer"></div>
       <button class="btn" id="btnLink" title="Connect two flowchart nodes" style="display:none">Link</button>
       <button class="btn" id="btnAutoLayout" style="display:none">Auto Layout</button>
+      <button class="btn" id="btnPropsPanel" title="Show / focus properties panel" style="display:none">Properties</button>
       <button class="btn" id="btnValidate">Validate</button>
       <button class="btn" id="btnDryRun">Dry Run</button>
       <button class="btn primary" id="btnSave">Save</button>
@@ -348,38 +404,52 @@ export function getDesignerHtml(
       <div class="hover-tip" id="hoverTip"></div>
     </main>
 
-    <aside class="panel right">
-      <h2><span class="grow">Properties</span></h2>
-      <div class="panel-tools">
-        <button class="btn" id="btnExpandProps" type="button" title="Expand all property groups">Expand</button>
-        <button class="btn" id="btnCollapseProps" type="button" title="Collapse all property groups">Collapse</button>
+    <aside class="panel right" id="propsPanel">
+      <div class="panel-resize-x" id="propsResizeX" title="Drag to resize width"></div>
+      <div class="panel-chrome" id="propsChrome">
+        <h2><span class="grow">Properties</span></h2>
+        <div class="panel-chrome-actions">
+          <button class="icon-btn" id="btnPropsFloat" type="button" title="Float panel">⧉</button>
+          <button class="icon-btn" id="btnPropsDock" type="button" title="Dock panel" style="display:none">▣</button>
+          <button class="icon-btn" id="btnPropsCollapse" type="button" title="Collapse panel">—</button>
+        </div>
       </div>
-      <div class="props" id="props"></div>
-      <div class="side-section collapsed" id="variablesSection" data-section="variables">
-        <button type="button" class="side-section-head" id="btnToggleVariables">
-          <span class="chev">▸</span>
-          <span class="grow">Variables</span>
-          <span class="count" id="variablesCount">0</span>
-        </button>
-        <div class="side-section-body">
-          <div class="props" id="variablesPanel"></div>
-          <div style="padding:0 0 12px;display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn" id="btnAddVar">Add Variable</button>
+      <div class="panel-scroll" id="propsScroll">
+        <div class="panel-tools">
+          <button class="btn" id="btnExpandProps" type="button" title="Expand all property groups">Expand</button>
+          <button class="btn" id="btnCollapseProps" type="button" title="Collapse all property groups">Collapse</button>
+        </div>
+        <div class="props" id="props"></div>
+        <div class="side-section collapsed" id="variablesSection" data-section="variables">
+          <button type="button" class="side-section-head" id="btnToggleVariables">
+            <span class="chev">▸</span>
+            <span class="grow">Variables</span>
+            <span class="count" id="variablesCount">0</span>
+          </button>
+          <div class="side-section-body">
+            <div class="props" id="variablesPanel"></div>
+            <div style="padding:0 0 12px;display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn" id="btnAddVar">Add Variable</button>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="side-section" id="connectionsSection" data-section="connections" style="display:none">
-        <button type="button" class="side-section-head" id="btnToggleConnections">
-          <span class="chev">▾</span>
-          <span class="grow">Connections</span>
-          <span class="count" id="connectionsCount">0</span>
-        </button>
-        <div class="side-section-body">
-          <div class="props" id="connectionsPanel"></div>
+        <div class="side-section" id="connectionsSection" data-section="connections" style="display:none">
+          <button type="button" class="side-section-head" id="btnToggleConnections">
+            <span class="chev">▾</span>
+            <span class="grow">Connections</span>
+            <span class="count" id="connectionsCount">0</span>
+          </button>
+          <div class="side-section-body">
+            <div class="props" id="connectionsPanel"></div>
+          </div>
+        </div>
+        <div style="padding:0 14px 18px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn danger" id="btnDelete" disabled>Delete activity</button>
         </div>
       </div>
-      <div style="padding:0 14px 18px;display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn danger" id="btnDelete" disabled>Delete activity</button>
+      <div class="panel-resize-y" id="propsResizeY" title="Drag to resize height (float mode)"></div>
+      <div class="collapsed-only">
+        <button class="btn" id="btnPropsExpand" type="button" title="Expand properties panel">Properties</button>
       </div>
     </aside>
   </div>
@@ -396,10 +466,17 @@ export function getDesignerHtml(
       dragOffset: { x: 0, y: 0 },
       zoom: 1,
       collapsedCats: {},
-      collapsedPropSections: {}
+      collapsedPropSections: {},
+      propsMode: 'docked', // docked | floating | collapsed
+      propsWidth: 300,
+      propsHeight: Math.round(window.innerHeight * 0.7),
+      propsFloatPos: { x: null, y: null }
     };
 
     const els = {
+      app: document.querySelector('.app'),
+      propsPanel: document.getElementById('propsPanel'),
+      propsScroll: document.getElementById('propsScroll'),
       catalog: document.getElementById('catalog'),
       sequence: document.getElementById('sequence'),
       flowStage: document.getElementById('flowStage'),
@@ -476,6 +553,7 @@ export function getDesignerHtml(
         case 'Programming.Assign': return (p.to || '') + ' := ' + (p.value || '');
         case 'Flowchart.FlowDecision': return String(p.condition || '');
         case 'REFramework.InvokeWorkflow': return String(p.workflowPath || '');
+        case 'UI.ExtractTableData': return '→ ' + (p.result || 'extractedTable');
         case 'ControlFlow.If':
         case 'ControlFlow.While': return 'when ' + (p.condition || '');
         case 'Messaging.HttpRequest': return (p.method || 'GET') + ' ' + (p.url || '');
@@ -484,6 +562,59 @@ export function getDesignerHtml(
           return first === undefined ? node.type : String(first).slice(0, 42);
         }
       }
+    }
+
+    function applyPropsPanelLayout() {
+      const panel = els.propsPanel;
+      const app = els.app;
+      if (!panel || !app) return;
+      document.documentElement.style.setProperty('--props-width', state.propsWidth + 'px');
+      document.documentElement.style.setProperty('--props-height', state.propsHeight + 'px');
+      panel.classList.remove('floating', 'collapsed-strip');
+      app.classList.remove('props-floating', 'props-collapsed');
+      panel.style.left = '';
+      panel.style.top = '';
+      panel.style.right = '';
+      panel.style.width = '';
+      panel.style.height = '';
+      const btnFloat = document.getElementById('btnPropsFloat');
+      const btnDock = document.getElementById('btnPropsDock');
+      const btnToolbar = document.getElementById('btnPropsPanel');
+      if (state.propsMode === 'floating') {
+        panel.classList.add('floating');
+        app.classList.add('props-floating');
+        panel.style.width = state.propsWidth + 'px';
+        panel.style.height = state.propsHeight + 'px';
+        if (state.propsFloatPos.x != null) {
+          panel.style.left = state.propsFloatPos.x + 'px';
+          panel.style.top = state.propsFloatPos.y + 'px';
+          panel.style.right = 'auto';
+        }
+        if (btnFloat) btnFloat.style.display = 'none';
+        if (btnDock) btnDock.style.display = '';
+        if (btnToolbar) btnToolbar.style.display = 'none';
+      } else if (state.propsMode === 'collapsed') {
+        panel.classList.add('collapsed-strip');
+        app.classList.add('props-collapsed');
+        if (btnFloat) btnFloat.style.display = '';
+        if (btnDock) btnDock.style.display = 'none';
+        if (btnToolbar) btnToolbar.style.display = '';
+      } else {
+        if (btnFloat) btnFloat.style.display = '';
+        if (btnDock) btnDock.style.display = 'none';
+        if (btnToolbar) btnToolbar.style.display = 'none';
+      }
+      try { vscode.setState({ propsMode: state.propsMode, propsWidth: state.propsWidth, propsHeight: state.propsHeight, propsFloatPos: state.propsFloatPos }); } catch (e) {}
+    }
+    function restorePropsPanelState() {
+      try {
+        const saved = vscode.getState && vscode.getState();
+        if (!saved) return;
+        if (saved.propsMode) state.propsMode = saved.propsMode;
+        if (saved.propsWidth) state.propsWidth = saved.propsWidth;
+        if (saved.propsHeight) state.propsHeight = saved.propsHeight;
+        if (saved.propsFloatPos) state.propsFloatPos = saved.propsFloatPos;
+      } catch (e) {}
     }
 
     function applyZoom() {
@@ -1226,6 +1357,84 @@ export function getDesignerHtml(
     document.getElementById('btnToggleConnections')?.addEventListener('click', () => {
       toggleSideSection(els.connectionsSection);
     });
+    document.getElementById('btnPropsFloat')?.addEventListener('click', () => {
+      state.propsMode = 'floating';
+      applyPropsPanelLayout();
+      toast('Properties panel floating');
+    });
+    document.getElementById('btnPropsDock')?.addEventListener('click', () => {
+      state.propsMode = 'docked';
+      state.propsFloatPos = { x: null, y: null };
+      applyPropsPanelLayout();
+      toast('Properties panel docked');
+    });
+    document.getElementById('btnPropsCollapse')?.addEventListener('click', () => {
+      state.propsMode = 'collapsed';
+      applyPropsPanelLayout();
+    });
+    document.getElementById('btnPropsExpand')?.addEventListener('click', () => {
+      state.propsMode = 'docked';
+      applyPropsPanelLayout();
+    });
+    document.getElementById('btnPropsPanel')?.addEventListener('click', () => {
+      state.propsMode = state.propsMode === 'collapsed' ? 'docked' : state.propsMode;
+      if (state.propsMode === 'collapsed') state.propsMode = 'docked';
+      applyPropsPanelLayout();
+    });
+
+    // Width resize
+    (function bindPropsResize() {
+      const handleX = document.getElementById('propsResizeX');
+      const handleY = document.getElementById('propsResizeY');
+      const chrome = document.getElementById('propsChrome');
+      let mode = null; // 'x' | 'y' | 'move'
+      let start = { x: 0, y: 0, w: 0, h: 0, left: 0, top: 0 };
+      handleX?.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        mode = 'x';
+        handleX.classList.add('dragging');
+        start = { x: e.clientX, y: e.clientY, w: state.propsWidth, h: state.propsHeight, left: 0, top: 0 };
+      });
+      handleY?.addEventListener('mousedown', (e) => {
+        if (state.propsMode !== 'floating') return;
+        e.preventDefault();
+        mode = 'y';
+        handleY.classList.add('dragging');
+        start = { x: e.clientX, y: e.clientY, w: state.propsWidth, h: state.propsHeight, left: 0, top: 0 };
+      });
+      chrome?.addEventListener('mousedown', (e) => {
+        if (state.propsMode !== 'floating') return;
+        if (e.target.closest('button')) return;
+        mode = 'move';
+        const rect = els.propsPanel.getBoundingClientRect();
+        start = { x: e.clientX, y: e.clientY, w: state.propsWidth, h: state.propsHeight, left: rect.left, top: rect.top };
+      });
+      window.addEventListener('mousemove', (e) => {
+        if (!mode) return;
+        if (mode === 'x') {
+          // Left-edge handle: drag left → wider
+          state.propsWidth = Math.min(560, Math.max(240, start.w + (start.x - e.clientX)));
+          applyPropsPanelLayout();
+        } else if (mode === 'y') {
+          state.propsHeight = Math.min(window.innerHeight - 90, Math.max(280, start.h + (e.clientY - start.y)));
+          applyPropsPanelLayout();
+        } else if (mode === 'move') {
+          state.propsFloatPos = {
+            x: Math.max(8, start.left + (e.clientX - start.x)),
+            y: Math.max(8, start.top + (e.clientY - start.y))
+          };
+          applyPropsPanelLayout();
+        }
+      });
+      window.addEventListener('mouseup', () => {
+        if (!mode) return;
+        mode = null;
+        handleX?.classList.remove('dragging');
+        handleY?.classList.remove('dragging');
+        applyPropsPanelLayout();
+      });
+    })();
+
     document.getElementById('btnZoomIn')?.addEventListener('click', () => setZoom(state.zoom + 0.1));
     document.getElementById('btnZoomOut')?.addEventListener('click', () => setZoom(state.zoom - 0.1));
     document.getElementById('btnZoomReset')?.addEventListener('click', () => setZoom(1));
@@ -1289,6 +1498,8 @@ export function getDesignerHtml(
       if (msg.type === 'toast' && msg.message) toast(msg.message);
     });
 
+    restorePropsPanelState();
+    applyPropsPanelLayout();
     renderAll();
     vscode.postMessage({ type: 'ready' });
   </script>

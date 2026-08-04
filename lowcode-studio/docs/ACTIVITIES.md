@@ -1,12 +1,12 @@
 # LowCode Studio — Activity coverage
 
-Generated for **v0.6.3** from the extension activity catalog.
+Generated for **v0.6.4** from the extension activity catalog.
 
 This list is what you can design in VS Code / Cursor, dry-run locally, and best-effort import/export with UiPath Studio / Studio Web.
 
 > Not every property of every UiPath activity is modeled. Selectors for UI activities round-trip via `selector` / `selectorModern` / `selectorXml`.
 
-**Total activities:** 57
+**Total activities:** 58
 
 ## By category
 
@@ -128,6 +128,7 @@ UiPath package (typical): `UiPath.UIAutomation.Activities`
 | Check | `UI.Check` | No | selector, selectorModern, action |
 | Click | `UI.Click` | No | selector, selectorModern, clickType, simulateClick |
 | Element Exists | `UI.ElementExists` | No | selector, selectorModern, result, timeoutMs |
+| Extract Table Data | `UI.ExtractTableData` | No | selector, selectorModern, extractionMetadata, includeHeaders, maxResults, smartExtraction… |
 | Get Attribute | `UI.GetAttribute` | No | selector, selectorModern, attribute, result |
 | Get Text | `UI.GetText` | No | selector, selectorModern, result |
 | Hover | `UI.Hover` | No | selector, selectorModern |

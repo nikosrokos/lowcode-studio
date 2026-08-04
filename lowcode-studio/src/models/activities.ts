@@ -755,6 +755,67 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     ]
   },
   {
+    type: 'UI.ExtractTableData',
+    displayName: 'Extract Table Data',
+    category: 'UI Automation',
+    description:
+      'Smart extraction of a table from the page into a DataTable (Windows UI Automation Extract Table Data).',
+    icon: '$(table)',
+    color: '#10B981',
+    properties: [
+      {
+        name: 'selector',
+        label: 'Table Selector (Windows)',
+        type: 'multiline',
+        defaultValue:
+          "<html app='chrome.exe' title='*' />\n<webctrl tag='TABLE' />",
+        required: true,
+        description: 'Classic Windows selector for the HTML table or grid root.'
+      },
+      {
+        name: 'selectorModern',
+        label: 'Modern Selector',
+        type: 'multiline',
+        defaultValue: ''
+      },
+      {
+        name: 'extractionMetadata',
+        label: 'Extraction Metadata (JSON)',
+        type: 'multiline',
+        defaultValue:
+          '{\n  "Columns": [\n    { "Name": "Column1", "Attr": "text" },\n    { "Name": "Column2", "Attr": "text" }\n  ],\n  "SmartExtraction": true\n}',
+        description:
+          'UiPath-style extraction metadata / column map. SmartExtraction infers columns when empty.'
+      },
+      {
+        name: 'includeHeaders',
+        label: 'Include Headers',
+        type: 'boolean',
+        defaultValue: true
+      },
+      {
+        name: 'maxResults',
+        label: 'Max Results',
+        type: 'number',
+        defaultValue: 100
+      },
+      {
+        name: 'smartExtraction',
+        label: 'Smart Extraction',
+        type: 'boolean',
+        defaultValue: true,
+        description: 'Infer columns from the page table when metadata is incomplete.'
+      },
+      {
+        name: 'result',
+        label: 'Result DataTable',
+        type: 'expression',
+        defaultValue: 'extractedTable',
+        required: true
+      }
+    ]
+  },
+  {
     type: 'Data.ReadCsv',
     displayName: 'Read CSV',
     category: 'Data',

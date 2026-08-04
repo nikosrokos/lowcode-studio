@@ -403,6 +403,11 @@ function emitPseudo(list: ActivityNode[], lines: string[], depth: number) {
       case 'UI.Click':
         lines.push(`${pad}Click(${JSON.stringify(activity.properties.selector)})`);
         break;
+      case 'UI.ExtractTableData':
+        lines.push(
+          `${pad}${activity.properties.result || 'extractedTable'} = ExtractTableData(${JSON.stringify(activity.properties.selector)}, smart=${activity.properties.smartExtraction !== false})`
+        );
+        break;
       case 'UI.TypeInto':
         lines.push(
           `${pad}TypeInto(${JSON.stringify(activity.properties.selector)}, ${activity.properties.text})`
@@ -472,6 +477,8 @@ function summarize(activity: ActivityNode, variables: Record<string, unknown>): 
       return `${activity.properties.to} := ${activity.properties.value}`;
     case 'UI.Click':
       return `Click ${String(activity.properties.selector).slice(0, 40)}`;
+    case 'UI.ExtractTableData':
+      return `ExtractTable -> ${activity.properties.result || 'extractedTable'}`;
     case 'UI.TypeInto':
       return `Type ${activity.properties.text}`;
     case 'Messaging.HttpRequest':
@@ -758,6 +765,33 @@ function executeStub(
       const result = String(activity.properties.result || 'extractedText');
       variables[result] = 'Sample extracted text';
       log.push(`${indent}GetText -> ${result}`);
+      break;
+    }
+    case 'UI.ExtractTableData': {
+      const result = String(activity.properties.result || 'extractedTable');
+      let columns = ['Column1', 'Column2'];
+      try {
+        const meta = JSON.parse(String(activity.properties.extractionMetadata || '{}')) as {
+          Columns?: Array<{ Name?: string }>;
+        };
+        if (Array.isArray(meta.Columns) && meta.Columns.length) {
+          columns = meta.Columns.map((c, i) => c.Name || `Column${i + 1}`);
+        }
+      } catch {
+        // keep defaults — smart extraction mock
+      }
+      const max = Math.min(5, Math.max(1, Number(activity.properties.maxResults ?? 5)));
+      const rows = Array.from({ length: max }, (_, r) =>
+        columns.map((c) => `${c}_R${r + 1}`)
+      );
+      variables[result] = {
+        columns,
+        rows,
+        smartExtraction: activity.properties.smartExtraction !== false
+      };
+      log.push(
+        `${indent}ExtractTableData smart=${activity.properties.smartExtraction !== false} cols=${columns.length} rows=${rows.length} -> ${result}`
+      );
       break;
     }
     case 'UI.ElementExists': {

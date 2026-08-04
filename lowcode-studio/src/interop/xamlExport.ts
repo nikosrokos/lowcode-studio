@@ -374,6 +374,9 @@ ${pad}</ui:RetryScope>`;
   }
 
   if (isUiActivity(activity.type)) {
+    if (activity.type === 'UI.ExtractTableData') {
+      return renderExtractTableData(activity, pad);
+    }
     return renderUiActivity(activity, pad, indent);
   }
 
@@ -437,6 +440,36 @@ ${pad}</python:PythonScope>`;
     default:
       return `${pad}<ui:Comment DisplayName="${escapeAttr(activity.displayName)}" Text="Python placeholder" />`;
   }
+}
+
+function renderExtractTableData(activity: ActivityNode, pad: string): string {
+  const props = applyWindowsSelectorsToActivityProps(activity.properties || {});
+  const selAttr = selectorAttribute(props);
+  const target = emitTargetXaml(props, pad + '  ');
+  const result = escapeAttr(String(props.result || 'extractedTable'));
+  const includeHeaders = props.includeHeaders === false || props.includeHeaders === 'false' ? 'False' : 'True';
+  const maxResults = Number(props.maxResults ?? 100);
+  const smart =
+    props.smartExtraction === false || props.smartExtraction === 'false' ? 'False' : 'True';
+  const meta = escapeAttr(String(props.extractionMetadata || ''));
+  const attrs = [
+    `DisplayName="${escapeAttr(activity.displayName)}"`,
+    selAttr.trim(),
+    `ExtractMetadata="${meta}"`,
+    `IncludeHeaders="${includeHeaders}"`,
+    `MaxNumberOfResults="${maxResults}"`,
+    `SmartExtraction="${smart}"`,
+    `DataTable="[${result}]"`
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  if (!target) {
+    return `${pad}<uia:ExtractTableData ${attrs} />`;
+  }
+  return `${pad}<uia:ExtractTableData ${attrs}>
+${target}
+${pad}</uia:ExtractTableData>`;
 }
 
 function renderUiActivity(activity: ActivityNode, pad: string, indent: number): string {

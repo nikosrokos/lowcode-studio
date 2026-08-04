@@ -139,6 +139,16 @@ const MAP: Array<{
     ],
     xamlNamespace: 'uia'
   },
+  {
+    lcsType: 'UI.ExtractTableData',
+    xamlLocalNames: [
+      'ExtractTableData',
+      'ExtractData',
+      'NExtractData',
+      'ExtractStructuredData'
+    ],
+    xamlNamespace: 'uia'
+  },
   { lcsType: 'Data.ReadCsv', xamlLocalNames: ['ReadCsvFile', 'ReadCSV'], xamlNamespace: 'ui' },
   { lcsType: 'Data.WriteCsv', xamlLocalNames: ['WriteCsvFile', 'WriteCSV'], xamlNamespace: 'ui' },
   {
