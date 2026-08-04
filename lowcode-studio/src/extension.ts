@@ -38,6 +38,12 @@ import {
   importUiPathNupkg,
   importUiPathProjectFolder
 } from './interop/studioProject';
+import {
+  CONFIG_JSON_REL,
+  CONFIG_XLSX_REL,
+  exportJsonToXlsx,
+  importXlsxToJson
+} from './interop/configBridge';
 
 let editorProvider: WorkflowEditorProvider;
 let variablesProvider: VariablesTreeProvider;
@@ -247,6 +253,12 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('lowcodeStudio.exportStudioWeb', () =>
       exportStudioWebCommand()
     ),
+    vscode.commands.registerCommand('lowcodeStudio.exportConfigXlsx', () =>
+      exportConfigXlsxCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.importConfigXlsx', () =>
+      importConfigXlsxCommand()
+    ),
     vscode.commands.registerCommand('lowcodeStudio.openStudioWeb', () => {
       void vscode.env.openExternal(vscode.Uri.parse('https://studio.uipath.com'));
     }),
@@ -332,7 +344,11 @@ async function newProject(forcedTemplate?: 'blank' | 'reframework'): Promise<voi
     for (const file of files) {
       const full = path.join(projectDir, file.relativePath);
       fs.mkdirSync(path.dirname(full), { recursive: true });
-      fs.writeFileSync(full, file.content, 'utf8');
+      if (Buffer.isBuffer(file.content)) {
+        fs.writeFileSync(full, file.content);
+      } else {
+        fs.writeFileSync(full, file.content, 'utf8');
+      }
     }
   } else {
     const mainWorkflow = 'Main.lcs.json';
@@ -538,6 +554,106 @@ async function importUiPathPackageCommand(): Promise<void> {
       err instanceof Error ? err.message : 'Package import failed'
     );
   }
+}
+
+async function exportConfigXlsxCommand(): Promise<void> {
+  const projectDir = await resolveLcsProjectDir();
+  if (!projectDir) {
+    return;
+  }
+  try {
+    const result = exportJsonToXlsx(projectDir);
+    projectProvider.refresh();
+    const open = await vscode.window.showInformationMessage(
+      `Exported classic Config.xlsx (${result.sheets.join(', ')})`,
+      'Open Folder'
+    );
+    if (open === 'Open Folder') {
+      await vscode.commands.executeCommand(
+        'revealFileInOS',
+        vscode.Uri.file(result.targetPath)
+      );
+    }
+  } catch (err) {
+    vscode.window.showErrorMessage(err instanceof Error ? err.message : 'Export Config.xlsx failed');
+  }
+}
+
+async function importConfigXlsxCommand(): Promise<void> {
+  const projectDir = await resolveLcsProjectDir();
+  if (!projectDir) {
+    return;
+  }
+  const defaultXlsx = path.join(projectDir, CONFIG_XLSX_REL);
+  let xlsxPath = fs.existsSync(defaultXlsx) ? defaultXlsx : undefined;
+  if (!xlsxPath) {
+    const picked = await vscode.window.showOpenDialog({
+      canSelectFiles: true,
+      canSelectFolders: false,
+      canSelectMany: false,
+      filters: { Excel: ['xlsx'] },
+      openLabel: 'Import Config.xlsx'
+    });
+    if (!picked?.[0]) {
+      return;
+    }
+    xlsxPath = picked[0].fsPath;
+  } else {
+    const choice = await vscode.window.showQuickPick(
+      [
+        { label: `Use project ${CONFIG_XLSX_REL}`, value: 'project' },
+        { label: 'Pick another .xlsx…', value: 'pick' }
+      ],
+      { placeHolder: 'Import classic REFramework Config.xlsx → Config.json' }
+    );
+    if (!choice) {
+      return;
+    }
+    if (choice.value === 'pick') {
+      const picked = await vscode.window.showOpenDialog({
+        canSelectFiles: true,
+        canSelectFolders: false,
+        canSelectMany: false,
+        filters: { Excel: ['xlsx'] },
+        openLabel: 'Import Config.xlsx'
+      });
+      if (!picked?.[0]) {
+        return;
+      }
+      xlsxPath = picked[0].fsPath;
+    }
+  }
+
+  try {
+    const result = importXlsxToJson(projectDir, xlsxPath);
+    projectProvider.refresh();
+    const doc = await vscode.workspace.openTextDocument(result.targetPath);
+    await vscode.window.showTextDocument(doc);
+    vscode.window.showInformationMessage(
+      `Imported Config.xlsx → ${CONFIG_JSON_REL} (${result.sheets.join(', ')})`
+    );
+  } catch (err) {
+    vscode.window.showErrorMessage(err instanceof Error ? err.message : 'Import Config.xlsx failed');
+  }
+}
+
+async function resolveLcsProjectDir(): Promise<string | undefined> {
+  const workspace = vscode.workspace.workspaceFolders?.[0];
+  if (!workspace) {
+    vscode.window.showErrorMessage('Open a workspace folder first.');
+    return undefined;
+  }
+  const projectJson = findNearestProject(workspace.uri.fsPath);
+  if (projectJson) {
+    return path.dirname(projectJson);
+  }
+  const picked = await vscode.window.showOpenDialog({
+    canSelectFiles: false,
+    canSelectFolders: true,
+    canSelectMany: false,
+    openLabel: 'Select LowCode Studio project folder'
+  });
+  return picked?.[0]?.fsPath;
 }
 
 async function exportStudioWebCommand(): Promise<void> {
@@ -948,8 +1064,10 @@ A **Studio-like low-code designer** for VS Code and Cursor — built for Mac use
 1. **LowCode Studio: New REFramework Project** (easiest path)
 2. Open \`Main.lcs.json\` — flowchart of the framework states
 3. Edit \`Framework/Process.lcs.json\` for business logic
-4. Edit \`Data/Config.json\` for retries / endpoints
+4. Edit \`Data/Config.json\` (or **Import Config.xlsx** from classic REFramework)
 5. Press **F5** to dry-run Main, or **Dry Run REFramework Scenario** for \`Data/Test/scenarios.json\`
+
+**Config bridge:** \`Export Config.xlsx\` / \`Import Config.xlsx\` — JSON ↔ classic Settings/Constants/Assets sheets
 
 **Custom activities:** \`Register Custom Activity\` → This project (\`activities.custom.json\`) or All my projects (user library)
 

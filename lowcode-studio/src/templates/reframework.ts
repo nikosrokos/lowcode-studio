@@ -7,10 +7,17 @@ import {
   stringifyWorkflow
 } from '../models/workflow';
 import { resolveUiPathDependencies } from '../interop/uipathDependencies';
+import {
+  CONFIG_JSON_REL,
+  CONFIG_XLSX_REL,
+  configJsonToXlsxBuffer,
+  defaultREFrameworkConfig
+} from '../interop/configBridge';
 
 export interface GeneratedFile {
   relativePath: string;
-  content: string;
+  /** Text for JSON/workflows; Buffer for binary assets such as Config.xlsx */
+  content: string | Buffer;
 }
 
 /**
@@ -97,9 +104,14 @@ export function generateREFrameworkProject(projectName: string): GeneratedFile[]
     content: stringifyWorkflow(buildTakeScreenshot())
   });
 
+  const config = defaultREFrameworkConfig(projectName);
   files.push({
-    relativePath: 'Data/Config.json',
-    content: JSON.stringify(defaultConfig(projectName), null, 2) + '\n'
+    relativePath: CONFIG_JSON_REL,
+    content: JSON.stringify(config, null, 2) + '\n'
+  });
+  files.push({
+    relativePath: CONFIG_XLSX_REL,
+    content: configJsonToXlsxBuffer(config)
   });
 
   files.push({
@@ -266,7 +278,7 @@ function buildMainFlowchart(projectName: string): WorkflowDocument {
 
 function buildInitAllSettings(): WorkflowDocument {
   return sequence('InitAllSettings', [
-    log('Loading Config.json from Data folder', 'Info'),
+    log('Loading Config.json / Config.xlsx from Data folder', 'Info'),
     assign('Config', 'ConfigFile'),
     log('"Settings loaded: MaxRetryNumber, OrchestratorQueueName, ..."', 'Info')
   ], [
@@ -483,29 +495,6 @@ function assign(to: string, value: string): ActivityNode {
   };
 }
 
-function defaultConfig(projectName: string) {
-  return {
-    Settings: {
-      projectName,
-      MaxRetryNumber: 2,
-      MaxTransactions: 3,
-      TimeoutMS: 30000,
-      ExScreenshotsFolderPath: 'Data/Temp',
-      LogLevel: 'Info'
-    },
-    Constants: {
-      OrchestratorQueueName: `${projectName}.Queue`,
-      ConfigPath: 'Data/Config.json'
-    },
-    Assets: {
-      CredentialAsset: 'REFramework.Credential'
-    },
-    Endpoints: {
-      ProcessApi: 'https://api.example.com/items'
-    }
-  };
-}
-
 function defaultTestScenarios(projectName: string) {
   return {
     schemaVersion: '1.0',
@@ -580,7 +569,8 @@ ${projectName}/
     KillAllProcesses.lcs.json
     TakeScreenshot.lcs.json
   Data/
-    Config.json                 ← settings (xlsx-free for Mac)
+    Config.json                 ← Mac-friendly settings (source of truth in LCS)
+    Config.xlsx                 ← classic REFramework twin (Settings/Constants/Assets)
     Test/scenarios.json         ← simulated dry-run tests
     Input/ Output/ Temp/
   activities.custom.json        ← project custom activities
@@ -589,19 +579,28 @@ ${projectName}/
 ## How to use (easy path)
 
 1. Open **Main.lcs.json** — flowchart shows Init → Get Data → Process → End.
-2. Edit **Data/Config.json** for retries, queue name, endpoints.
+2. Edit **Data/Config.json** for retries, queue name, endpoints (or import classic **Config.xlsx**).
 3. Put business steps in **Framework/Process.lcs.json**.
 4. Adjust **GetTransactionData** for your queue / input source.
 5. Press **F5** (Dry Run) on Main to simulate the transaction loop.
 6. Run **LowCode Studio: Dry Run REFramework Scenario** for named tests in \`Data/Test/scenarios.json\`.
 
+## Config.json ↔ Config.xlsx bridge
+
+| Command | Direction |
+|---|---|
+| **Export Config.xlsx** | \`Config.json\` → classic Excel (Settings / Constants / Assets / extras) |
+| **Import Config.xlsx** | classic Excel → \`Config.json\` |
+
+Dry-run prefers \`Config.json\` when both exist. Assets sheet columns: **Name | Asset | OrchestratorFolder**.
+
 ## Simulated tests (recommended)
 
-Use **Config.json + scenario variables + expect assertions** — not a real robot:
+Use **Config + scenario variables + expect assertions** — not a real robot:
 
 | File | Role |
 |---|---|
-| \`Data/Config.json\` | Shared settings (retries, MaxTransactions, endpoints) |
+| \`Data/Config.json\` / \`Config.xlsx\` | Shared settings (retries, MaxTransactions, endpoints) |
 | \`Data/Test/scenarios.json\` | Named dry-runs with variable seeds + assertions |
 
 Edit a scenario, then run **Dry Run REFramework Scenario** and pick it (or All).

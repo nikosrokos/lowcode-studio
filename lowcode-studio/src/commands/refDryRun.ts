@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { dryRunWorkflow, DryRunResult } from './simulator';
 import { parseWorkflow, WorkflowDocument } from '../models/workflow';
+import { loadProjectConfig } from '../interop/configBridge';
 
 export const SCENARIOS_FILENAME = 'Data/Test/scenarios.json';
 
@@ -94,15 +95,8 @@ export function defaultScenariosFile(projectName: string): ScenariosFile {
 }
 
 export function loadConfigJson(projectDir: string): Record<string, unknown> {
-  const configPath = path.join(projectDir, 'Data', 'Config.json');
-  if (!fs.existsSync(configPath)) {
-    return {};
-  }
-  try {
-    return JSON.parse(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
+  // Prefer JSON; fall back to classic Config.xlsx via bridge
+  return loadProjectConfig(projectDir).config;
 }
 
 export function loadScenariosFile(projectDir: string): ScenariosFile {

@@ -10,11 +10,18 @@ function run(): void {
   assert.ok(paths.includes('Main.lcs.json'));
   assert.ok(paths.includes('Framework/Process.lcs.json'));
   assert.ok(paths.includes('Data/Config.json'));
+  assert.ok(paths.includes('Data/Config.xlsx'));
   assert.ok(paths.includes('Data/Test/scenarios.json'));
   assert.ok(paths.includes('activities.custom.json'));
   assert.ok(paths.includes('project.json'));
 
-  const main = parseWorkflow(files.find((f) => f.relativePath === 'Main.lcs.json')!.content);
+  const xlsxFile = files.find((f) => f.relativePath === 'Data/Config.xlsx');
+  assert.ok(xlsxFile && Buffer.isBuffer(xlsxFile.content));
+  assert.ok((xlsxFile!.content as Buffer).length > 100);
+
+  const main = parseWorkflow(
+    String(files.find((f) => f.relativePath === 'Main.lcs.json')!.content)
+  );
   assert.strictEqual(main.type, 'Flowchart');
   assert.ok((main.connections || []).length >= 5);
   assert.ok(main.activities.some((a) => a.type === 'Flowchart.FlowDecision'));
@@ -30,7 +37,7 @@ function run(): void {
   assert.ok(result.steps.length > 3);
 
   const process = parseWorkflow(
-    files.find((f) => f.relativePath === 'Framework/Process.lcs.json')!.content
+    String(files.find((f) => f.relativePath === 'Framework/Process.lcs.json')!.content)
   );
   assert.strictEqual(process.type, 'Sequence');
   assert.ok(validateWorkflow(process).every((i) => i.severity !== 'error'));

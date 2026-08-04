@@ -296,12 +296,15 @@ export function exportToStudioWebProject(
   );
   written.push('project.json');
 
-  // Copy Config.json if present (Studio Web can use it as a resource)
-  const config = path.join(lcsProjectDir, 'Data', 'Config.json');
-  if (fs.existsSync(config)) {
+  // Copy Config.json / classic Config.xlsx if present (Studio Web resources)
+  for (const rel of ['Data/Config.json', 'Data/Config.xlsx']) {
+    const abs = path.join(lcsProjectDir, rel);
+    if (!fs.existsSync(abs)) {
+      continue;
+    }
     fs.mkdirSync(path.join(outDir, 'Data'), { recursive: true });
-    fs.copyFileSync(config, path.join(outDir, 'Data', 'Config.json'));
-    written.push('Data/Config.json');
+    fs.copyFileSync(abs, path.join(outDir, rel));
+    written.push(rel);
   }
 
   const depList = Object.entries(dependencies)
