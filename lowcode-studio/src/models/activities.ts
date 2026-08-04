@@ -435,6 +435,61 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     ]
   },
   {
+    type: 'UI.UseApplicationBrowser',
+    displayName: 'Use Application/Browser',
+    category: 'UI Automation',
+    description:
+      'Modern UI scope: attach/open a Windows app or browser, then run nested UI activities (Click, Type Into, Extract Table…).',
+    icon: '$(browser)',
+    color: '#059669',
+    container: true,
+    properties: [
+      {
+        name: 'mode',
+        label: 'Mode',
+        type: 'enum',
+        options: ['Browser', 'Application'],
+        defaultValue: 'Browser'
+      },
+      {
+        name: 'urlOrPath',
+        label: 'URL / Path',
+        type: 'string',
+        defaultValue: 'https://example.com',
+        required: true,
+        description: 'Browser URL or application executable path.'
+      },
+      {
+        name: 'browserType',
+        label: 'Browser',
+        type: 'enum',
+        options: ['Chrome', 'Edge', 'Firefox', 'IE'],
+        defaultValue: 'Chrome'
+      },
+      {
+        name: 'selector',
+        label: 'Window Selector (Windows)',
+        type: 'multiline',
+        defaultValue: "<html app='chrome.exe' title='*' />",
+        description: 'Optional attach selector for an already-open window.'
+      },
+      {
+        name: 'open',
+        label: 'Open',
+        type: 'enum',
+        options: ['IfNotOpen', 'Always', 'Never'],
+        defaultValue: 'IfNotOpen'
+      },
+      {
+        name: 'close',
+        label: 'Close',
+        type: 'enum',
+        options: ['Never', 'Always', 'IfOpenedByAppCard'],
+        defaultValue: 'Never'
+      }
+    ]
+  },
+  {
     type: 'UI.Click',
     displayName: 'Click',
     category: 'UI Automation',

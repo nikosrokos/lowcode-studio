@@ -1,12 +1,12 @@
 # LowCode Studio — Activity coverage
 
-Generated for **v0.6.4** from the extension activity catalog.
+Generated for **v0.6.5** from the extension activity catalog.
 
 This list is what you can design in VS Code / Cursor, dry-run locally, and best-effort import/export with UiPath Studio / Studio Web.
 
 > Not every property of every UiPath activity is modeled. Selectors for UI activities round-trip via `selector` / `selectorModern` / `selectorXml`.
 
-**Total activities:** 58
+**Total activities:** 59
 
 ## By category
 
@@ -136,6 +136,7 @@ UiPath package (typical): `UiPath.UIAutomation.Activities`
 | Select Item | `UI.SelectItem` | No | selector, selectorModern, item |
 | Take Screenshot | `UI.TakeScreenshot` | No | selector, filePath |
 | Type Into | `UI.TypeInto` | No | selector, selectorModern, text, emptyField |
+| Use Application/Browser | `UI.UseApplicationBrowser` | Yes | mode, urlOrPath, browserType, selector, open, close |
 | Wait Element | `UI.WaitElement` | No | selector, selectorModern, action, timeoutMs |
 
 ## Python pack (`UiPath.Python.Activities`)

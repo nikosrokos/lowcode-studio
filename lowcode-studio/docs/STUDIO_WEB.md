@@ -7,10 +7,10 @@ LowCode Studio is optimized for **Mac design + dry-run**. Exported projects targ
 ```
 Design on Mac (LowCode Studio)
    → Dry Run / Scenarios (F5 / Shift+F5)
-   → Validate Packages
-   → Connect to Studio Web (exports Windows .uip + .uis)
+   → Validate Packages / review Windows TODO
+   → Connect to Studio Web (exports Windows .uip + .uis + WINDOWS_TODO.md)
    → Import .uip / open in Studio Desktop (Windows)
-   → Refine selectors with UI Explorer on Windows
+   → Refine selectors with UI Explorer / Indicate Element on Windows
    → Publish → run on Windows robot
 ```
 
@@ -42,6 +42,7 @@ Override per project with `"uipathTargetFramework": "Portable"` in LowCode Studi
 | **`.uis`** | Solution / CLI `uip solution upload` |
 | **`*.StudioWeb/` folder** | Unpacked Windows project for Git / Studio Desktop |
 | `OPEN_IN_STUDIO_WEB.md` | Checklist written next to the export |
+| `WINDOWS_TODO.md` | Mac → Windows handoff TODOs (selectors, invokes, placeholders) |
 | `PACKAGE_WARNINGS.md` | Package / selector validation notes (when present) |
 
 ## What the export includes
@@ -56,7 +57,10 @@ Override per project with `"uipathTargetFramework": "Portable"` in LowCode Studi
 ## Tips for a clean Windows run
 
 - Prefer activities that map to real UiPath packages (see [ACTIVITIES.md](ACTIVITIES.md))
-- Capture / refine selectors on a **Windows** machine with UI Explorer
+- Use the designer **Selector Builder** for classic Windows selectors before Connect
+- Nest UI steps under **Use Application/Browser** when targeting a modern app/browser scope
+- Review `WINDOWS_TODO.md` after Connect — fix high-priority items before robot run
+- Capture / refine remaining selectors on a **Windows** machine with UI Explorer
 - Review `Imported.*` / Comment placeholders after import
 - Keep scenario dry-runs in LowCode Studio — they do not run in Studio Web automatically
 - Publish from Studio Web or Studio Desktop; execute on a Windows robot

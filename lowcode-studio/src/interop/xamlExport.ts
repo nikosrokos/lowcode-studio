@@ -373,6 +373,24 @@ ${pad}</ui:RetryScope>`;
     return `${pad}<Break DisplayName="${escapeAttr(activity.displayName)}" />`;
   }
 
+  if (activity.type === 'UI.UseApplicationBrowser') {
+    const kids = (activity.children || []).map((c) => renderActivity(c, indent + 1)).join('\n');
+    const props = applyWindowsSelectorsToActivityProps(activity.properties || {});
+    const url = escapeAttr(String(props.urlOrPath || 'https://example.com'));
+    const mode = String(props.mode || 'Browser');
+    const browser = escapeAttr(String(props.browserType || 'Chrome'));
+    const open = escapeAttr(String(props.open || 'IfNotOpen'));
+    const close = escapeAttr(String(props.close || 'Never'));
+    const selAttr = selectorAttribute(props);
+    return `${pad}<uia:NApplicationCard DisplayName="${escapeAttr(activity.displayName)}" Url="${url}" OpenMode="${open}" CloseMode="${close}" BrowserType="${browser}" AttachMode="${mode === 'Application' ? 'Application' : 'Browser'}"${selAttr}>
+${pad}  <uia:NApplicationCard.Body>
+${pad}    <Sequence>
+${kids}
+${pad}    </Sequence>
+${pad}  </uia:NApplicationCard.Body>
+${pad}</uia:NApplicationCard>`;
+  }
+
   if (isUiActivity(activity.type)) {
     if (activity.type === 'UI.ExtractTableData') {
       return renderExtractTableData(activity, pad);

@@ -35,6 +35,11 @@ import {
   validateProjectPackages
 } from './interop/packageValidation';
 import {
+  buildWindowsTodoChecklist,
+  formatWindowsTodoReport,
+  writeWindowsTodoFile
+} from './interop/windowsTodo';
+import {
   getActivityDefinition,
   setCustomActivityOverlay
 } from './models/activities';
@@ -916,25 +921,51 @@ async function connectStudioWebCommand(): Promise<void> {
   }
   try {
     let packageReport = '';
+    let windowsTodoReport = '';
+    let windowsTodoPath = '';
     try {
       const pkg = validateProjectPackages(projectDir);
       packageReport = formatPackageValidationReport(pkg);
+      const todo = buildWindowsTodoChecklist(projectDir);
+      windowsTodoReport = formatWindowsTodoReport(todo);
+      try {
+        windowsTodoPath = writeWindowsTodoFile(projectDir, todo);
+      } catch {
+        // ignore write failures during pre-check
+      }
       const warnCount = pkg.warnings.filter((w) => w.severity === 'warning').length;
-      if (warnCount > 0) {
+      const highTodo = todo.items.filter((i) => i.priority === 'high').length;
+      if (warnCount > 0 || highTodo > 0) {
+        const label =
+          highTodo > 0
+            ? `${highTodo} high-priority Windows TODO(s)` +
+              (warnCount ? ` + ${warnCount} package warning(s)` : '') +
+              ' before Studio Web packaging.'
+            : `${warnCount} package validation warning(s) before Studio Web packaging.`;
         const proceed = await vscode.window.showWarningMessage(
-          `${warnCount} package validation warning(s) before Studio Web packaging.`,
+          label,
           'Continue',
-          'Show Warnings',
+          'Show Windows TODO',
           'Cancel'
         );
         if (!proceed || proceed === 'Cancel') {
           return;
         }
-        if (proceed === 'Show Warnings') {
+        if (proceed === 'Show Windows TODO') {
           const channel = getOutput();
           channel.clear();
-          channel.appendLine(packageReport);
+          if (windowsTodoReport) {
+            channel.appendLine(windowsTodoReport);
+            channel.appendLine('');
+          }
+          if (packageReport) {
+            channel.appendLine(packageReport);
+          }
           channel.show(true);
+          if (windowsTodoPath && fs.existsSync(windowsTodoPath)) {
+            const doc = await vscode.workspace.openTextDocument(windowsTodoPath);
+            await vscode.window.showTextDocument(doc, { preview: true });
+          }
           const again = await vscode.window.showWarningMessage(
             'Continue packaging for Studio Web?',
             'Continue',
@@ -961,6 +992,16 @@ async function connectStudioWebCommand(): Promise<void> {
       result.targetDir
     );
 
+    let exportTodoPath = '';
+    try {
+      const todo = buildWindowsTodoChecklist(projectDir);
+      windowsTodoReport = formatWindowsTodoReport(todo);
+      exportTodoPath = writeWindowsTodoFile(result.targetDir, todo);
+      writeWindowsTodoFile(projectDir, todo);
+    } catch {
+      // ignore
+    }
+
     const channel = getOutput();
     channel.clear();
     channel.appendLine('Connect to Studio Web');
@@ -970,6 +1011,10 @@ async function connectStudioWebCommand(): Promise<void> {
     channel.appendLine(`Solution (.uis): ${result.archives.uisPath}`);
     channel.appendLine(`Main:   ${result.mainXaml}`);
     channel.appendLine('');
+    if (windowsTodoReport) {
+      channel.appendLine(windowsTodoReport);
+      channel.appendLine('');
+    }
     if (packageReport) {
       channel.appendLine(packageReport);
       channel.appendLine('');
@@ -996,6 +1041,7 @@ async function connectStudioWebCommand(): Promise<void> {
       'Reveal .uip',
       'Open Studio Web',
       'Open Folder',
+      'Open Windows TODO',
       'Open Checklist',
       'Show Guide'
     );
@@ -1010,6 +1056,20 @@ async function connectStudioWebCommand(): Promise<void> {
     }
     if (next === 'Open Folder') {
       await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(result.targetDir));
+    }
+    if (next === 'Open Windows TODO') {
+      const todoFile =
+        exportTodoPath && fs.existsSync(exportTodoPath)
+          ? exportTodoPath
+          : windowsTodoPath && fs.existsSync(windowsTodoPath)
+            ? windowsTodoPath
+            : path.join(result.targetDir, 'WINDOWS_TODO.md');
+      if (fs.existsSync(todoFile)) {
+        const doc = await vscode.workspace.openTextDocument(todoFile);
+        await vscode.window.showTextDocument(doc);
+      } else {
+        vscode.window.showWarningMessage('WINDOWS_TODO.md was not generated for this export.');
+      }
     }
     if (next === 'Open Checklist') {
       const doc = await vscode.workspace.openTextDocument(result.guidePath);
