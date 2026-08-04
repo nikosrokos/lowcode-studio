@@ -981,7 +981,9 @@ function executeStub(
       break;
     case 'Messaging.HttpRequest': {
       const result = String(activity.properties.result || 'response');
-      const url = String(activity.properties.url || '');
+      const urlRaw = String(activity.properties.url || '');
+      const urlResolved = resolveExpression(urlRaw, variables);
+      const url = String(urlResolved ?? urlRaw);
       const fromFixture = lookupFixtureHttp(fixtures.http, activity, result, url);
       variables[result] = fromFixture || { status: 200, body: { ok: true } };
       log.push(

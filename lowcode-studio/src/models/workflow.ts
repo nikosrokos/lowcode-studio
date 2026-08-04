@@ -67,7 +67,7 @@ export interface WorkflowDocument {
   };
 }
 
-export type ProjectTemplate = 'blank' | 'reframework';
+export type ProjectTemplate = 'blank' | 'reframework' | 'blueprint';
 
 export interface ProjectManifest {
   schemaVersion: '1.0';
@@ -76,6 +76,8 @@ export interface ProjectManifest {
   main: string;
   workflows: string[];
   template?: ProjectTemplate;
+  /** Set when template === 'blueprint' (web-scrape-excel, …) */
+  blueprintId?: string;
   createdAt: string;
   /** UiPath NuGet activity packages preserved from import / used on Studio Web export */
   uipathDependencies?: Record<string, string>;
@@ -176,7 +178,9 @@ export function createProjectManifest(
     description:
       template === 'reframework'
         ? `${name} — UiPath-style REFramework project (Windows target)`
-        : `${name} LowCode Studio project (Windows target)`,
+        : template === 'blueprint'
+          ? `${name} — Robot blueprint project (Windows target)`
+          : `${name} LowCode Studio project (Windows target)`,
     main: mainWorkflow,
     workflows,
     template,
