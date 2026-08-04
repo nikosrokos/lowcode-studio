@@ -117,9 +117,82 @@ export function ensureScenariosFile(projectDir: string, projectName: string): Sc
     return loadScenariosFile(projectDir);
   }
   const file = defaultScenariosFile(projectName);
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(file, null, 2) + '\n', 'utf8');
+  saveScenariosFile(projectDir, file);
   return file;
+}
+
+export function scenariosFilePath(projectDir: string): string {
+  return path.join(projectDir, SCENARIOS_FILENAME);
+}
+
+export function saveScenariosFile(projectDir: string, file: ScenariosFile): void {
+  const filePath = scenariosFilePath(projectDir);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const payload: ScenariosFile = {
+    schemaVersion: '1.0',
+    scenarios: file.scenarios || []
+  };
+  fs.writeFileSync(filePath, JSON.stringify(payload, null, 2) + '\n', 'utf8');
+}
+
+export function upsertScenario(
+  file: ScenariosFile,
+  scenario: DryRunScenario
+): ScenariosFile {
+  const scenarios = file.scenarios.filter((s) => s.name !== scenario.name);
+  scenarios.push(scenario);
+  scenarios.sort((a, b) => a.name.localeCompare(b.name));
+  return { schemaVersion: '1.0', scenarios };
+}
+
+/** Quick scenario for the common MaxTransactions smoke test. */
+export function createQuickScenario(options: {
+  name: string;
+  description?: string;
+  maxTransactions?: number;
+  expectProcess?: boolean;
+}): DryRunScenario {
+  const max = options.maxTransactions ?? 1;
+  const logIncludes =
+    max <= 0
+      ? ['CloseAllApplications']
+      : options.expectProcess === false
+        ? ['CloseAllApplications']
+        : ['Process completed', 'CloseAllApplications'];
+  return {
+    name: options.name.trim(),
+    description:
+      options.description ||
+      (max <= 0 ? 'Empty queue smoke test' : `Process ${max} transaction(s) then end`),
+    configOverrides: {
+      Settings: { MaxTransactions: max }
+    },
+    variables: {
+      MaxTransactions: max,
+      TransactionNumber: 1,
+      RetryNumber: 0,
+      ...(max <= 0 ? { TransactionItem: null } : {})
+    },
+    expect: {
+      ok: true,
+      logIncludes,
+      minSteps: max <= 0 ? 3 : 4,
+      variables: { TransactionItem: null }
+    }
+  };
+}
+
+export function duplicateScenario(
+  scenario: DryRunScenario,
+  newName: string
+): DryRunScenario {
+  return {
+    ...JSON.parse(JSON.stringify(scenario)),
+    name: newName.trim(),
+    description: scenario.description
+      ? `${scenario.description} (copy)`
+      : `Copy of ${scenario.name}`
+  };
 }
 
 export function deepMerge(
