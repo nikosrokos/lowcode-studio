@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Mac-first low-code RPA for VS Code/Cursor: REFramework design, scenario dry-runs (Shift+F5), and the easiest Connect to Studio Web handoff for Orchestrator publish.",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -69,23 +69,31 @@
     "commands": [
       {
         "command": "lowcodeStudio.openLocalProject",
-        "title": "LowCode Studio: Open Local Project",
-        "icon": "$(folder-opened)"
+        "title": "Open Local Project \u2014 browse for a folder with project.json",
+        "icon": "$(folder-opened)",
+        "shortTitle": "Open",
+        "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.newProject",
-        "title": "LowCode Studio: New Project",
-        "icon": "$(new-folder)"
+        "title": "New blank LowCode Studio project",
+        "icon": "$(new-folder)",
+        "shortTitle": "New",
+        "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.newREFramework",
-        "title": "LowCode Studio: New REFramework Project",
-        "icon": "$(type-hierarchy)"
+        "title": "New REFramework Project \u2014 Init \u2192 Get Data \u2192 Process template",
+        "icon": "$(type-hierarchy)",
+        "shortTitle": "REFramework",
+        "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.newWorkflow",
-        "title": "LowCode Studio: New Workflow",
-        "icon": "$(new-file)"
+        "title": "New Workflow \u2014 Sequence or Flowchart",
+        "icon": "$(new-file)",
+        "shortTitle": "Workflow",
+        "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.openDesigner",
@@ -93,47 +101,65 @@
       },
       {
         "command": "lowcodeStudio.validatePackages",
-        "title": "LowCode Studio: Validate Packages",
-        "icon": "$(warning)"
+        "title": "Validate Packages \u2014 NuGet deps and Windows selector warnings",
+        "icon": "$(warning)",
+        "shortTitle": "Validate",
+        "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.validateWorkflow",
-        "title": "LowCode Studio: Validate Workflow",
-        "icon": "$(check)"
+        "title": "Validate Workflow \u2014 required fields and structure",
+        "icon": "$(check)",
+        "shortTitle": "Validate",
+        "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.dryRun",
-        "title": "LowCode Studio: Dry Run",
-        "icon": "$(play)"
+        "title": "Dry Run \u2014 simulate the open workflow (F5)",
+        "icon": "$(play)",
+        "shortTitle": "Dry Run",
+        "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.dryRunScenario",
-        "title": "LowCode Studio: Dry Run Scenarios",
-        "icon": "$(beaker)"
+        "title": "Dry Run Scenarios \u2014 run REFramework test scenarios (Shift+F5)",
+        "icon": "$(beaker)",
+        "shortTitle": "Scenarios",
+        "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.manageScenarios",
-        "title": "LowCode Studio: Manage Scenarios",
-        "icon": "$(checklist)"
+        "title": "Manage Scenarios \u2014 add, duplicate, or open scenarios.json",
+        "icon": "$(checklist)",
+        "shortTitle": "Manage",
+        "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.registerCustomActivity",
-        "title": "LowCode Studio: Register Custom Activity",
-        "icon": "$(extensions)"
+        "title": "Register a custom activity",
+        "icon": "$(extensions)",
+        "shortTitle": "Register",
+        "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.manageCustomActivities",
-        "title": "LowCode Studio: Manage Custom Activities"
+        "title": "Manage custom activities",
+        "shortTitle": "Manage",
+        "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.addVariable",
-        "title": "LowCode Studio: Add Variable",
-        "icon": "$(add)"
+        "title": "Add Variable to the open workflow",
+        "icon": "$(add)",
+        "shortTitle": "Add",
+        "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.refreshExplorer",
-        "title": "LowCode Studio: Refresh Explorer",
-        "icon": "$(refresh)"
+        "title": "Refresh Project Explorer",
+        "icon": "$(refresh)",
+        "shortTitle": "Refresh",
+        "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.insertActivity",
@@ -145,23 +171,31 @@
       },
       {
         "command": "lowcodeStudio.importUiPathProject",
-        "title": "LowCode Studio: Import UiPath Project Folder",
-        "icon": "$(folder-opened)"
+        "title": "Import UiPath Project Folder into LowCode Studio",
+        "icon": "$(folder-opened)",
+        "shortTitle": "Import Folder",
+        "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.importUiPathPackage",
-        "title": "LowCode Studio: Import UiPath Package (.nupkg)",
-        "icon": "$(file-zip)"
+        "title": "Import UiPath Package (.nupkg)",
+        "icon": "$(file-zip)",
+        "shortTitle": "Import .nupkg",
+        "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.connectStudioWeb",
-        "title": "LowCode Studio: Connect to Studio Web",
-        "icon": "$(cloud-upload)"
+        "title": "Connect to Studio Web \u2014 export Windows .uip / .uis for publish",
+        "icon": "$(cloud-upload)",
+        "shortTitle": "Connect",
+        "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.exportStudioWeb",
-        "title": "LowCode Studio: Export for Studio Web",
-        "icon": "$(export)"
+        "title": "Export for Studio Web (Windows project folder)",
+        "icon": "$(export)",
+        "shortTitle": "Export",
+        "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.showStudioWebGuide",
@@ -169,13 +203,17 @@
       },
       {
         "command": "lowcodeStudio.exportConfigXlsx",
-        "title": "LowCode Studio: Export Config.xlsx",
-        "icon": "$(file-binary)"
+        "title": "Export Config.xlsx from Config.json",
+        "icon": "$(file-binary)",
+        "shortTitle": "Export Config",
+        "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.importConfigXlsx",
-        "title": "LowCode Studio: Import Config.xlsx",
-        "icon": "$(file)"
+        "title": "Import Config.xlsx into Config.json",
+        "icon": "$(file)",
+        "shortTitle": "Import Config",
+        "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.openStudioWeb",
@@ -191,87 +229,104 @@
         {
           "command": "lowcodeStudio.openLocalProject",
           "when": "view == lowcodeStudio.projects",
-          "group": "navigation@0"
+          "group": "navigation@0",
+          "tooltip": "Open Local Project \u2014 browse for a folder with project.json"
         },
         {
           "command": "lowcodeStudio.dryRunScenario",
           "when": "view == lowcodeStudio.projects",
-          "group": "navigation@1"
+          "group": "navigation@1",
+          "tooltip": "Dry Run Scenarios \u2014 run REFramework test scenarios (Shift+F5)"
         },
         {
           "command": "lowcodeStudio.manageScenarios",
           "when": "view == lowcodeStudio.projects",
-          "group": "navigation@2"
+          "group": "navigation@2",
+          "tooltip": "Manage Scenarios \u2014 add, duplicate, or open scenarios.json"
         },
         {
           "command": "lowcodeStudio.connectStudioWeb",
           "when": "view == lowcodeStudio.projects",
-          "group": "navigation@3"
+          "group": "navigation@3",
+          "tooltip": "Connect to Studio Web \u2014 export Windows .uip / .uis for publish"
         },
         {
           "command": "lowcodeStudio.validatePackages",
           "when": "view == lowcodeStudio.projects",
-          "group": "navigation@4"
+          "group": "navigation@4",
+          "tooltip": "Validate Packages \u2014 NuGet deps and Windows selector warnings"
         },
         {
           "command": "lowcodeStudio.refreshExplorer",
           "when": "view == lowcodeStudio.projects",
-          "group": "navigation@5"
+          "group": "navigation@5",
+          "tooltip": "Refresh Project Explorer"
         },
         {
           "command": "lowcodeStudio.newREFramework",
           "when": "view == lowcodeStudio.projects",
-          "group": "1_create@1"
+          "group": "1_create@1",
+          "tooltip": "New REFramework Project \u2014 Init \u2192 Get Data \u2192 Process template"
         },
         {
           "command": "lowcodeStudio.newProject",
           "when": "view == lowcodeStudio.projects",
-          "group": "1_create@2"
+          "group": "1_create@2",
+          "tooltip": "New blank LowCode Studio project"
         },
         {
           "command": "lowcodeStudio.newWorkflow",
           "when": "view == lowcodeStudio.projects",
-          "group": "1_create@3"
+          "group": "1_create@3",
+          "tooltip": "New Workflow \u2014 Sequence or Flowchart"
         },
         {
           "command": "lowcodeStudio.importUiPathProject",
           "when": "view == lowcodeStudio.projects",
-          "group": "2_import@1"
+          "group": "2_import@1",
+          "tooltip": "Import UiPath Project Folder into LowCode Studio"
         },
         {
           "command": "lowcodeStudio.importUiPathPackage",
           "when": "view == lowcodeStudio.projects",
-          "group": "2_import@2"
+          "group": "2_import@2",
+          "tooltip": "Import UiPath Package (.nupkg)"
         },
         {
           "command": "lowcodeStudio.exportStudioWeb",
           "when": "view == lowcodeStudio.projects",
-          "group": "3_export@1"
+          "group": "3_export@1",
+          "tooltip": "Export for Studio Web (Windows project folder)"
         },
         {
           "command": "lowcodeStudio.exportConfigXlsx",
           "when": "view == lowcodeStudio.projects",
-          "group": "3_export@2"
+          "group": "3_export@2",
+          "tooltip": "Export Config.xlsx from Config.json"
         },
         {
           "command": "lowcodeStudio.importConfigXlsx",
           "when": "view == lowcodeStudio.projects",
-          "group": "3_export@3"
+          "group": "3_export@3",
+          "tooltip": "Import Config.xlsx into Config.json"
         },
         {
           "command": "lowcodeStudio.addVariable",
           "when": "view == lowcodeStudio.variables",
-          "group": "navigation"
+          "group": "navigation",
+          "tooltip": "Add Variable to the open workflow"
         },
         {
           "command": "lowcodeStudio.registerCustomActivity",
           "when": "view == lowcodeStudio.activities",
-          "group": "navigation"
+          "group": "navigation",
+          "tooltip": "Register a custom activity"
         },
         {
           "command": "lowcodeStudio.manageCustomActivities",
           "when": "view == lowcodeStudio.activities",
-          "group": "navigation"
+          "group": "navigation",
+          "tooltip": "Manage custom activities"
         }
       ],
       "view/item/context": [
@@ -409,7 +464,7 @@
     "package": "npm run bundle && vsce package --no-dependencies",
     "lint": "tsc --noEmit",
     "docs:activities": "npm run compile && node scripts/generate-activities-md.js",
-    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && node out/test/windowsTarget.test.js && npm run docs:activities"
+    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && node out/test/windowsTarget.test.js && node out/test/extractTableData.test.js && npm run docs:activities"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",

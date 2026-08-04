@@ -62,6 +62,7 @@ const ACTIVITY_TO_PACKAGES: Record<string, string[]> = {
   'UI.OpenApplication': ['UiPath.UIAutomation.Activities'],
   'UI.GetAttribute': ['UiPath.UIAutomation.Activities'],
   'UI.WaitElement': ['UiPath.UIAutomation.Activities'],
+  'UI.ExtractTableData': ['UiPath.UIAutomation.Activities'],
   'Excel.ReadRange': ['UiPath.Excel.Activities'],
   'Excel.WriteRange': ['UiPath.Excel.Activities'],
   'Excel.ReadCell': ['UiPath.Excel.Activities'],

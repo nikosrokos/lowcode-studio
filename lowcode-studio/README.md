@@ -1,12 +1,12 @@
 # LowCode Studio
 
-**Version 0.6.3** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.6.4** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.6.3-0ea5e9)
+![version](https://img.shields.io/badge/version-0.6.4-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
@@ -31,27 +31,28 @@ Design on Mac (REFramework)
 
 ## In action
 
-### 1. Sequence designer + custom container colors
+<p>
+  <img src="docs/images/designer-overview.png" alt="Designer with floating properties panel" width="640" />
+</p>
 
-![Sequence designer with custom colors](docs/images/vscode-sequence-colors.png)
+<p>
+  <img src="docs/images/project-explorer.png" alt="Project Explorer title actions with tooltips" width="360" />
+  &nbsp;
+  <img src="docs/images/extract-table.png" alt="Extract Table Data smart extraction" width="420" />
+</p>
 
-### 2. Import UiPath / Export for Studio Web (with activity packages)
+1. **Designer** — sequence canvas, activities toolbox, floating/resizable properties  
+2. **Project Explorer** — title actions with tooltips (Open, Scenarios, Connect, Validate…)  
+3. **Extract Table Data** — smart page → DataTable extraction for Windows UI automation
 
-![Import and Studio Web export](docs/images/vscode-import-export-studioweb.png)
+## What’s in 0.6.4
 
-### 3. REFramework flowchart
+- Project Explorer title actions with **tooltips** (`title` / `shortTitle`)
+- Properties panel can **float**, **resize** (width/height), or **collapse**
+- **Extract Table Data** activity — smart table extraction from page to DataTable
+- README screenshots refreshed (3 compact current-UI images)
 
-![REFramework flowchart in VS Code](docs/images/vscode-reframework-flowchart.png)
-
-### 4. REFramework scenario testing (Config + scenarios)
-
-![REFramework scenario dry-run testing](docs/images/vscode-reframework-testing.png)
-
-### 5. REFramework Process with Invoke Code & top activities
-
-![REFramework Process with Invoke Code](docs/images/vscode-reframework-process-activities.png)
-
-## What’s in 0.6.3
+### Also in 0.6.3
 
 - **Windows project target** — Connect/Export writes `targetFramework: Windows` (`net8.0-windows`) so automations run on Windows robots
 - **Windows classic selectors** — UI activities default to `<html>/<webctrl>` (and normalize `<target>` placeholders on export)
@@ -76,7 +77,7 @@ Design on Mac (REFramework)
 - **Connect to Studio Web** — guided export + checklist + open studio.uipath.com ([guide](docs/STUDIO_WEB.md))
 - **Dry Run Scenarios** as a first-class path — Shift+F5, last-scenario recall, Manage Scenarios
 - Config.xlsx bridge, custom activities, Invoke Code + top-use activities, Python pack, XAML import/export
-- Activity catalog: [docs/ACTIVITIES.md](docs/ACTIVITIES.md) (**57** activities)
+- Activity catalog: [docs/ACTIVITIES.md](docs/ACTIVITIES.md)
 
 ## Install
 
@@ -88,7 +89,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.3.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.4.vsix` → reload.
 
 ## Easy path (REFramework)
 
@@ -179,6 +180,7 @@ See [docs/ACTIVITIES.md](docs/ACTIVITIES.md). Invoke Code / UI steps are dry-run
 - Config.xlsx bridge, custom activities, Invoke Code / top activities, Python pack
 - Package validation warnings + Open Local Project + Project Explorer title actions
 - Windows project target + classic Windows UI selectors for robot execution
+- Floating/resizable properties panel, Extract Table Data, title-action tooltips
 
 ### Next
 1. Import polish for `Imported.*` placeholders
