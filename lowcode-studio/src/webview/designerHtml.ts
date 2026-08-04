@@ -3,6 +3,7 @@ import { WorkflowDocument } from '../models/workflow';
 import { SELECTOR_TEMPLATES } from '../interop/selectorBuilder';
 import { ActivityPaletteState } from '../interop/activityPalette';
 import { PropertySuggestions } from '../interop/propertySuggestions';
+import { DesignerProjectEntry } from '../interop/projectResolve';
 
 export function getDesignerHtml(
   nonce: string,
@@ -15,13 +16,15 @@ export function getDesignerHtml(
     configExpressions: [],
     workflowPaths: []
   },
-  palette: ActivityPaletteState = { favorites: [], recent: [] }
+  palette: ActivityPaletteState = { favorites: [], recent: [] },
+  projects: DesignerProjectEntry[] = []
 ): string {
   const workflowJson = JSON.stringify(workflow).replace(/</g, '\\u003c');
   const catalogJson = JSON.stringify(catalog).replace(/</g, '\\u003c');
   const selectorTemplatesJson = JSON.stringify(SELECTOR_TEMPLATES).replace(/</g, '\\u003c');
   const suggestionsJson = JSON.stringify(suggestions).replace(/</g, '\\u003c');
   const paletteJson = JSON.stringify(palette).replace(/</g, '\\u003c');
+  const projectsJson = JSON.stringify(projects).replace(/</g, '\\u003c');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -61,13 +64,13 @@ export function getDesignerHtml(
     }
     .app {
       display: grid;
-      grid-template-columns: 250px 1fr var(--props-width, 300px);
+      grid-template-columns: 280px 1fr var(--props-width, 300px);
       grid-template-rows: 52px 1fr;
       height: 100%;
       --props-width: 300px;
     }
-    .app.props-floating { grid-template-columns: 250px 1fr; }
-    .app.props-collapsed { grid-template-columns: 250px 1fr 40px; }
+    .app.props-floating { grid-template-columns: 280px 1fr; }
+    .app.props-collapsed { grid-template-columns: 280px 1fr 40px; }
     .toolbar {
       grid-column: 1 / -1;
       display: flex;
@@ -111,6 +114,46 @@ export function getDesignerHtml(
       position: relative;
       min-height: 0;
     }
+    .panel.left-rail {
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .left-tabs {
+      display: flex; gap: 2px; padding: 8px 8px 0; flex: 0 0 auto;
+      border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--panel) 90%, transparent);
+    }
+    .left-tab {
+      flex: 1; border: none; background: transparent; color: var(--muted);
+      font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .04em;
+      text-transform: uppercase; padding: 8px 4px 10px; cursor: pointer;
+      border-bottom: 2px solid transparent; border-radius: 6px 6px 0 0;
+    }
+    .left-tab:hover { color: var(--text); background: var(--hover); }
+    .left-tab.active {
+      color: var(--text);
+      border-bottom-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 10%, transparent);
+    }
+    .left-pane { display: none; flex: 1; min-height: 0; overflow: auto; flex-direction: column; }
+    .left-pane.active { display: flex; }
+    .project-tree { padding: 8px 6px 16px; font-size: 12px; }
+    .project-node {
+      display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+      border-radius: 6px; cursor: pointer; user-select: none;
+    }
+    .project-node:hover { background: var(--hover); }
+    .project-node.active {
+      background: color-mix(in srgb, var(--accent) 16%, transparent);
+      outline: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    }
+    .project-node .ico { width: 14px; opacity: .75; flex: 0 0 auto; }
+    .project-node .label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .project-node .badge {
+      font-size: 10px; color: var(--accent-fg); background: var(--accent);
+      border-radius: 4px; padding: 1px 5px; font-weight: 700;
+    }
+    .project-children { margin-left: 12px; border-left: 1px solid var(--border); padding-left: 4px; }
+    .project-empty { padding: 16px 12px; color: var(--muted); font-size: 12px; line-height: 1.45; }
     .panel.right {
       border-right: none; border-left: 1px solid var(--border);
       display: flex; flex-direction: column; overflow: hidden;
@@ -485,14 +528,35 @@ export function getDesignerHtml(
       <button class="btn primary" id="btnSave">Save</button>
     </div>
 
-    <aside class="panel" id="toolbox">
-      <h2><span class="grow">Activities</span></h2>
-      <div class="panel-tools">
-        <button class="btn" id="btnExpandCats" type="button" title="Expand all categories">Expand</button>
-        <button class="btn" id="btnCollapseCats" type="button" title="Collapse all categories">Collapse</button>
+    <aside class="panel left-rail" id="toolbox">
+      <div class="left-tabs" role="tablist" aria-label="Designer left panes">
+        <button class="left-tab" type="button" data-left-tab="project" role="tab">Project</button>
+        <button class="left-tab active" type="button" data-left-tab="activities" role="tab">Activities</button>
+        <button class="left-tab" type="button" data-left-tab="variables" role="tab">Variables</button>
       </div>
-      <input class="search" id="search" placeholder="Search activities..." />
-      <div id="catalog"></div>
+      <div class="left-pane" id="paneProject" data-left-pane="project">
+        <h2><span class="grow">Project Explorer</span></h2>
+        <div class="project-tree" id="projectTree"></div>
+      </div>
+      <div class="left-pane active" id="paneActivities" data-left-pane="activities">
+        <h2><span class="grow">Activities</span></h2>
+        <div class="panel-tools">
+          <button class="btn" id="btnExpandCats" type="button" title="Expand all categories">Expand</button>
+          <button class="btn" id="btnCollapseCats" type="button" title="Collapse all categories">Collapse</button>
+        </div>
+        <input class="search" id="search" placeholder="Search activities..." />
+        <div id="catalog"></div>
+      </div>
+      <div class="left-pane" id="paneVariables" data-left-pane="variables">
+        <h2>
+          <span class="grow">Variables</span>
+          <span class="count" id="variablesCount" style="font-size:11px;color:var(--muted);normal-case;letter-spacing:0;text-transform:none;">0</span>
+        </h2>
+        <div class="props" id="variablesPanel" style="padding:0 10px;"></div>
+        <div style="padding:0 12px 16px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn" id="btnAddVar">Add Variable</button>
+        </div>
+      </div>
     </aside>
 
     <main class="canvas-wrap" id="canvasWrap">
@@ -546,19 +610,6 @@ export function getDesignerHtml(
           <button class="btn" id="btnCollapseProps" type="button" title="Collapse all property groups">Collapse</button>
         </div>
         <div class="props" id="props"></div>
-        <div class="side-section collapsed" id="variablesSection" data-section="variables">
-          <button type="button" class="side-section-head" id="btnToggleVariables">
-            <span class="chev">▸</span>
-            <span class="grow">Variables</span>
-            <span class="count" id="variablesCount">0</span>
-          </button>
-          <div class="side-section-body">
-            <div class="props" id="variablesPanel"></div>
-            <div style="padding:0 0 12px;display:flex;gap:8px;flex-wrap:wrap;">
-              <button class="btn" id="btnAddVar">Add Variable</button>
-            </div>
-          </div>
-        </div>
         <div class="side-section" id="connectionsSection" data-section="connections" style="display:none">
           <button type="button" class="side-section-head" id="btnToggleConnections">
             <span class="chev">▾</span>
@@ -589,6 +640,8 @@ export function getDesignerHtml(
       catalog: ${catalogJson},
       suggestions: ${suggestionsJson},
       palette: ${paletteJson},
+      projects: ${projectsJson},
+      leftTab: 'activities',
       selectedId: null,
       dragType: null,
       linkFrom: null,
@@ -612,6 +665,7 @@ export function getDesignerHtml(
       propsPanel: document.getElementById('propsPanel'),
       propsScroll: document.getElementById('propsScroll'),
       catalog: document.getElementById('catalog'),
+      projectTree: document.getElementById('projectTree'),
       sequence: document.getElementById('sequence'),
       flowStage: document.getElementById('flowStage'),
       canvasZoom: document.getElementById('canvasZoom'),
@@ -619,7 +673,6 @@ export function getDesignerHtml(
       variablesPanel: document.getElementById('variablesPanel'),
       connectionsPanel: document.getElementById('connectionsPanel'),
       connectionsSection: document.getElementById('connectionsSection'),
-      variablesSection: document.getElementById('variablesSection'),
       variablesCount: document.getElementById('variablesCount'),
       connectionsCount: document.getElementById('connectionsCount'),
       workflowName: document.getElementById('workflowName'),
@@ -633,6 +686,52 @@ export function getDesignerHtml(
       btnLink: document.getElementById('btnLink'),
       btnAutoLayout: document.getElementById('btnAutoLayout')
     };
+
+    function setLeftTab(tab) {
+      state.leftTab = tab || 'activities';
+      document.querySelectorAll('.left-tab').forEach((btn) => {
+        btn.classList.toggle('active', btn.getAttribute('data-left-tab') === state.leftTab);
+      });
+      document.querySelectorAll('.left-pane').forEach((pane) => {
+        pane.classList.toggle('active', pane.getAttribute('data-left-pane') === state.leftTab);
+      });
+    }
+    document.querySelectorAll('.left-tab').forEach((btn) => {
+      btn.addEventListener('click', () => setLeftTab(btn.getAttribute('data-left-tab')));
+    });
+
+    function renderProjectTree() {
+      if (!els.projectTree) return;
+      const projects = state.projects || [];
+      if (!projects.length) {
+        els.projectTree.innerHTML = '<div class="project-empty">Open a folder or use <b>Open Local Project</b> to see projects here.</div>';
+        return;
+      }
+      function nodeHtml(node, depth) {
+        const icon = node.kind === 'project' ? 'P' : node.kind === 'folder' ? 'F' : node.kind === 'workflow' ? 'W' : '·';
+        const active = node.active ? ' active' : '';
+        const badge = node.active ? '<span class="badge">active</span>' : '';
+        let html = '<div class="project-node' + active + '" data-kind="' + escapeAttr(node.kind) + '" data-path="' + escapeAttr(node.path) + '">' +
+          '<span class="ico">' + icon + '</span><span class="label">' + escapeHtml(node.name) + '</span>' + badge + '</div>';
+        if (node.children && node.children.length) {
+          html += '<div class="project-children">' + node.children.map((c) => nodeHtml(c, depth + 1)).join('') + '</div>';
+        }
+        return html;
+      }
+      els.projectTree.innerHTML = projects.map((p) => nodeHtml(p, 0)).join('');
+      els.projectTree.querySelectorAll('.project-node').forEach((el) => {
+        el.addEventListener('click', () => {
+          const kind = el.getAttribute('data-kind');
+          const p = el.getAttribute('data-path') || '';
+          if (kind === 'project') {
+            vscode.postMessage({ type: 'setActiveProject', path: p });
+            toast('Active project → ' + (el.querySelector('.label')?.textContent || ''));
+          } else if (kind === 'workflow' || kind === 'file') {
+            vscode.postMessage({ type: 'openProjectFile', path: p });
+          }
+        });
+      });
+    }
 
     function isFlow() { return state.workflow.type === 'Flowchart'; }
     function toast(msg) {
@@ -1655,6 +1754,7 @@ export function getDesignerHtml(
         : 'Sequence mode: drag activities onto the sequence. Hover for details. Double-click Invoke Workflow to open it.';
       applyZoom();
       renderCatalog();
+      renderProjectTree();
       if (isFlow()) renderFlowchart(); else renderSequence();
       renderProps();
       renderVariables();
@@ -1690,9 +1790,6 @@ export function getDesignerHtml(
     document.getElementById('btnCollapseProps')?.addEventListener('click', () => {
       state.collapsedPropSections = { general: true, activity: true, flow: true };
       renderProps();
-    });
-    document.getElementById('btnToggleVariables')?.addEventListener('click', () => {
-      toggleSideSection(els.variablesSection);
     });
     document.getElementById('btnToggleConnections')?.addEventListener('click', () => {
       toggleSideSection(els.connectionsSection);
@@ -1839,12 +1936,7 @@ export function getDesignerHtml(
           ? ('Δ ' + keys.map(k => k + '=' + JSON.stringify((step.variablesSnapshot || {})[k])).join(' · '))
           : 'no variable changes';
       }
-      const varSection = document.getElementById('variablesSection');
-      if (varSection) {
-        varSection.classList.remove('collapsed');
-        const chev = varSection.querySelector('.chev');
-        if (chev) chev.textContent = '▾';
-      }
+      setLeftTab('variables');
       renderAll();
       const el = document.querySelector('[data-id="' + step.activityId + '"]');
       if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -1938,6 +2030,10 @@ export function getDesignerHtml(
       if (msg.type === 'paletteState' && msg.palette) {
         state.palette = msg.palette;
         if (state.paletteOpen) renderPaletteList();
+      }
+      if (msg.type === 'projectTree' && Array.isArray(msg.projects)) {
+        state.projects = msg.projects;
+        renderProjectTree();
       }
       if (msg.type === 'toast' && msg.message) toast(msg.message);
       if (msg.type === 'dryRunPlayback' && msg.result) {

@@ -8,7 +8,7 @@ LowCode Studio is optimized for **Mac design + dry-run**. Exported projects targ
 Design on Mac (LowCode Studio)
    → Dry Run / Scenarios (F5 / Shift+F5)
    → Validate Packages / review Windows TODO
-   → Connect to Studio Web (exports Windows .uip + .uis + WINDOWS_TODO.md)
+   → Connect to Studio Web (exports Windows .uip + WINDOWS_TODO.md)
    → Import .uip / open in Studio Desktop (Windows)
    → Refine selectors with UI Explorer / Indicate Element on Windows
    → Publish → run on Windows robot
@@ -17,11 +17,12 @@ Design on Mac (LowCode Studio)
 ## One-command handoff
 
 1. Open your LowCode Studio project
-2. Run **LowCode Studio: Connect to Studio Web**
-3. Prefer **Reveal .uip** then **Open Studio Web**
-4. In Studio Web: **Automations → New → Import project** → select the `.uip` file  
+2. Select the project in **Project Explorer** (or open one of its workflows)
+3. Run **Export .uip** / **Connect to Studio Web**
+4. Prefer **Reveal .uip** then **Open Studio Web**
+5. In Studio Web: **Automations → New → Import project** → select the `.uip` file  
    — or open the unpacked folder in **Studio Desktop (Windows)**
-5. Wait for packages to restore, refine UI selectors on Windows, publish
+6. Wait for packages to restore, refine UI selectors on Windows, publish
 
 ## Windows compatibility
 
@@ -39,8 +40,7 @@ Override per project with `"uipathTargetFramework": "Portable"` in LowCode Studi
 
 | File | Use |
 |---|---|
-| **`.uip`** | Studio Web **Import project** (recommended) |
-| **`.uis`** | Solution / CLI `uip solution upload` |
+| **`.uip`** | Studio Web **Import project** (only archive Export .uip creates) |
 | **`*.StudioWeb/` folder** | Unpacked Windows project for Git / Studio Desktop |
 | `OPEN_IN_STUDIO_WEB.md` | Checklist written next to the export |
 | `WINDOWS_TODO.md` | Mac → Windows handoff TODOs (selectors, invokes, placeholders) |

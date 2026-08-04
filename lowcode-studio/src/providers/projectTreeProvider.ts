@@ -9,9 +9,14 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
     ProjectTreeItem | undefined | null | void
   >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+  private activeProjectDir: string | undefined;
 
   constructor(_workspaceRoot?: string) {
     // workspace roots are read live so Open Local Project refreshes correctly
+  }
+
+  setActiveProject(projectDir: string | undefined): void {
+    this.activeProjectDir = projectDir;
   }
 
   refresh(): void {
@@ -52,15 +57,28 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
           )
         ];
       }
-      return unique.map(
-        (p) =>
-          new ProjectTreeItem(
-            path.basename(path.dirname(p)),
-            p,
-            vscode.TreeItemCollapsibleState.Expanded,
-            'project'
-          )
-      );
+      return unique.map((p) => {
+        const dir = path.dirname(p);
+        const item = new ProjectTreeItem(
+          path.basename(dir),
+          p,
+          vscode.TreeItemCollapsibleState.Expanded,
+          'project'
+        );
+        if (
+          this.activeProjectDir &&
+          path.resolve(this.activeProjectDir) === path.resolve(dir)
+        ) {
+          item.description = 'active';
+          item.iconPath = new vscode.ThemeIcon('root-folder-opened');
+        }
+        item.command = {
+          command: 'lowcodeStudio.setActiveProject',
+          title: 'Set Active Project',
+          arguments: [item]
+        };
+        return item;
+      });
     }
 
     if (element.contextValue === 'project') {

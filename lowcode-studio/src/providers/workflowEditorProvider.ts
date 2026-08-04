@@ -25,6 +25,10 @@ import {
   toggleFavorite
 } from '../interop/activityPalette';
 import { buildPropertySuggestions } from '../interop/propertySuggestions';
+import {
+  buildDesignerProjectTree,
+  findProjectRoot
+} from '../interop/projectResolve';
 
 export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
   public static readonly viewType = 'lowcodeStudio.workflowEditor';
@@ -36,6 +40,26 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
     private readonly context: vscode.ExtensionContext,
     private readonly onWorkflowChanged: (doc: WorkflowDocument | undefined) => void
   ) {}
+
+  getActiveDocumentPath(): string | undefined {
+    return this.activeDocument?.uri.fsPath;
+  }
+
+  refreshProjectTree(): void {
+    if (!this.activePanel) {
+      return;
+    }
+    this.activePanel.webview.postMessage({
+      type: 'projectTree',
+      projects: this.buildProjectTree()
+    });
+  }
+
+  private buildProjectTree() {
+    const roots = (vscode.workspace.workspaceFolders || []).map((f) => f.uri.fsPath);
+    const active = this.context.workspaceState.get<string>('lowcodeStudio.activeProjectDir');
+    return buildDesignerProjectTree(roots, active);
+  }
 
   get activeWorkflow(): WorkflowDocument | undefined {
     if (!this.activeDocument) {
@@ -174,8 +198,18 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
         } catch {
           this.onWorkflowChanged(undefined);
         }
+        const projectRoot = findProjectRoot(path.dirname(document.uri.fsPath));
+        if (projectRoot) {
+          void vscode.commands.executeCommand('lowcodeStudio.setActiveProject', projectRoot);
+        }
       }
     });
+
+    // Selecting/opening a workflow marks its project active
+    const projectRoot = findProjectRoot(path.dirname(document.uri.fsPath));
+    if (projectRoot) {
+      void vscode.commands.executeCommand('lowcodeStudio.setActiveProject', projectRoot);
+    }
 
     webviewPanel.webview.onDidReceiveMessage(async (message) => {
       switch (message.type) {
@@ -266,6 +300,38 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           await this.openInvokedWorkflow(document, String(message.workflowPath || ''));
           break;
         }
+        case 'openProjectFile': {
+          const filePath = String(message.path || '');
+          if (!filePath || !fs.existsSync(filePath)) {
+            vscode.window.showWarningMessage('File not found in project explorer.');
+            break;
+          }
+          const projectDir = findProjectRoot(
+            fs.statSync(filePath).isDirectory() ? filePath : path.dirname(filePath)
+          );
+          if (projectDir) {
+            await vscode.commands.executeCommand('lowcodeStudio.setActiveProject', projectDir);
+          }
+          if (filePath.endsWith('.lcs.json')) {
+            await vscode.commands.executeCommand(
+              'vscode.openWith',
+              vscode.Uri.file(filePath),
+              WorkflowEditorProvider.viewType,
+              { preview: false }
+            );
+          } else if (!fs.statSync(filePath).isDirectory()) {
+            const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
+            await vscode.window.showTextDocument(doc, { preview: true });
+          }
+          break;
+        }
+        case 'setActiveProject': {
+          const dir = String(message.path || '');
+          if (dir) {
+            await vscode.commands.executeCommand('lowcodeStudio.setActiveProject', dir);
+          }
+          break;
+        }
         case 'activityUsed': {
           await this.rememberActivityUse(String(message.activityType || ''));
           break;
@@ -353,7 +419,8 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
       workflow,
       getActivityCatalog(),
       suggestions,
-      this.getPaletteState()
+      this.getPaletteState(),
+      this.buildProjectTree()
     );
   }
 
@@ -382,29 +449,4 @@ function escapeHtml(text: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
-}
-
-function findProjectRoot(startDir: string): string | undefined {
-  let current = startDir;
-  for (let i = 0; i < 12; i++) {
-    const candidate = path.join(current, 'project.json');
-    if (fs.existsSync(candidate)) {
-      try {
-        const content = JSON.parse(fs.readFileSync(candidate, 'utf8')) as {
-          schemaVersion?: string;
-        };
-        if (content.schemaVersion === '1.0') {
-          return current;
-        }
-      } catch {
-        // keep walking
-      }
-    }
-    const parent = path.dirname(current);
-    if (parent === current) {
-      break;
-    }
-    current = parent;
-  }
-  return undefined;
 }

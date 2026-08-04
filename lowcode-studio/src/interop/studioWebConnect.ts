@@ -12,19 +12,20 @@ export interface StudioWebConnectResult extends ExportedStudioWebProject {
 }
 
 /**
- * Export for Studio Web, package `.uip` + `.uis`, and write an import checklist.
+ * Export for Studio Web, package `.uip` only, and write an import checklist.
  */
 export function connectToStudioWeb(
   lcsProjectDir: string,
   destinationParent?: string
 ): StudioWebConnectResult {
   const exported = exportToStudioWebProject(lcsProjectDir, destinationParent);
-  const archives = packageStudioWebArchives(exported.targetDir, path.dirname(exported.targetDir));
+  const archives = packageStudioWebArchives(exported.targetDir, path.dirname(exported.targetDir), {
+    includeUis: false
+  });
 
   const checklist = [
     'Open Studio Web (studio.uipath.com) and sign in',
     `Import project: use ${path.basename(archives.uipPath)} (Automations → New → Import project)`,
-    `Or upload solution archive: ${path.basename(archives.uisPath)} (.uis)`,
     'Wait for NuGet packages in project.json to restore',
     'Open the main .xaml, replace Comment placeholders if needed, then publish'
   ];
@@ -38,7 +39,7 @@ export function connectToStudioWeb(
     guidePath,
     `# Open in UiPath Studio Web
 
-Exported from **LowCode Studio** as importable packages.
+Exported from **LowCode Studio** as an importable \`.uip\` package.
 
 ## Fastest path — import \`.uip\`
 
@@ -46,10 +47,6 @@ Exported from **LowCode Studio** as importable packages.
 2. Automations → arrow next to **New project** → **Import project**
 3. Choose **\`${path.basename(archives.uipPath)}\`** (next to the \`.StudioWeb\` folder)
 4. Let packages restore, open \`${exported.mainXaml}\`, publish when ready
-
-## Alternative — \`.uis\` solution archive
-
-Use **\`${path.basename(archives.uisPath)}\`** with UiPath CLI \`uip solution upload\` or solution import flows.
 
 ## Folder export (Git)
 
@@ -68,7 +65,6 @@ ${depLines || '_No dependencies listed_'}
 | File | Use |
 |---|---|
 | \`${path.basename(archives.uipPath)}\` | Studio Web **Import project** (Windows-compatible) |
-| \`${path.basename(archives.uisPath)}\` | Solution / CLI upload |
 | \`${path.basename(exported.targetDir)}/\` | Unpacked **Windows** UiPath project (Git / Studio Desktop) |
 
 > Projects export with \`targetFramework: Windows\` and classic Windows UI selectors so they run on **Windows robots**. Refine selectors with UI Explorer on a Windows machine.
@@ -82,7 +78,7 @@ Publish remains in **Studio Web** / Studio Desktop by design.
   if (fs.existsSync(readmePath)) {
     fs.appendFileSync(
       readmePath,
-      `\n## Import packages\n\n- \`.uip\`: \`${archives.uipPath}\`\n- \`.uis\`: \`${archives.uisPath}\`\n`,
+      `\n## Import package\n\n- \`.uip\`: \`${archives.uipPath}\`\n`,
       'utf8'
     );
   }
@@ -95,8 +91,7 @@ Publish remains in **Studio Web** / Studio Desktop by design.
     files: [
       ...exported.files,
       'OPEN_IN_STUDIO_WEB.md',
-      path.basename(archives.uipPath),
-      path.basename(archives.uisPath)
+      path.basename(archives.uipPath)
     ]
   };
 }
@@ -111,7 +106,7 @@ LowCode Studio is optimized for **Mac design + dry-run**. Exports target **Windo
 \`\`\`
 Design on Mac (LowCode Studio)
    → Dry Run / Scenarios (F5 / Shift+F5)
-   → Connect to Studio Web (exports Windows .uip + .uis)
+   → Connect to Studio Web (exports Windows .uip)
    → Import .uip / open in Studio Desktop (Windows)
    → Refine selectors with UI Explorer on Windows
    → Publish → run on Windows robot
@@ -127,7 +122,6 @@ Design on Mac (LowCode Studio)
 | Package | Use |
 |---|---|
 | **\`.uip\`** | Studio Web Automations → Import project |
-| **\`.uis\`** | Solution / CLI \`uip solution upload\` |
 | **\`.StudioWeb/\` folder** | Windows project for Git / Studio Desktop |
 
 ## Tips

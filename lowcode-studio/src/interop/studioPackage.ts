@@ -6,19 +6,25 @@ import AdmZip from 'adm-zip';
 export interface PackagedStudioArchives {
   /** Studio Web Import project format (ZIP renamed .uip) */
   uipPath: string;
-  /** Solution-style bundle for CLI / Studio Web upload (.uis) */
-  uisPath: string;
+  /** Solution-style bundle for CLI / Studio Web upload (.uis) — only when includeUis */
+  uisPath?: string;
   projectName: string;
+}
+
+export interface PackageStudioOptions {
+  /** When true, also write a `.uis` solution archive. Default false (Export .uip only). */
+  includeUis?: boolean;
 }
 
 /**
  * Package an exported Portable Studio Web folder as:
  * - `.uip` — zip of project files (Studio Web → Import project)
- * - `.uis` — solution wrapper zip with `.uipx` + project folder (CLI upload / solution import)
+ * - `.uis` — optional solution wrapper zip with `.uipx` + project folder
  */
 export function packageStudioWebArchives(
   exportedProjectDir: string,
-  destinationDir?: string
+  destinationDir?: string,
+  options: PackageStudioOptions = {}
 ): PackagedStudioArchives {
   if (!fs.existsSync(exportedProjectDir)) {
     throw new Error(`Export folder not found: ${exportedProjectDir}`);
@@ -34,12 +40,13 @@ export function packageStudioWebArchives(
     description?: string;
     projectVersion?: string;
   };
-  const projectName = sanitize(manifest.name || path.basename(exportedProjectDir).replace(/\.StudioWeb$/i, ''));
+  const projectName = sanitize(
+    manifest.name || path.basename(exportedProjectDir).replace(/\.StudioWeb$/i, '')
+  );
   const outDir = destinationDir || path.dirname(exportedProjectDir);
   fs.mkdirSync(outDir, { recursive: true });
 
   const uipPath = uniquePath(outDir, `${projectName}.uip`);
-  const uisPath = uniquePath(outDir, `${projectName}.uis`);
 
   // .uip = flat project zip (what Studio Web Download/Import uses)
   const uipZip = new AdmZip();
@@ -50,32 +57,38 @@ export function packageStudioWebArchives(
   );
   uipZip.writeZip(uipPath);
 
-  // .uis = solution archive: root .uipx + projects/<name>/...
-  const uisZip = new AdmZip();
-  const solutionId = crypto.randomUUID();
-  const uipx = {
-    schemaVersion: '1.0',
-    name: projectName,
-    description: manifest.description || `${projectName} from LowCode Studio`,
-    solutionId,
-    version: manifest.projectVersion || '1.0.0',
-    projects: [
-      {
-        name: projectName,
-        path: `projects/${projectName}`,
-        type: 'Process',
-        main: manifest.main || 'Main.xaml'
-      }
-    ],
-    createdWith: 'LowCode Studio',
-    target: 'StudioWeb'
-  };
-  uisZip.addFile(`${projectName}.uipx`, Buffer.from(JSON.stringify(uipx, null, 2) + '\n', 'utf8'));
-  addDirectoryToZip(uisZip, exportedProjectDir, `projects/${projectName}`);
-  removeZipEntries(uisZip, (name) =>
-    /(^|\/)(README_STUDIO_WEB|OPEN_IN_STUDIO_WEB)\.md$/i.test(name)
-  );
-  uisZip.writeZip(uisPath);
+  let uisPath: string | undefined;
+  if (options.includeUis) {
+    uisPath = uniquePath(outDir, `${projectName}.uis`);
+    const uisZip = new AdmZip();
+    const solutionId = crypto.randomUUID();
+    const uipx = {
+      schemaVersion: '1.0',
+      name: projectName,
+      description: manifest.description || `${projectName} from LowCode Studio`,
+      solutionId,
+      version: manifest.projectVersion || '1.0.0',
+      projects: [
+        {
+          name: projectName,
+          path: `projects/${projectName}`,
+          type: 'Process',
+          main: manifest.main || 'Main.xaml'
+        }
+      ],
+      createdWith: 'LowCode Studio',
+      target: 'StudioWeb'
+    };
+    uisZip.addFile(
+      `${projectName}.uipx`,
+      Buffer.from(JSON.stringify(uipx, null, 2) + '\n', 'utf8')
+    );
+    addDirectoryToZip(uisZip, exportedProjectDir, `projects/${projectName}`);
+    removeZipEntries(uisZip, (name) =>
+      /(^|\/)(README_STUDIO_WEB|OPEN_IN_STUDIO_WEB)\.md$/i.test(name)
+    );
+    uisZip.writeZip(uisPath);
+  }
 
   return { uipPath, uisPath, projectName };
 }
@@ -91,7 +104,11 @@ function addDirectoryToZip(zip: AdmZip, dir: string, zipPrefix: string): void {
       if (entry.isDirectory()) {
         walk(abs, rel);
       } else if (entry.isFile()) {
-        zip.addLocalFile(abs, path.posix.dirname(rel) === '.' ? '' : path.posix.dirname(rel), path.posix.basename(rel));
+        zip.addLocalFile(
+          abs,
+          path.posix.dirname(rel) === '.' ? '' : path.posix.dirname(rel),
+          path.posix.basename(rel)
+        );
       }
     }
   };
