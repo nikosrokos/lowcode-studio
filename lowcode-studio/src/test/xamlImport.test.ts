@@ -68,7 +68,12 @@ function run(): void {
     main: string;
     dependencies: Record<string, string>;
   };
-  assert.strictEqual(parsed.targetFramework, 'Portable');
+  assert.strictEqual(parsed.targetFramework, 'Windows');
+  assert.strictEqual(
+    (parsed as { runtimeOptions?: { netCore?: { targetFramework?: string } } }).runtimeOptions
+      ?.netCore?.targetFramework,
+    'net8.0-windows'
+  );
   assert.strictEqual(parsed.main, 'Main.xaml');
   assert.ok(parsed.dependencies['UiPath.System.Activities']);
 

@@ -5,10 +5,17 @@ import {
 } from '../models/workflow';
 import { isUiActivity, xamlInfoForLcsType } from './activityMap';
 import { emitTargetXaml, selectorAttribute } from './selectorRoundTrip';
+import {
+  applyWindowsSelectorsToActivityProps,
+  netTfmForTarget,
+  resolveUiPathTarget,
+  UiPathTargetFramework
+} from './windowsTarget';
 
 /**
- * Best-effort XAML export for Studio Web / Studio Desktop (Portable-friendly subset).
- * Not every LCS activity has a perfect UiPath twin — unknowns become Comments.
+ * Best-effort XAML export for UiPath Studio Desktop (Windows) / Studio Web import.
+ * Default project compatibility is **Windows** so robots run on Windows machines
+ * with classic UI Automation selectors.
  */
 export function exportWorkflowToXaml(doc: WorkflowDocument): string {
   const varsXml = renderVariables(doc.variables);
@@ -30,11 +37,20 @@ export function exportUiPathProjectJson(options: {
   main: string;
   projectVersion?: string;
   dependencies?: Record<string, string>;
+  /** Windows (default) runs on Windows robots; Portable is cross-platform. */
+  targetFramework?: UiPathTargetFramework;
+  /** When true, marks the process as needing a user session (UI automation). */
+  requiresUserInteraction?: boolean;
 }): string {
   const main = options.main.endsWith('.xaml') ? options.main : `${options.main}.xaml`;
+  const targetFramework = resolveUiPathTarget(options.targetFramework);
+  const netTfm = netTfmForTarget(targetFramework);
+  const requiresUserInteraction = options.requiresUserInteraction ?? true;
   const manifest = {
     name: options.name,
-    description: options.description || `${options.name} exported from LowCode Studio`,
+    description:
+      options.description ||
+      `${options.name} exported from LowCode Studio (${targetFramework})`,
     main,
     dependencies: options.dependencies || {
       'UiPath.System.Activities': '[25.4.1]',
@@ -45,10 +61,10 @@ export function exportUiPathProjectJson(options: {
     projectVersion: options.projectVersion || '1.0.0',
     runtimeOptions: {
       autoDispose: false,
-      netCore: { isValid: true, targetFramework: 'net6.0' },
+      netCore: { isValid: true, targetFramework: netTfm },
       isPausable: true,
       isAttended: false,
-      requiresUserInteraction: false,
+      requiresUserInteraction,
       supportsPersistence: false,
       excludedLoggedData: ['Private:*', '*password*'],
       executionType: 'Workflow',
@@ -78,7 +94,7 @@ export function exportUiPathProjectJson(options: {
     isTemplate: false,
     templateProjectData: {},
     publishData: {},
-    targetFramework: 'Portable'
+    targetFramework
   };
   return JSON.stringify(manifest, null, 2) + '\n';
 }
@@ -424,8 +440,9 @@ ${pad}</python:PythonScope>`;
 }
 
 function renderUiActivity(activity: ActivityNode, pad: string, indent: number): string {
-  const selAttr = selectorAttribute(activity.properties);
-  const target = emitTargetXaml(activity.properties, pad + '  ');
+  const props = applyWindowsSelectorsToActivityProps(activity.properties || {});
+  const selAttr = selectorAttribute(props);
+  const target = emitTargetXaml(props, pad + '  ');
   const open =
     activity.type === 'UI.Click'
       ? 'uia:NClick'
@@ -449,32 +466,32 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
 
   const extra: string[] = [];
   if (activity.type === 'UI.TypeInto') {
-    extra.push(`Text="[${escapeAttr(String(activity.properties.text ?? '""'))}]"`);
+    extra.push(`Text="[${escapeAttr(String(props.text ?? '""'))}]"`);
   }
   if (activity.type === 'UI.SelectItem') {
-    extra.push(`Item="[${escapeAttr(String(activity.properties.item ?? '""'))}]"`);
+    extra.push(`Item="[${escapeAttr(String(props.item ?? '""'))}]"`);
   }
   if (activity.type === 'UI.OpenApplication') {
-    extra.push(`Url="${escapeAttr(String(activity.properties.pathOrUrl || ''))}"`);
+    extra.push(`Url="${escapeAttr(String(props.pathOrUrl || ''))}"`);
   }
   if (activity.type === 'UI.TakeScreenshot') {
-    extra.push(`FileName="${escapeAttr(String(activity.properties.filePath || 'screenshot.png'))}"`);
+    extra.push(`FileName="${escapeAttr(String(props.filePath || 'screenshot.png'))}"`);
   }
   if (activity.type === 'UI.Check') {
-    extra.push(`Action="${escapeAttr(String(activity.properties.action || 'Check'))}"`);
+    extra.push(`Action="${escapeAttr(String(props.action || 'Check'))}"`);
   }
   if (activity.type === 'UI.GetAttribute') {
-    extra.push(`Attribute="${escapeAttr(String(activity.properties.attribute || 'aaname'))}"`);
+    extra.push(`Attribute="${escapeAttr(String(props.attribute || 'aaname'))}"`);
   }
   if (activity.type === 'UI.WaitElement') {
-    extra.push(`TimeoutMS="${Number(activity.properties.timeoutMs ?? 30000)}"`);
+    extra.push(`TimeoutMS="${Number(props.timeoutMs ?? 30000)}"`);
   }
 
   const openTag =
     activity.type === 'UI.GetAttribute'
       ? 'uia:NGetAttribute'
       : activity.type === 'UI.WaitElement'
-        ? activity.properties.action === 'Vanish'
+        ? props.action === 'Vanish'
           ? 'uia:WaitElementVanish'
           : 'uia:OnElementAppear'
         : open;

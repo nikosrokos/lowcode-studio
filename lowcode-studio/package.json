@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Mac-first low-code RPA for VS Code/Cursor: REFramework design, scenario dry-runs (Shift+F5), and the easiest Connect to Studio Web handoff for Orchestrator publish.",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -370,6 +370,15 @@
     "configuration": {
       "title": "LowCode Studio",
       "properties": {
+        "lowcodeStudio.uipathTargetFramework": {
+          "type": "string",
+          "default": "Windows",
+          "enum": [
+            "Windows",
+            "Portable"
+          ],
+          "description": "UiPath compatibility for Connect/Export. Windows (default) runs on Windows robots with classic UI selectors. Portable is cross-platform."
+        },
         "lowcodeStudio.defaultWorkflowType": {
           "type": "string",
           "default": "Sequence",
@@ -400,7 +409,7 @@
     "package": "npm run bundle && vsce package --no-dependencies",
     "lint": "tsc --noEmit",
     "docs:activities": "npm run compile && node scripts/generate-activities-md.js",
-    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && npm run docs:activities"
+    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && node out/test/windowsTarget.test.js && npm run docs:activities"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",

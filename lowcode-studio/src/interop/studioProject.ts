@@ -10,6 +10,7 @@ import {
 } from '../models/workflow';
 import { importXaml, ImportWarning } from './xamlImport';
 import { exportUiPathProjectJson, exportWorkflowToXaml } from './xamlExport';
+import { resolveUiPathTarget } from './windowsTarget';
 import {
   collectActivityTypes,
   resolveUiPathDependencies
@@ -240,6 +241,7 @@ export function exportToStudioWebProject(
     workflows?: string[];
     description?: string;
     uipathDependencies?: Record<string, string>;
+    uipathTargetFramework?: string;
   };
 
   const projectName = sanitizeName(manifest.name || path.basename(lcsProjectDir));
@@ -284,13 +286,20 @@ export function exportToStudioWebProject(
     extraPackages: collectCustomNugetPackages(customActivities, activityTypes)
   });
 
+  const targetFramework = resolveUiPathTarget(manifest.uipathTargetFramework);
+  const requiresUserInteraction = activityTypes.some(
+    (t) => t.startsWith('UI.') || t.startsWith('Imported.')
+  );
+
   fs.writeFileSync(
     path.join(outDir, 'project.json'),
     exportUiPathProjectJson({
       name: projectName,
       description: manifest.description,
       main: mainXaml,
-      dependencies
+      dependencies,
+      targetFramework,
+      requiresUserInteraction
     }),
     'utf8'
   );
@@ -319,17 +328,16 @@ export function exportToStudioWebProject(
 
   fs.writeFileSync(
     path.join(outDir, 'README_STUDIO_WEB.md'),
-    `# ${projectName} — Studio Web export
+    `# ${projectName} — Studio export (Windows)
 
-Exported from **LowCode Studio** as a Portable UiPath project.
+Exported from **LowCode Studio** as a **Windows** UiPath project (\`targetFramework: ${targetFramework}\`).
 
-## Open in Studio Web
+## Run on a Windows machine
 
-1. Go to [UiPath Automation Cloud → Studio Web](https://studio.uipath.com)
-2. Create/open a solution and **import / upload** this project folder (or push it via Git if your tenant uses Git integration)
-3. Studio restores activity packages from \`project.json\` dependencies
-4. Review activities marked as comments — those were best-effort placeholders
-5. Publish from Studio Web to Orchestrator when ready
+1. Open the project in **UiPath Studio Desktop (Windows)** or import the \`.uip\` in Studio Web and run on a **Windows robot**
+2. Restore NuGet packages from \`project.json\`
+3. UI activities use **classic Windows selectors** (\`<html>/<webctrl>\`, \`<wnd>\`, …) — capture/refine them on Windows with UI Explorer
+4. Publish to Orchestrator and run from a Windows unattended/attended robot
 
 Main entry: \`${mainXaml}\`
 
