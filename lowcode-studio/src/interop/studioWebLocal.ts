@@ -3,8 +3,19 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { writeUiPathProjectToDir, ExportedStudioWebProject } from './studioProject';
 import { isLcsProjectDir } from './projectResolve';
+import { importXaml, ImportWarning } from './xamlImport';
+import { stringifyWorkflow } from '../models/workflow';
 
 export const STUDIO_WEB_LOCAL_URL = 'https://studio.uipath.com';
+/** Kept under the LCS project — overwritten .lcs.json / .xaml copies before sync. */
+export const SYNC_TRASH_DIR = '.lcs-sync-trash';
+const MAX_TRASH_GENERATIONS = 10;
+
+export interface StudioWebFileFingerprint {
+  lcsHash?: string;
+  xamlHash?: string;
+  syncedAt?: string;
+}
 
 export interface StudioWebLocalLink {
   /** Absolute path to the solution root (folder that contains the .uipx) */
@@ -13,12 +24,30 @@ export interface StudioWebLocalLink {
   projectFolder: string;
   solutionId: string;
   projectId: string;
+  /** ISO time of last successful bidirectional sync */
+  lastSyncedAt?: string;
+  /** Per-workflow content hashes after last sync (detect Studio Web edits). */
+  files?: Record<string, StudioWebFileFingerprint>;
 }
 
 export interface StudioWebLocalSyncResult extends ExportedStudioWebProject {
   link: StudioWebLocalLink;
   uipxPath: string;
   created: boolean;
+  /** .lcs.json rels pulled from Studio Web before push */
+  pulled?: string[];
+  /** Workflows where both sides changed — LCS Save won; Studio Web copy in trash */
+  conflicts?: string[];
+  backups?: string[];
+}
+
+export interface StudioWebPullResult {
+  updated: string[];
+  skipped: string[];
+  conflicts: string[];
+  backups: string[];
+  warnings: ImportWarning[];
+  created: string[];
 }
 
 interface LcsManifestWithLocal {
@@ -227,8 +256,12 @@ This folder is a **UiPath solution** linked from LowCode Studio.
 3. **Open solution** → select this folder (\`${path.basename(solutionDir)}\`)
 4. Allow the browser to edit files when prompted
 
-LowCode Studio syncs \`.xaml\` + \`project.json\` into \`${projectFolder}/\` every time you **Save** a workflow.
-The linked project uses \`targetFramework: Portable\` so Studio Web can open it on Mac (Windows-target projects are blocked in Studio Web on Mac).
+**Bidirectional sync on Save:**
+- Edits in LowCode Studio → push \`.xaml\` into this folder
+- Edits in Studio Web → pulled back into \`.lcs.json\` when you Save (or run **Pull from Studio Web Local**)
+- Overwritten copies land in the LCS project under \`.lcs-sync-trash/\`
+
+The linked project uses \`targetFramework: Portable\` so Studio Web can open it on Mac.
 
 No \`.uip\` export is required for this loop.
 `,
@@ -244,13 +277,278 @@ No \`.uip\` export is required for this loop.
   };
 }
 
+function contentHash(text: string): string {
+  return crypto.createHash('sha256').update(text, 'utf8').digest('hex').slice(0, 16);
+}
+
+function trashRoot(lcsProjectDir: string): string {
+  return path.join(lcsProjectDir, SYNC_TRASH_DIR);
+}
+
+/** Copy a file into .lcs-sync-trash/{stamp}/ before overwrite. Returns backup path or undefined. */
+export function backupToSyncTrash(
+  lcsProjectDir: string,
+  absPath: string,
+  stamp: string,
+  labelRel: string
+): string | undefined {
+  if (!fs.existsSync(absPath)) {
+    return undefined;
+  }
+  const dest = path.join(trashRoot(lcsProjectDir), stamp, labelRel.replace(/[\\/]/g, '__'));
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.copyFileSync(absPath, dest);
+  pruneSyncTrash(lcsProjectDir);
+  return dest;
+}
+
+function pruneSyncTrash(lcsProjectDir: string): void {
+  const root = trashRoot(lcsProjectDir);
+  if (!fs.existsSync(root)) {
+    return;
+  }
+  let dirs: string[];
+  try {
+    dirs = fs
+      .readdirSync(root, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name)
+      .sort()
+      .reverse();
+  } catch {
+    return;
+  }
+  for (const name of dirs.slice(MAX_TRASH_GENERATIONS)) {
+    try {
+      fs.rmSync(path.join(root, name), { recursive: true, force: true });
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function listStudioWebXamlRels(projectDir: string): string[] {
+  const results: string[] = [];
+  const stack = [projectDir];
+  while (stack.length) {
+    const current = stack.pop()!;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (
+        entry.name === 'node_modules' ||
+        entry.name === '.git' ||
+        entry.name === '.local' ||
+        entry.name === 'bin' ||
+        entry.name === 'obj'
+      ) {
+        continue;
+      }
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(full);
+      } else if (entry.isFile() && entry.name.endsWith('.xaml')) {
+        results.push(path.relative(projectDir, full).replace(/\\/g, '/'));
+      }
+    }
+  }
+  return results.sort();
+}
+
 /**
- * Sync the LCS project into its linked Studio Web Local Workspace project folder.
- * No-op-friendly: throws if not linked.
+ * Pull Studio Web Local .xaml → LCS .lcs.json (receive changes).
+ * Backs up overwritten JSON into `.lcs-sync-trash/`.
+ */
+export function syncFromStudioWebLocal(
+  lcsProjectDir: string,
+  options: {
+    /** Only these .lcs.json rels (default: all linked / discovered). */
+    workflowRels?: string[];
+    /** Skip pull for these (e.g. the file the designer is actively saving). */
+    skipLcsRels?: string[];
+    /** Pull even when LCS content also changed since last sync. */
+    force?: boolean;
+  } = {}
+): StudioWebPullResult {
+  const link = getStudioWebLocalLink(lcsProjectDir);
+  if (!link) {
+    throw new Error(
+      'This project is not linked to a Studio Web Local Workspace. Run Connect first.'
+    );
+  }
+  const projectDir = path.join(link.solutionDir, link.projectFolder);
+  if (!fs.existsSync(projectDir)) {
+    throw new Error(`Linked Studio Web project folder missing: ${projectDir}`);
+  }
+
+  const skip = new Set((options.skipLcsRels || []).map((r) => r.replace(/\\/g, '/')));
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const result: StudioWebPullResult = {
+    updated: [],
+    skipped: [],
+    conflicts: [],
+    backups: [],
+    warnings: [],
+    created: []
+  };
+
+  const xamlRels = listStudioWebXamlRels(projectDir);
+  const targets = options.workflowRels?.length
+    ? options.workflowRels.map((r) => r.replace(/\.lcs\.json$/i, '.xaml').replace(/\\/g, '/'))
+    : xamlRels;
+
+  const fingerprints = { ...(link.files || {}) };
+  let manifestDirty = false;
+
+  for (const xamlRel of targets) {
+    const lcsRel = xamlRel.replace(/\.xaml$/i, '.lcs.json');
+    if (skip.has(lcsRel)) {
+      result.skipped.push(lcsRel);
+      continue;
+    }
+    const xamlAbs = path.join(projectDir, xamlRel);
+    const lcsAbs = path.join(lcsProjectDir, lcsRel);
+    if (!fs.existsSync(xamlAbs)) {
+      continue;
+    }
+    const xamlText = fs.readFileSync(xamlAbs, 'utf8');
+    const xamlHash = contentHash(xamlText);
+    const lcsText = fs.existsSync(lcsAbs) ? fs.readFileSync(lcsAbs, 'utf8') : '';
+    const lcsHash = lcsText ? contentHash(lcsText) : '';
+    const prev = fingerprints[lcsRel];
+
+    const xamlChanged = !prev?.xamlHash || prev.xamlHash !== xamlHash;
+    const lcsChanged = Boolean(lcsText) && (!prev?.lcsHash || prev.lcsHash !== lcsHash);
+
+    if (!xamlChanged && fs.existsSync(lcsAbs)) {
+      result.skipped.push(lcsRel);
+      continue;
+    }
+
+    // Both sides diverged — caller may force; otherwise mark conflict and skip
+    if (xamlChanged && lcsChanged && !options.force && prev?.lcsHash && prev?.xamlHash) {
+      result.conflicts.push(lcsRel);
+      result.skipped.push(lcsRel);
+      continue;
+    }
+
+    // Fallback without fingerprints: only pull when XAML mtime is clearly newer
+    if (!prev?.xamlHash && fs.existsSync(lcsAbs) && !options.force) {
+      try {
+        const xamlStat = fs.statSync(xamlAbs);
+        const lcsStat = fs.statSync(lcsAbs);
+        if (xamlStat.mtimeMs <= lcsStat.mtimeMs + 1500) {
+          result.skipped.push(lcsRel);
+          continue;
+        }
+      } catch {
+        // pull
+      }
+    }
+
+    const name = path.basename(lcsRel, '.lcs.json');
+    const imported = importXaml(xamlText, name);
+    result.warnings.push(
+      ...imported.warnings.map((w) => ({ message: `${xamlRel}: ${w.message}` }))
+    );
+    const nextJson = stringifyWorkflow(imported.workflow);
+
+    if (fs.existsSync(lcsAbs)) {
+      const bak = backupToSyncTrash(lcsProjectDir, lcsAbs, stamp, lcsRel);
+      if (bak) {
+        result.backups.push(bak);
+      }
+    } else {
+      result.created.push(lcsRel);
+      manifestDirty = true;
+    }
+
+    fs.mkdirSync(path.dirname(lcsAbs), { recursive: true });
+    fs.writeFileSync(lcsAbs, nextJson, 'utf8');
+    fingerprints[lcsRel] = {
+      lcsHash: contentHash(nextJson),
+      xamlHash,
+      syncedAt: new Date().toISOString()
+    };
+    result.updated.push(lcsRel);
+  }
+
+  if (result.updated.length || manifestDirty) {
+    const manifest = readLcsManifest(lcsProjectDir);
+    if (manifestDirty) {
+      const workflows = new Set([
+        ...((manifest.workflows as string[]) || []),
+        ...result.created,
+        ...result.updated
+      ]);
+      manifest.workflows = [...workflows].sort();
+    }
+    if (manifest.studioWebLocal) {
+      manifest.studioWebLocal = {
+        ...manifest.studioWebLocal,
+        lastSyncedAt: new Date().toISOString(),
+        files: { ...(manifest.studioWebLocal.files || {}), ...fingerprints }
+      };
+    }
+    writeLcsManifest(lcsProjectDir, manifest);
+  }
+
+  return result;
+}
+
+function recordPushFingerprints(
+  lcsProjectDir: string,
+  projectDir: string,
+  contentOverrides?: Record<string, string>
+): void {
+  const manifest = readLcsManifest(lcsProjectDir);
+  if (!manifest.studioWebLocal) {
+    return;
+  }
+  const files: Record<string, StudioWebFileFingerprint> = {
+    ...(manifest.studioWebLocal.files || {})
+  };
+  const now = new Date().toISOString();
+  for (const lcsRel of listLcsWorkflowRels(lcsProjectDir)) {
+    const lcsAbs = path.join(lcsProjectDir, lcsRel);
+    const xamlRel = lcsRel.replace(/\.lcs\.json$/i, '.xaml');
+    const xamlAbs = path.join(projectDir, xamlRel);
+    const lcsText =
+      contentOverrides?.[lcsRel] ??
+      contentOverrides?.[lcsRel.replace(/\\/g, '/')] ??
+      (fs.existsSync(lcsAbs) ? fs.readFileSync(lcsAbs, 'utf8') : '');
+    if (!lcsText || !fs.existsSync(xamlAbs)) {
+      continue;
+    }
+    files[lcsRel] = {
+      lcsHash: contentHash(lcsText),
+      xamlHash: contentHash(fs.readFileSync(xamlAbs, 'utf8')),
+      syncedAt: now
+    };
+  }
+  manifest.studioWebLocal = {
+    ...manifest.studioWebLocal,
+    lastSyncedAt: now,
+    files
+  };
+  writeLcsManifest(lcsProjectDir, manifest);
+}
+
+/**
+ * Bidirectional sync: pull Studio Web edits into .lcs.json (when LCS unchanged),
+ * then push LCS → Studio Web. Overwrites go to `.lcs-sync-trash/`.
  */
 export function syncToStudioWebLocal(
   lcsProjectDir: string,
-  options: { contentOverrides?: Record<string, string> } = {}
+  options: {
+    contentOverrides?: Record<string, string>;
+    /** When false, skip pull (push-only). Default true. */
+    pullFirst?: boolean;
+  } = {}
 ): StudioWebLocalSyncResult {
   const link = getStudioWebLocalLink(lcsProjectDir);
   if (!link) {
@@ -264,32 +562,117 @@ export function syncToStudioWebLocal(
     );
   }
 
+  const overrides = { ...(options.contentOverrides || {}) };
+  const pullFirst = options.pullFirst !== false;
+  let pulled: string[] = [];
+  let conflicts: string[] = [];
+  let backups: string[] = [];
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+  if (pullFirst) {
+    // Pull Studio Web → LCS for workflows the designer is NOT actively saving
+    const pull = syncFromStudioWebLocal(lcsProjectDir, {
+      skipLcsRels: Object.keys(overrides),
+      force: false
+    });
+    pulled = pull.updated;
+    conflicts = pull.conflicts;
+    backups = [...pull.backups];
+
+    // For the file being saved: if Studio Web changed and LCS override matches last sync
+    // (designer didn't actually change content), prefer Studio Web pull
+    const freshLink = getStudioWebLocalLink(lcsProjectDir)!;
+    const projectDirPeek = path.join(freshLink.solutionDir, freshLink.projectFolder);
+    for (const [lcsRel, overrideText] of Object.entries(overrides)) {
+      const prev = freshLink.files?.[lcsRel];
+      const xamlAbs = path.join(projectDirPeek, lcsRel.replace(/\.lcs\.json$/i, '.xaml'));
+      if (!fs.existsSync(xamlAbs) || !prev?.xamlHash || !prev?.lcsHash) {
+        continue;
+      }
+      const xamlHash = contentHash(fs.readFileSync(xamlAbs, 'utf8'));
+      const overrideHash = contentHash(overrideText);
+      const xamlChanged = xamlHash !== prev.xamlHash;
+      const lcsUnchanged = overrideHash === prev.lcsHash;
+      if (xamlChanged && lcsUnchanged) {
+        const pullOne = syncFromStudioWebLocal(lcsProjectDir, {
+          workflowRels: [lcsRel],
+          force: true
+        });
+        pulled.push(...pullOne.updated);
+        backups.push(...pullOne.backups);
+        if (pullOne.updated.includes(lcsRel)) {
+          const lcsAbs = path.join(lcsProjectDir, lcsRel);
+          overrides[lcsRel] = fs.readFileSync(lcsAbs, 'utf8');
+        }
+      } else if (xamlChanged && !lcsUnchanged) {
+        // Both changed — keep LCS Save; trash Studio Web copy
+        const bak = backupToSyncTrash(
+          lcsProjectDir,
+          xamlAbs,
+          stamp,
+          lcsRel.replace(/\.lcs\.json$/i, '.xaml') + '.from-studio-web'
+        );
+        if (bak) {
+          backups.push(bak);
+        }
+        if (!conflicts.includes(lcsRel)) {
+          conflicts.push(lcsRel);
+        }
+      }
+    }
+  }
+
+  // Backup Studio Web xaml that we are about to overwrite
+  const projectDir = path.join(link.solutionDir, link.projectFolder);
+  for (const lcsRel of listLcsWorkflowRels(lcsProjectDir)) {
+    const xamlRel = lcsRel.replace(/\.lcs\.json$/i, '.xaml');
+    const xamlAbs = path.join(projectDir, xamlRel);
+    if (fs.existsSync(xamlAbs)) {
+      const bak = backupToSyncTrash(
+        lcsProjectDir,
+        xamlAbs,
+        stamp,
+        xamlRel + '.before-push'
+      );
+      if (bak) {
+        backups.push(bak);
+      }
+    }
+  }
+
   const solutionName = path.basename(link.solutionDir);
   const { uipxPath, data } = readOrCreateUipx(link.solutionDir, solutionName, link.solutionId);
   data.SolutionId = link.solutionId || data.SolutionId;
   ensureProjectInUipx(data, link.projectFolder, link.projectId);
-  // Rewrite .uipx so Studio Web Local Workspace watchers refresh
   fs.writeFileSync(uipxPath, JSON.stringify(data, null, 2) + '\n', 'utf8');
 
-  const projectDir = path.join(link.solutionDir, link.projectFolder);
   const exported = writeUiPathProjectToDir(lcsProjectDir, projectDir, {
     writeReadme: false,
     targetFramework: 'Portable',
-    contentOverrides: options.contentOverrides
+    contentOverrides: overrides
   });
+
+  recordPushFingerprints(lcsProjectDir, projectDir, overrides);
+  const updatedLink = getStudioWebLocalLink(lcsProjectDir) || link;
 
   return {
     ...exported,
     targetDir: projectDir,
-    link,
+    link: updatedLink,
     uipxPath,
-    created: false
+    created: false,
+    pulled,
+    conflicts,
+    backups
   };
 }
 
 export function trySyncToStudioWebLocal(
   lcsProjectDir: string,
-  options: { contentOverrides?: Record<string, string> } = {}
+  options: {
+    contentOverrides?: Record<string, string>;
+    pullFirst?: boolean;
+  } = {}
 ): StudioWebLocalSyncResult | undefined {
   if (!getStudioWebLocalLink(lcsProjectDir)) {
     return undefined;
@@ -297,10 +680,20 @@ export function trySyncToStudioWebLocal(
   return syncToStudioWebLocal(lcsProjectDir, options);
 }
 
+export function trySyncFromStudioWebLocal(
+  lcsProjectDir: string,
+  options?: Parameters<typeof syncFromStudioWebLocal>[1]
+): StudioWebPullResult | undefined {
+  if (!getStudioWebLocalLink(lcsProjectDir)) {
+    return undefined;
+  }
+  return syncFromStudioWebLocal(lcsProjectDir, options);
+}
+
 export interface StudioWebLocalStaleFile {
   workflowRel: string;
   xamlRel: string;
-  reason: 'missing-xaml' | 'lcs-newer';
+  reason: 'missing-xaml' | 'lcs-newer' | 'xaml-newer';
 }
 
 export interface StudioWebLocalSyncStatus {
@@ -360,11 +753,30 @@ export function getStudioWebLocalSyncStatus(
       continue;
     }
     try {
-      const lcsStat = fs.statSync(lcsAbs);
-      const xamlStat = fs.statSync(xamlAbs);
-      // Allow a small clock/fs skew window after sync
-      if (lcsStat.mtimeMs > xamlStat.mtimeMs + 1500) {
-        stale.push({ workflowRel: rel, xamlRel, reason: 'lcs-newer' });
+      const lcsText = fs.readFileSync(lcsAbs, 'utf8');
+      const xamlText = fs.readFileSync(xamlAbs, 'utf8');
+      const prev = link.files?.[rel];
+      const lcsHash = contentHash(lcsText);
+      const xamlHash = contentHash(xamlText);
+      if (prev?.lcsHash && prev?.xamlHash) {
+        const lcsChanged = lcsHash !== prev.lcsHash;
+        const xamlChanged = xamlHash !== prev.xamlHash;
+        if (xamlChanged && !lcsChanged) {
+          stale.push({ workflowRel: rel, xamlRel, reason: 'xaml-newer' });
+        } else if (lcsChanged && !xamlChanged) {
+          stale.push({ workflowRel: rel, xamlRel, reason: 'lcs-newer' });
+        } else if (lcsChanged && xamlChanged) {
+          // Both diverged — surface as xaml-newer so Pull is offered
+          stale.push({ workflowRel: rel, xamlRel, reason: 'xaml-newer' });
+        }
+      } else {
+        const lcsStat = fs.statSync(lcsAbs);
+        const xamlStat = fs.statSync(xamlAbs);
+        if (xamlStat.mtimeMs > lcsStat.mtimeMs + 1500) {
+          stale.push({ workflowRel: rel, xamlRel, reason: 'xaml-newer' });
+        } else if (lcsStat.mtimeMs > xamlStat.mtimeMs + 1500) {
+          stale.push({ workflowRel: rel, xamlRel, reason: 'lcs-newer' });
+        }
       }
     } catch {
       stale.push({ workflowRel: rel, xamlRel, reason: 'missing-xaml' });
@@ -372,15 +784,30 @@ export function getStudioWebLocalSyncStatus(
   }
 
   const inSync = stale.length === 0;
+  const xamlNewer = stale.filter((s) => s.reason === 'xaml-newer').length;
+  const lcsNewer = stale.filter((s) => s.reason === 'lcs-newer').length;
+  let summary = 'Synced with Studio Web Local Workspace';
+  if (!inSync) {
+    const parts: string[] = [];
+    if (xamlNewer) {
+      parts.push(`${xamlNewer} Studio Web newer (Pull or Save to merge)`);
+    }
+    if (lcsNewer) {
+      parts.push(`${lcsNewer} LCS newer (Save to push)`);
+    }
+    const missing = stale.filter((s) => s.reason === 'missing-xaml').length;
+    if (missing) {
+      parts.push(`${missing} missing .xaml`);
+    }
+    summary = `Out of sync — ${parts.join('; ')}`;
+  }
   return {
     linked: true,
     inSync,
     link,
     projectDir,
     stale,
-    summary: inSync
-      ? 'Synced with Studio Web Local Workspace'
-      : `Out of sync — ${stale.length} workflow(s) need Save sync`
+    summary
   };
 }
 
@@ -562,31 +989,29 @@ export function validateStudioWebLocalOpenability(
 export function studioWebLocalGuideMarkdown(): string {
   return `# LowCode Studio ↔ Studio Web Local Workspace
 
-Design in LowCode Studio. Open the linked solution in Studio Web **Local Workspace**.
-**Save** in LowCode Studio syncs \`.xaml\` into that folder — no \`.uip\` export needed.
+Design in LowCode Studio **or** Studio Web Local Workspace. **Save** keeps both sides in sync.
 
 ## Loop
 
 \`\`\`
 LowCode Studio (design + dry-run)
-   → Connect / Open Studio Web Local Workspace  (once: create or open solution folder)
-   → Open that folder in Studio Web → Local Workspace
-   → Save in LowCode Studio  → files sync on disk → Studio Web sees updates
+   ↔ Connect / Open Studio Web Local Workspace  (once)
+   ↔ Edit in Studio Web Local Workspace
+   → Save in LowCode Studio  → pull Studio Web edits into .lcs.json, then push .xaml
+   → Or: Pull from Studio Web Local (command) without pushing
    → Publish from Studio Web when ready
 \`\`\`
 
-## First-time connect
+## Trash / backups
 
-1. Select your LowCode Studio project
-2. Run **Connect / Open Studio Web Local Workspace**
-3. **Create new** solution folder (or **Open existing** \`.uipx\` solution)
-4. Reveal the folder, then in Studio Web: Local Workspace → Open solution → Allow file access
+Before overwrite, copies go to \`.lcs-sync-trash/\` inside the LowCode Studio project
+(last ${MAX_TRASH_GENERATIONS} sync generations).
 
 ## Notes
 
-- Link is stored in LowCode Studio \`project.json\` → \`studioWebLocal\`
+- Link is stored in LowCode Studio \`project.json\` → \`studioWebLocal\` (includes content fingerprints)
 - Linked UiPath project is always **Portable** (required to open in Studio Web on Mac)
-- Sync runs automatically on Save (disable via setting \`lowcodeStudio.syncStudioWebOnSave\`)
+- Sync on Save: \`lowcodeStudio.syncStudioWebOnSave\` (default on)
 - Classic **Export Windows project folder** / legacy \`.uip\` remains for Windows Desktop / robot handoff
 
 > Not an official UiPath product.
