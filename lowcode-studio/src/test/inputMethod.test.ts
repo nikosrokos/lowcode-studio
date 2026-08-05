@@ -100,7 +100,7 @@ function run(): void {
   assert.ok(xaml.includes('InteractionMode="Simulate"'));
   assert.ok(xaml.includes('InteractionMode="SameAsCard"'));
   assert.ok(xaml.includes('ClickType="Single"'));
-  assert.ok(xaml.includes('EmptyField="True"'));
+  assert.ok(xaml.includes('EmptyFieldMode="SingleLine"'), xaml);
 
   const imported = importXaml(
     `<?xml version="1.0" encoding="utf-8"?>

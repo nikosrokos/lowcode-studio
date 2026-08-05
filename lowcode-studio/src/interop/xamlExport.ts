@@ -20,24 +20,45 @@ import {
   UiPathTargetFramework
 } from './windowsTarget';
 
+export interface XamlExportOptions {
+  /** When Portable (Studio Web Local), rewrite Windows-only activities. */
+  targetFramework?: UiPathTargetFramework;
+}
+
+/** Active export target — set for the duration of exportWorkflowToXaml. */
+let exportTarget: UiPathTargetFramework = 'Windows';
+
+function isPortableExport(): boolean {
+  return exportTarget === 'Portable';
+}
+
 /**
  * Best-effort XAML export for UiPath Studio Desktop (Windows) / Studio Web import.
  * Default project compatibility is **Windows** so robots run on Windows machines
- * with classic UI Automation selectors.
+ * with classic UI Automation selectors. Studio Web Local sync should pass Portable.
  */
-export function exportWorkflowToXaml(doc: WorkflowDocument): string {
-  const varsXml = renderVariables(doc.variables);
-  const membersXml = renderXamlMembers(doc.arguments || []);
-  const body =
-    doc.type === 'Flowchart'
-      ? renderFlowchart(doc)
-      : renderSequence(doc.activities, doc.name, varsXml);
+export function exportWorkflowToXaml(
+  doc: WorkflowDocument,
+  options: XamlExportOptions = {}
+): string {
+  const prev = exportTarget;
+  exportTarget = resolveUiPathTarget(options.targetFramework);
+  try {
+    const varsXml = renderVariables(doc.variables);
+    const membersXml = renderXamlMembers(doc.arguments || []);
+    const body =
+      doc.type === 'Flowchart'
+        ? renderFlowchart(doc)
+        : renderSequence(doc.activities, doc.name, varsXml);
 
-  return `<?xml version="1.0" encoding="utf-8"?>
+    return `<?xml version="1.0" encoding="utf-8"?>
 <Activity mc:Ignorable="sap sap2010" x:Class="${escapeAttr(sanitizeClass(doc.name))}" sap:VirtualizedContainerService.HintSize="1200,800" sap2010:WorkflowViewState.IdRef="Activity1" xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation" xmlns:sap2010="http://schemas.microsoft.com/netfx/2010/xaml/activities/presentation" xmlns:scg="clr-namespace:System.Collections.Generic;assembly=System.Collections" xmlns:sd="clr-namespace:System.Data;assembly=System.Data.Common" xmlns:ui="http://schemas.uipath.com/workflow/activities" xmlns:uia="http://schemas.uipath.com/workflow/activities/uipath.uiautomation.next" xmlns:excel="http://schemas.uipath.com/workflow/activities/excel" xmlns:mail="http://schemas.uipath.com/workflow/activities/mail" xmlns:python="http://schemas.uipath.com/workflow/activities/python" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 ${membersXml}${body}
 </Activity>
 `;
+  } finally {
+    exportTarget = prev;
+  }
 }
 
 const GUID_RE =
@@ -289,26 +310,7 @@ ${pad}</Assign>`;
   }
 
   if (activity.type === 'Programming.MultipleAssign') {
-    const lines = String(activity.properties.assignments || '')
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean);
-    const assigns = lines
-      .map((line) => {
-        const eq = line.indexOf('=');
-        const to = eq >= 0 ? line.slice(0, eq).trim() : line;
-        const value = eq >= 0 ? line.slice(eq + 1).trim() : '""';
-        return `${pad}  <Assign>
-${pad}    <Assign.To><OutArgument x:TypeArguments="x:Object">[${escapeAttr(to)}]</OutArgument></Assign.To>
-${pad}    <Assign.Value><InArgument x:TypeArguments="x:Object">[${escapeAttr(value)}]</InArgument></Assign.Value>
-${pad}  </Assign>`;
-      })
-      .join('\n');
-    return `${pad}<ui:MultipleAssign DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
-${pad}  <ui:MultipleAssign.Assignments>
-${assigns || `${pad}  <Assign />`}
-${pad}  </ui:MultipleAssign.Assignments>
-${pad}</ui:MultipleAssign>`;
+    return renderMultipleAssign(activity, pad);
   }
 
   if (activity.type === 'Programming.InvokeCode') {
@@ -434,6 +436,10 @@ ${argsXml}${pad}</ui:InvokeWorkflowFile>`;
   }
 
   if (activity.type === 'System.MessageBox') {
+    if (isPortableExport()) {
+      // Message Box is Windows-only — Log Message loads in Studio Web
+      return `${pad}<ui:LogMessage DisplayName="${escapeAttr(exportDisplayName(activity.displayName))} (Portable)" Level="Info" Message="[${escapeAttr(toVbStringArgument(activity.properties.text))}]" />`;
+    }
     return `${pad}<ui:MessageBox DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Text="[${escapeAttr(toVbStringArgument(activity.properties.text))}]" Caption="${escapeAttr(String(activity.properties.title || 'LowCode Studio'))}" />`;
   }
 
@@ -460,10 +466,24 @@ ${argsXml}${pad}</ui:InvokeWorkflowFile>`;
     return `${pad}<ui:CopyFile DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Path="[${escapeAttr(toVbStringArgument(activity.properties.path))}]" Destination="[${escapeAttr(toVbStringArgument(activity.properties.destination))}]" Overwrite="${activity.properties.overwrite === false ? 'False' : 'True'}" />`;
   }
   if (activity.type === 'System.DeleteFile') {
+    if (isPortableExport()) {
+      return `${pad}<ui:Comment DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Text="${escapeAttr('Delete File is Windows-only — replace with a Portable Delete / file activity in Studio Web, or export as Windows. Path: ' + String(activity.properties.path || ''))}" />`;
+    }
     return `${pad}<ui:DeleteFile DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Path="[${escapeAttr(toVbStringArgument(activity.properties.path))}]" />`;
   }
+  if (activity.type === 'Data.ReadCsv') {
+    return `${pad}<ui:ReadCsvFile DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" FilePath="[${escapeAttr(toVbStringArgument(activity.properties.filePath || activity.properties.path || 'input.csv'))}]" DataTable="[${escapeAttr(String(activity.properties.result || 'dt'))}]" />`;
+  }
+  if (activity.type === 'Data.WriteCsv') {
+    return `${pad}<ui:WriteCsvFile DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" FilePath="[${escapeAttr(toVbStringArgument(activity.properties.filePath || activity.properties.path || 'output.csv'))}]" DataTable="[${escapeAttr(String(activity.properties.data || 'dt'))}]" />`;
+  }
   if (activity.type === 'Flowchart.FlowSwitch') {
-    return `${pad}<FlowSwitch x:TypeArguments="x:String" Expression="[${escapeAttr(String(activity.properties.expression || 'key'))}]" DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" />`;
+    // FlowSwitch is invalid inside a Sequence — export as Switch for Studio Web
+    return `${pad}<Switch x:TypeArguments="x:String" Expression="[${escapeAttr(String(activity.properties.expression || 'key'))}]" DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
+${pad}  <Switch.Default>
+${pad}    <Sequence />
+${pad}  </Switch.Default>
+${pad}</Switch>`;
   }
 
   if (activity.type === 'ControlFlow.DoWhile') {
@@ -529,22 +549,11 @@ ${pad}</ui:TimeoutScope>`;
   }
 
   if (activity.type === 'UI.UseApplicationBrowser') {
-    const kids = (activity.children || []).map((c) => renderActivity(c, indent + 1)).join('\n');
-    const props = applyWindowsSelectorsToActivityProps(activity.properties || {});
-    const url = escapeAttr(String(props.urlOrPath || 'https://example.com'));
-    const mode = String(props.mode || 'Browser');
-    const browser = escapeAttr(String(props.browserType || 'Chrome'));
-    const open = escapeAttr(String(props.open || 'IfNotOpen'));
-    const close = escapeAttr(String(props.close || 'Never'));
-    const selAttr = selectorAttribute(props);
-    const inputAttr = interactionModeAttribute(props, 'Simulate');
-    return `${pad}<uia:NApplicationCard DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Url="${url}" OpenMode="${open}" CloseMode="${close}" BrowserType="${browser}" AttachMode="${mode === 'Application' ? 'Application' : 'Browser'}"${inputAttr}${selAttr}>
-${pad}  <uia:NApplicationCard.Body>
-${pad}    <Sequence>
-${kids}
-${pad}    </Sequence>
-${pad}  </uia:NApplicationCard.Body>
-${pad}</uia:NApplicationCard>`;
+    return renderUseApplicationBrowser(activity, pad, indent);
+  }
+
+  if (activity.type === 'Data.BuildDataTable') {
+    return renderBuildDataTable(activity, pad, indent);
   }
 
   if (isUiActivity(activity.type)) {
@@ -622,6 +631,9 @@ ${pad}</uia:NApplicationCard>`;
   }
 
   if (activity.type.startsWith('Python.')) {
+    if (isPortableExport()) {
+      return `${pad}<ui:Comment DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Text="${escapeAttr('Python activities are not in the stable cross-platform pack — use Windows export or UiPath.Python 2.0 preview in Studio Web. (' + activity.type + ')')}" />`;
+    }
     return renderPythonActivity(activity, pad, indent);
   }
 
@@ -648,6 +660,157 @@ ${pad}</uia:NApplicationCard>`;
   }
 
   return `${pad}<ui:Comment DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Text="${escapeAttr('Exported placeholder for ' + activity.type)}" />`;
+}
+
+function renderMultipleAssign(activity: ActivityNode, pad: string): string {
+  const lines = String(activity.properties.assignments || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const assignBlocks = lines
+    .map((line) => {
+      const eq = line.indexOf('=');
+      const to = eq >= 0 ? line.slice(0, eq).trim() : line;
+      const value = eq >= 0 ? line.slice(eq + 1).trim() : '""';
+      return `${pad}  <Assign DisplayName="${escapeAttr(to)} = …">
+${pad}    <Assign.To><OutArgument x:TypeArguments="x:Object">[${escapeAttr(to)}]</OutArgument></Assign.To>
+${pad}    <Assign.Value><InArgument x:TypeArguments="x:Object">[${escapeAttr(value)}]</InArgument></Assign.Value>
+${pad}  </Assign>`;
+    })
+    .join('\n');
+
+  if (isPortableExport()) {
+    // Multiple Assign is Windows-only — expand to Sequence of Assign
+    return `${pad}<Sequence DisplayName="${escapeAttr(exportDisplayName(activity.displayName))} (Portable)">
+${assignBlocks || `${pad}  <ui:Comment Text="Empty Multiple Assign" />`}
+${pad}</Sequence>`;
+  }
+
+  return `${pad}<ui:MultipleAssign DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
+${pad}  <ui:MultipleAssign.Assignments>
+${assignBlocks || `${pad}  <Assign />`}
+${pad}  </ui:MultipleAssign.Assignments>
+${pad}</ui:MultipleAssign>`;
+}
+
+/**
+ * Modern Use Application/Browser (NApplicationCard).
+ * Studio rejects hallucinated card-level Url / BrowserType / AttachMode="Browser".
+ * URL + BrowserType belong on TargetApp; AttachMode is SingleWindow | ByInstance.
+ */
+function renderUseApplicationBrowser(
+  activity: ActivityNode,
+  pad: string,
+  indent: number
+): string {
+  const kids = (activity.children || [])
+    .map((c) => renderActivity(c, indent + 3))
+    .join('\n');
+  const props = applyWindowsSelectorsToActivityProps(activity.properties || {});
+  const mode = String(props.mode || 'Browser');
+  const isApp = /application/i.test(mode);
+  const pathOrUrl = String(props.urlOrPath || (isApp ? '' : 'https://example.com'));
+  const browser = escapeAttr(String(props.browserType || 'Chrome'));
+  const open = escapeAttr(normalizeOpenMode(props.open));
+  const close = escapeAttr(normalizeCloseMode(props.close));
+  // AttachMode is window scope — NOT Browser/Application (those go on TargetApp)
+  const attach = escapeAttr(
+    normalizeAttachMode(props.attachMode) || (isApp ? 'ByInstance' : 'ByInstance')
+  );
+  let inputAttr = interactionModeAttribute(props, 'Simulate');
+  // Portable / Studio Web only supports Simulate + Chromium API (DebuggerApi)
+  if (isPortableExport() && /InteractionMode="(WindowMessages|HardwareEvents|Background)"/.test(inputAttr)) {
+    inputAttr = ' InteractionMode="Simulate"';
+  }
+  const selector = String(props.selector || '').trim();
+  const selAttr = selector ? ` Selector="${escapeAttr(selector)}"` : '';
+  const scopeGuid = crypto.randomUUID();
+
+  const targetInner = isApp
+    ? ` FilePath="${escapeAttr(pathOrUrl)}"`
+    : ` BrowserType="${browser}" Url="${escapeAttr(pathOrUrl)}"${selAttr}`;
+
+  return `${pad}<uia:NApplicationCard DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" OpenMode="${open}" CloseMode="${close}" AttachMode="${attach}"${inputAttr} Version="V2" ScopeGuid="${scopeGuid}">
+${pad}  <uia:NApplicationCard.Body>
+${pad}    <ActivityAction x:TypeArguments="x:Object">
+${pad}      <ActivityAction.Argument>
+${pad}        <DelegateInArgument x:TypeArguments="x:Object" Name="WSSessionData" />
+${pad}      </ActivityAction.Argument>
+${pad}      <Sequence DisplayName="Do">
+${kids}
+${pad}      </Sequence>
+${pad}    </ActivityAction>
+${pad}  </uia:NApplicationCard.Body>
+${pad}  <uia:NApplicationCard.TargetApp>
+${pad}    <uia:TargetApp Area="0, 0, 0, 0"${targetInner} Version="V2" />
+${pad}  </uia:NApplicationCard.TargetApp>
+${pad}</uia:NApplicationCard>`;
+}
+
+function normalizeOpenMode(raw: unknown): string {
+  const v = String(raw || 'IfNotOpen').trim();
+  if (/^always$/i.test(v)) return 'Always';
+  if (/^never$/i.test(v)) return 'Never';
+  return 'IfNotOpen';
+}
+
+function normalizeCloseMode(raw: unknown): string {
+  const v = String(raw || 'Never').trim();
+  if (/^always$/i.test(v)) return 'Always';
+  if (/if\s*opened/i.test(v) || /IfOpenedBy/i.test(v)) return 'IfOpenedByAppBrowser';
+  return 'Never';
+}
+
+function normalizeAttachMode(raw: unknown): string | undefined {
+  const v = String(raw || '').trim();
+  if (!v) return undefined;
+  if (/single/i.test(v)) return 'SingleWindow';
+  if (/instance|process/i.test(v)) return 'ByInstance';
+  // Legacy LCS mistakenly stored Browser/Application here — ignore
+  if (/^(browser|application)$/i.test(v)) return undefined;
+  return undefined;
+}
+
+/**
+ * Build Data Table is Windows-only. Portable (Studio Web) rewrite:
+ * Assign New DataTable + Add Data Column per column (cross-platform).
+ */
+function renderBuildDataTable(
+  activity: ActivityNode,
+  pad: string,
+  indent: number
+): string {
+  const result = String(activity.properties.result || 'dt').replace(/^\[|\]$/g, '');
+  const columns = String(activity.properties.columns || 'Column1')
+    .split(',')
+    .map((c) => c.trim())
+    .filter(Boolean);
+  const display = escapeAttr(exportDisplayName(activity.displayName));
+
+  if (!isPortableExport()) {
+    return `${pad}<ui:BuildDataTable DisplayName="${display}" DataTable="[${escapeAttr(result)}]" />`;
+  }
+
+  const initPad = pad + '  ';
+  const colPad = pad + '  ';
+  const colXml = columns
+    .map(
+      (col) =>
+        `${colPad}<ui:AddDataColumn DisplayName="Add column ${escapeAttr(col)}" DataTable="[${escapeAttr(result)}]" ColumnName="${escapeAttr(col)}" />`
+    )
+    .join('\n');
+
+  return `${pad}<Sequence DisplayName="${display} (Portable)">
+${initPad}<Assign DisplayName="New DataTable → ${escapeAttr(result)}">
+${initPad}  <Assign.To>
+${initPad}    <OutArgument x:TypeArguments="sd:DataTable">[${escapeAttr(result)}]</OutArgument>
+${initPad}  </Assign.To>
+${initPad}  <Assign.Value>
+${initPad}    <InArgument x:TypeArguments="sd:DataTable">[New System.Data.DataTable]</InArgument>
+${initPad}  </Assign.Value>
+${initPad}</Assign>
+${colXml}
+${pad}</Sequence>`;
 }
 
 function renderPythonActivity(activity: ActivityNode, pad: string, indent: number): string {
@@ -702,6 +865,34 @@ ${pad}</uia:ExtractTableData>`;
 }
 
 function renderUiActivity(activity: ActivityNode, pad: string, indent: number): string {
+  // Open Application is not a real modern type (NOpenApplication) — emit NApplicationCard
+  if (activity.type === 'UI.OpenApplication') {
+    const pathOrUrl = String(activity.properties.pathOrUrl || '');
+    const isBrowser = /^https?:\/\//i.test(pathOrUrl) || !/\.exe$/i.test(pathOrUrl);
+    return renderUseApplicationBrowser(
+      {
+        ...activity,
+        type: 'UI.UseApplicationBrowser',
+        properties: {
+          mode: isBrowser ? 'Browser' : 'Application',
+          urlOrPath: pathOrUrl || 'https://example.com',
+          browserType: 'Chrome',
+          open: 'IfNotOpen',
+          close: 'Never',
+          inputMethod: 'Simulate',
+          selector: activity.properties.selector
+        }
+      },
+      pad,
+      indent
+    );
+  }
+
+  // Classic ElementExists / Wait appear|vanish → modern NCheckState (cross-platform)
+  if (activity.type === 'UI.ElementExists' || activity.type === 'UI.WaitElement') {
+    return renderCheckAppState(activity, pad);
+  }
+
   const props = applyWindowsSelectorsToActivityProps(activity.properties || {});
   const selAttr = selectorAttribute(props);
   const target = emitTargetXaml(props, pad + '  ');
@@ -712,19 +903,17 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
         ? 'uia:NTypeInto'
         : activity.type === 'UI.GetText'
           ? 'uia:NGetText'
-          : activity.type === 'UI.ElementExists'
-            ? 'uia:ElementExists'
-            : activity.type === 'UI.Check'
-              ? 'uia:NCheck'
-              : activity.type === 'UI.Hover'
-                ? 'uia:NHover'
-                : activity.type === 'UI.SelectItem'
-                  ? 'uia:NSelectItem'
-                  : activity.type === 'UI.TakeScreenshot'
-                    ? 'uia:NTakeScreenshot'
-                    : activity.type === 'UI.OpenApplication'
-                      ? 'uia:NOpenApplication'
-                      : 'uia:NClick';
+          : activity.type === 'UI.Check'
+            ? 'uia:NCheck'
+            : activity.type === 'UI.Hover'
+              ? 'uia:NHover'
+              : activity.type === 'UI.SelectItem'
+                ? 'uia:NSelectItem'
+                : activity.type === 'UI.TakeScreenshot'
+                  ? 'uia:NTakeScreenshot'
+                  : activity.type === 'UI.GetAttribute'
+                    ? 'uia:NGetAttribute'
+                    : 'uia:NClick';
 
   const extra: string[] = [];
   if (activity.type === 'UI.Click') {
@@ -738,17 +927,15 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
   }
   if (activity.type === 'UI.TypeInto') {
     extra.push(`Text="[${escapeAttr(toVbStringArgument(props.text))}]"`);
+    // Modern NTypeInto uses EmptyFieldMode enum — EmptyField bool fails Studio Web load
     if (props.emptyField !== false && props.emptyField !== 'false') {
-      extra.push(`EmptyField="True"`);
+      extra.push(`EmptyFieldMode="SingleLine"`);
     } else {
-      extra.push(`EmptyField="False"`);
+      extra.push(`EmptyFieldMode="None"`);
     }
   }
   if (activity.type === 'UI.SelectItem') {
     extra.push(`Item="[${escapeAttr(toVbStringArgument(props.item))}]"`);
-  }
-  if (activity.type === 'UI.OpenApplication') {
-    extra.push(`Url="${escapeAttr(String(props.pathOrUrl || ''))}"`);
   }
   if (activity.type === 'UI.TakeScreenshot') {
     extra.push(`FileName="${escapeAttr(String(props.filePath || 'screenshot.png'))}"`);
@@ -759,29 +946,18 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
   if (activity.type === 'UI.GetAttribute') {
     extra.push(`Attribute="${escapeAttr(String(props.attribute || 'aaname'))}"`);
   }
-  if (
-    activity.type === 'UI.GetText' ||
-    activity.type === 'UI.ElementExists' ||
-    activity.type === 'UI.GetAttribute'
-  ) {
+  if (activity.type === 'UI.GetText' || activity.type === 'UI.GetAttribute') {
     const resultVar = String(
-      props.result ||
-        (activity.type === 'UI.ElementExists'
-          ? 'exists'
-          : activity.type === 'UI.GetAttribute'
-            ? 'attributeValue'
-            : 'extractedText')
+      props.result || (activity.type === 'UI.GetAttribute' ? 'attributeValue' : 'extractedText')
     ).replace(/^\[|\]$/g, '');
     if (resultVar) {
       extra.push(`Result="[${escapeAttr(resultVar)}]"`);
     }
   }
   if (
-    activity.type === 'UI.WaitElement' ||
     activity.type === 'UI.Click' ||
     activity.type === 'UI.TypeInto' ||
     activity.type === 'UI.GetText' ||
-    activity.type === 'UI.ElementExists' ||
     activity.type === 'UI.Hover' ||
     activity.type === 'UI.Check' ||
     activity.type === 'UI.SelectItem'
@@ -789,8 +965,6 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
     const timeout = Number(props.timeoutMs);
     if (Number.isFinite(timeout) && timeout > 0) {
       extra.push(`TimeoutMS="${timeout}"`);
-    } else if (activity.type === 'UI.WaitElement') {
-      extra.push(`TimeoutMS="${Number(props.timeoutMs ?? 30000)}"`);
     }
   }
 
@@ -808,21 +982,20 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
       activity.type === 'UI.GetText'
         ? 'Simulate'
         : 'Same as App/Browser';
-    const inputAttr = interactionModeAttribute(props, fallback).trim();
+    let inputAttr = interactionModeAttribute(props, fallback).trim();
+    // Portable only supports Simulate + Chromium API (DebuggerApi) + SameAsCard
+    if (
+      isPortableExport() &&
+      /InteractionMode="(WindowMessages|HardwareEvents|Background)"/.test(inputAttr)
+    ) {
+      inputAttr = 'InteractionMode="Simulate"';
+    }
     if (inputAttr) {
       extra.push(inputAttr);
     }
   }
 
-  const openTag =
-    activity.type === 'UI.GetAttribute'
-      ? 'uia:NGetAttribute'
-      : activity.type === 'UI.WaitElement'
-        ? props.action === 'Vanish'
-          ? 'uia:WaitElementVanish'
-          : 'uia:OnElementAppear'
-        : open;
-
+  const openTag = open;
   const attrs = [
     `DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}"`,
     selAttr.trim(),
@@ -847,6 +1020,27 @@ ${target}
 ${pad}</${openTag}>`;
 }
 
+/** Modern Check App State — replaces classic ElementExists / OnElementAppear. */
+function renderCheckAppState(activity: ActivityNode, pad: string): string {
+  const props = applyWindowsSelectorsToActivityProps(activity.properties || {});
+  const selAttr = selectorAttribute(props);
+  const timeout = Number(props.timeoutMs ?? (activity.type === 'UI.WaitElement' ? 30000 : 5000));
+  const resultVar = String(props.result || 'exists').replace(/^\[|\]$/g, '');
+  const vanish =
+    activity.type === 'UI.WaitElement' &&
+    /vanish|disappear/i.test(String(props.action || ''));
+  const attrs = [
+    `DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}"`,
+    selAttr.trim(),
+    Number.isFinite(timeout) && timeout > 0 ? `TimeoutMS="${timeout}"` : '',
+    resultVar ? `Result="[${escapeAttr(resultVar)}]"` : '',
+    vanish ? 'Appearance="Disappear"' : ''
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return `${pad}<uia:NCheckState ${attrs} />`;
+}
+
 function renderExcelActivity(activity: ActivityNode, pad: string, indent = 0): string {
   const path = escapeAttr(String(activity.properties.workbookPath || 'data.xlsx'));
   const sheet = escapeAttr(String(activity.properties.sheetName || 'Sheet1'));
@@ -860,6 +1054,13 @@ function renderExcelActivity(activity: ActivityNode, pad: string, indent = 0): s
     case 'Excel.AppendRange':
       return `${pad}<excel:AppendRange DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" SheetName="${sheet}" DataTable="[${escapeAttr(String(activity.properties.data || 'dt'))}]" />`;
     case 'Excel.ExcelApplicationScope': {
+      if (isPortableExport()) {
+        const kids = (activity.children || []).map((c) => renderActivity(c, indent + 1)).join('\n');
+        return `${pad}<Sequence DisplayName="${escapeAttr(exportDisplayName(activity.displayName))} (Portable — no Excel Scope)">
+${pad}  <ui:Comment Text="${escapeAttr('Excel Application Scope is Windows-only. Nested workbook steps follow; open workbook activities in Studio Web if needed. Path: ' + String(activity.properties.workbookPath || 'data.xlsx'))}" />
+${kids}
+${pad}</Sequence>`;
+      }
       const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
       const create = activity.properties.createIfNotExists === false || activity.properties.createIfNotExists === 'false' ? 'False' : 'True';
       return `${pad}<excel:ExcelApplicationScope DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" CreateNewFile="${create}">

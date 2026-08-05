@@ -77,8 +77,10 @@ function run(): void {
     ],
     connections: []
   };
+  // Flowchart exports as Sequence — FlowSwitch becomes Switch (FlowSwitch is invalid in Sequence)
   const switchXaml = exportWorkflowToXaml(switchDoc);
-  assert.ok(switchXaml.includes('FlowSwitch'), switchXaml.slice(0, 400));
+  assert.ok(switchXaml.includes('<Switch'), switchXaml.slice(0, 400));
+  assert.ok(!switchXaml.includes('<FlowSwitch'), switchXaml.slice(0, 400));
 
   console.log('a2ImportMap.test.ts OK');
 }

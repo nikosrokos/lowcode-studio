@@ -5,6 +5,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.35] — 2026-08-05
+
+### Added
+- **Bidirectional Studio Web Local sync** — Save pulls Studio Web `.xaml` edits into `.lcs.json` when LCS did not change, then pushes; command **Pull from Studio Web Local Workspace**
+- **`.lcs-sync-trash/`** — backups of overwritten `.lcs.json` / `.xaml` (last 10 sync generations)
+- Content fingerprints on the link so Studio Web–newer workflows show in Project Explorer
+
+### Fixed
+- Editing in Studio Web Local then Saving in LCS no longer silently restores the older LCS version
+
+## [0.6.34] — 2026-08-05
+
+### Fixed
+- Full Studio Web Portable audit of the activity catalog:
+  - **Multiple Assign** → Sequence of Assign; **Message Box** → Log Message
+  - **Delete File**, **Excel Application Scope**, **Python.*** → Comment placeholders (Windows-only / not cross-platform)
+  - **Open Application** → `NApplicationCard`+`TargetApp` (never fake `NOpenApplication`)
+  - **Element Exists / Wait Element** → modern `NCheckState` (not classic tags in `uia:` ns)
+  - **Type Into** → `EmptyFieldMode` (bool `EmptyField` broke Studio Web load)
+  - **FlowSwitch** in Sequence export → `Switch`; **Read/Write CSV** emit FilePath/DataTable
+
+## [0.6.33] — 2026-08-05
+
+### Fixed
+- **Use Application/Browser** Studio Web “activity missing / could not be loaded”: export now uses real `NApplicationCard` shape (`TargetApp` for Url/BrowserType, `AttachMode=ByInstance|SingleWindow`, `ActivityAction` body) — no more hallucinated card-level `Url` / `AttachMode="Browser"`
+- **Build Data Table** on Studio Web Local (Portable): UiPath marks it Windows-only; Save now rewrites to `New DataTable` + **Add Data Column** so Studio Web can open the workflow
+
+### Added
+- Studio Web checklist / package validation notes for Windows-only activities
+
 ## [0.6.32] — 2026-08-05
 
 ### Added

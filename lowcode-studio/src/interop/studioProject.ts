@@ -284,11 +284,7 @@ export function writeUiPathProjectToDir(
     const raw = override ?? fs.readFileSync(abs, 'utf8');
     const doc = parseWorkflow(raw);
     docs.push(doc);
-    const xamlRel = rel.replace(/\.lcs\.json$/i, '.xaml');
-    const xamlAbs = path.join(outDir, xamlRel);
-    fs.mkdirSync(path.dirname(xamlAbs), { recursive: true });
-    writeFileAtomic(xamlAbs, exportWorkflowToXaml(doc));
-    written.push(xamlRel);
+    written.push(rel.replace(/\.lcs\.json$/i, '.xaml'));
   }
 
   const mainLcs = manifest.main || written[0]?.replace(/\.xaml$/i, '.lcs.json');
@@ -306,6 +302,15 @@ export function writeUiPathProjectToDir(
   const targetFramework = options.targetFramework
     ? resolveUiPathTarget(options.targetFramework)
     : resolveUiPathTarget(manifest.uipathTargetFramework);
+
+  // Re-write XAML with the resolved target (Portable rewrites Windows-only activities)
+  for (let i = 0; i < docs.length; i++) {
+    const rel = written[i];
+    if (!rel?.endsWith('.xaml')) continue;
+    const xamlAbs = path.join(outDir, rel);
+    fs.mkdirSync(path.dirname(xamlAbs), { recursive: true });
+    writeFileAtomic(xamlAbs, exportWorkflowToXaml(docs[i], { targetFramework }));
+  }
   const requiresUserInteraction = activityTypes.some(
     (t) => t.startsWith('UI.') || t.startsWith('Imported.')
   );

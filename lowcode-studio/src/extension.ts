@@ -57,6 +57,8 @@ import {
 import {
   getStudioWebLocalLink,
   isStudioWebSolutionDir,
+  SYNC_TRASH_DIR,
+  trySyncFromStudioWebLocal,
   trySyncToStudioWebLocal,
   unlinkStudioWebLocalWorkspace,
   validateStudioWebLocalOpenability
@@ -459,6 +461,47 @@ export function activate(context: vscode.ExtensionContext): void {
         void vscode.window.showInformationMessage('Studio Web Local Workspace unlinked.');
       }
     ),
+    vscode.commands.registerCommand(
+      'lowcodeStudio.pullStudioWebLocal',
+      async (item?: ProjectTreeItem) => {
+        const dir = projectDirFromTreeItem(item) || (await resolveLcsProjectDir());
+        if (!dir) {
+          return;
+        }
+        if (!getStudioWebLocalLink(dir)) {
+          void vscode.window.showInformationMessage(
+            'This project is not linked to a Studio Web Local Workspace.'
+          );
+          return;
+        }
+        try {
+          const pulled = trySyncFromStudioWebLocal(dir, { force: false });
+          projectProvider.refresh();
+          editorProvider?.refreshProjectTree?.();
+          if (!pulled) {
+            return;
+          }
+          const msg =
+            pulled.updated.length === 0
+              ? pulled.conflicts.length
+                ? `No pull — ${pulled.conflicts.length} conflict(s) (both sides changed). Use Save to keep LCS, or force via trash review.`
+                : 'Already in sync — nothing to pull from Studio Web Local.'
+              : `Pulled ${pulled.updated.length} workflow(s) from Studio Web Local` +
+                (pulled.created.length ? ` (${pulled.created.length} new)` : '') +
+                (pulled.backups.length ? ` · backups in ${SYNC_TRASH_DIR}/` : '');
+          void vscode.window.showInformationMessage(msg);
+          if (pulled.conflicts.length) {
+            void vscode.window.showWarningMessage(
+              `Skipped ${pulled.conflicts.length} conflict(s) where both LCS and Studio Web changed. Save to push LCS (Studio Web copy → ${SYNC_TRASH_DIR}/).`
+            );
+          }
+        } catch (err) {
+          void vscode.window.showErrorMessage(
+            err instanceof Error ? err.message : 'Pull from Studio Web Local failed'
+          );
+        }
+      }
+    ),
     vscode.commands.registerCommand('lowcodeStudio.exportConfigXlsx', () =>
       exportConfigXlsxCommand()
     ),
@@ -511,12 +554,15 @@ export function activate(context: vscode.ExtensionContext): void {
                   ? { [rel]: doc.getText() }
                   : undefined;
               const synced = trySyncToStudioWebLocal(projectRoot, {
-                contentOverrides: overrides
+                contentOverrides: overrides,
+                pullFirst: true
               });
               if (synced) {
+                const pulled = synced.pulled?.length || 0;
                 void vscode.window.setStatusBarMessage(
-                  `Synced → Studio Web Local (${path.basename(synced.link.solutionDir)}) · ${synced.files.filter((f) => f.endsWith('.xaml')).length} xaml`,
-                  3500
+                  `Synced ↔ Studio Web Local (${path.basename(synced.link.solutionDir)})` +
+                    (pulled ? ` · pulled ${pulled}` : ''),
+                  4000
                 );
               }
             } catch (err) {
