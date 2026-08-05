@@ -50,10 +50,15 @@ export function getDesignerHtml(
       --board: color-mix(in srgb, var(--bg) 96%, var(--text) 4%);
       --shadow: 0 1px 2px rgba(0,0,0,.12), 0 4px 12px rgba(0,0,0,.08);
       --shadow-sm: 0 1px 2px rgba(0,0,0,.1);
+      --shadow-frame: 0 12px 40px rgba(0,0,0,.28), 0 2px 8px rgba(0,0,0,.16);
       --radius: 8px;
+      --radius-frame: 14px;
       --mono: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, Menlo, monospace);
       --sans: var(--vscode-font-family, "Segoe UI", sans-serif);
       --spine: color-mix(in srgb, var(--muted) 40%, transparent);
+      --dock-h: 64px;
+      --left-width: 280px;
+      --props-width: 300px;
     }
     * { box-sizing: border-box; }
     html, body {
@@ -65,22 +70,32 @@ export function getDesignerHtml(
     }
     .app {
       display: grid;
-      grid-template-columns: 280px 1fr var(--props-width, 300px);
-      grid-template-rows: 52px 1fr;
+      grid-template-columns: var(--left-width, 280px) 1fr var(--props-width, 300px);
+      grid-template-rows: 48px 1fr;
       height: 100%;
-      --props-width: 300px;
+      gap: 0;
+      background:
+        radial-gradient(1200px 600px at 50% -10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 60%),
+        var(--bg);
     }
-    .app.props-floating { grid-template-columns: 280px 1fr; }
-    .app.props-collapsed { grid-template-columns: 280px 1fr 40px; }
+    .app.left-floating { grid-template-columns: 0 1fr var(--props-width, 300px); }
+    .app.left-collapsed { grid-template-columns: 40px 1fr var(--props-width, 300px); }
+    .app.props-floating { grid-template-columns: var(--left-width, 280px) 1fr 0; }
+    .app.props-collapsed { grid-template-columns: var(--left-width, 280px) 1fr 40px; }
+    .app.left-floating.props-floating { grid-template-columns: 0 1fr 0; }
+    .app.left-collapsed.props-floating { grid-template-columns: 40px 1fr 0; }
+    .app.left-floating.props-collapsed { grid-template-columns: 0 1fr 40px; }
+    .app.left-collapsed.props-collapsed { grid-template-columns: 40px 1fr 40px; }
     .toolbar {
       grid-column: 1 / -1;
       display: flex;
       align-items: center;
       gap: 10px;
       padding: 0 14px;
-      border-bottom: 1px solid var(--border);
-      background: color-mix(in srgb, var(--panel) 92%, transparent);
-      backdrop-filter: blur(8px);
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+      background: color-mix(in srgb, var(--panel) 78%, transparent);
+      backdrop-filter: blur(14px) saturate(1.2);
+      z-index: 20;
     }
     .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; min-width: 170px; }
     .brand-mark {
@@ -109,19 +124,33 @@ export function getDesignerHtml(
     .btn.danger { border-color: color-mix(in srgb, #ef4444 50%, var(--border)); }
     .btn.active { outline: 1px solid var(--focus); }
     .panel {
-      border-right: 1px solid var(--border);
-      background: color-mix(in srgb, var(--panel) 96%, transparent);
+      border-right: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+      background: color-mix(in srgb, var(--panel) 94%, transparent);
       overflow: auto;
       position: relative;
       min-height: 0;
     }
     .panel.left-rail {
       display: flex; flex-direction: column; overflow: hidden;
+      border-right: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+    }
+    .panel.frame-docked {
+      margin: 8px 0 8px 8px;
+      border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+      border-radius: var(--radius-frame);
+      box-shadow: var(--shadow-sm);
+      background: color-mix(in srgb, var(--panel) 96%, transparent);
+      backdrop-filter: blur(10px);
+    }
+    .panel.right.frame-docked {
+      margin: 8px 8px 8px 0;
+      border-right: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+      border-left: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
     }
     .left-tabs {
-      display: flex; gap: 2px; padding: 8px 8px 0; flex: 0 0 auto;
-      border-bottom: 1px solid var(--border);
-      background: color-mix(in srgb, var(--panel) 90%, transparent);
+      display: flex; gap: 2px; padding: 6px 8px 0; flex: 0 0 auto;
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+      background: transparent;
     }
     .left-tab {
       flex: 1; border: none; background: transparent; color: var(--muted);
@@ -164,55 +193,84 @@ export function getDesignerHtml(
     .project-children { margin-left: 12px; border-left: 1px solid var(--border); padding-left: 4px; }
     .project-empty { padding: 16px 12px; color: var(--muted); font-size: 12px; line-height: 1.45; }
     .panel.right {
-      border-right: none; border-left: 1px solid var(--border);
+      border-right: none; border-left: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
       display: flex; flex-direction: column; overflow: hidden;
     }
     .panel.right .panel-scroll { flex: 1; overflow: auto; min-height: 0; }
-    .panel.right .panel-resize-x {
-      position: absolute; left: 0; top: 0; bottom: 0; width: 5px; cursor: ew-resize;
+    .panel .frame-resize-x {
+      position: absolute; top: 0; bottom: 0; width: 5px; cursor: ew-resize;
       z-index: 6; background: transparent;
     }
-    .panel.right .panel-resize-x:hover,
-    .panel.right .panel-resize-x.dragging {
+    .panel.left-rail .frame-resize-x { right: 0; left: auto; }
+    .panel.right .frame-resize-x { left: 0; right: auto; }
+    .panel .frame-resize-x:hover,
+    .panel .frame-resize-x.dragging {
       background: color-mix(in srgb, var(--focus) 55%, transparent);
     }
-    .panel.right .panel-resize-y {
+    .panel .frame-resize-y {
       height: 6px; cursor: ns-resize; flex: 0 0 auto;
-      background: transparent; border-top: 1px solid var(--border);
+      background: transparent; border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+      display: none;
     }
-    .panel.right .panel-resize-y:hover,
-    .panel.right .panel-resize-y.dragging {
+    .panel.floating .frame-resize-y { display: block; }
+    .panel .frame-resize-y:hover,
+    .panel .frame-resize-y.dragging {
       background: color-mix(in srgb, var(--focus) 45%, transparent);
     }
     .panel-chrome {
-      display: flex; align-items: center; gap: 6px;
+      display: flex; align-items: center; gap: 8px;
       padding: 8px 10px 4px; flex: 0 0 auto;
       cursor: default; user-select: none;
     }
-    .panel.right.floating .panel-chrome { cursor: grab; }
-    .panel.right.floating .panel-chrome:active { cursor: grabbing; }
+    .panel.floating .panel-chrome { cursor: grab; }
+    .panel.floating .panel-chrome:active { cursor: grabbing; }
     .panel-chrome h2 { padding: 0; margin: 0; flex: 1; }
     .panel-chrome-actions { display: flex; gap: 4px; }
+    .traffic {
+      display: flex; align-items: center; gap: 6px; padding: 0 2px;
+      flex: 0 0 auto;
+    }
+    .traffic .tl {
+      width: 12px; height: 12px; border-radius: 50%; border: none;
+      padding: 0; cursor: pointer; box-shadow: inset 0 0 0 0.5px rgba(0,0,0,.25);
+      transition: transform .12s ease, filter .12s ease;
+    }
+    .traffic .tl:hover { transform: scale(1.08); filter: brightness(1.08); }
+    .traffic .tl.close { background: #ff5f57; }
+    .traffic .tl.min { background: #febc2e; }
+    .traffic .tl.max { background: #28c840; }
+    .panel.floating {
+      position: fixed; z-index: 28;
+      border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+      border-radius: var(--radius-frame);
+      box-shadow: var(--shadow-frame);
+      background: color-mix(in srgb, var(--panel) 94%, transparent);
+      backdrop-filter: blur(18px) saturate(1.35);
+      margin: 0 !important;
+    }
+    .panel.left-rail.floating {
+      left: 16px; top: 60px;
+      width: var(--left-width, 300px);
+      height: var(--left-height, 70vh);
+      max-height: calc(100vh - 96px);
+    }
     .panel.right.floating {
-      position: fixed; z-index: 30;
-      right: 18px; top: 64px;
+      right: 16px; top: 60px;
       width: var(--props-width, 340px);
       height: var(--props-height, 70vh);
-      max-height: calc(100vh - 80px);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      box-shadow: var(--shadow);
-      background: color-mix(in srgb, var(--panel) 97%, transparent);
-      backdrop-filter: blur(10px);
+      max-height: calc(100vh - 96px);
     }
-    .panel.right.collapsed-strip {
+    .panel.collapsed-strip {
       overflow: hidden; padding: 0;
       display: flex; flex-direction: column; align-items: center;
       justify-content: flex-start; gap: 8px; padding-top: 10px;
+      margin: 8px 4px; border-radius: 12px;
+      border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+      background: color-mix(in srgb, var(--panel) 92%, transparent);
     }
-    .panel.right.collapsed-strip > *:not(.collapsed-only) { display: none !important; }
+    .panel.collapsed-strip > *:not(.collapsed-only) { display: none !important; }
     .collapsed-only { display: none; }
-    .panel.right.collapsed-strip .collapsed-only { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+    .panel.collapsed-strip .collapsed-only { display: flex; flex-direction: column; gap: 6px; align-items: center; }
     .collapsed-only .btn { writing-mode: vertical-rl; padding: 10px 6px; }
     .panel h2 {
       margin: 0; padding: 14px 14px 8px; font-size: 11px; text-transform: uppercase;
@@ -251,21 +309,65 @@ export function getDesignerHtml(
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .canvas-wrap {
-      position: relative; overflow: auto; padding: 12px 16px 96px;
-      mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 28px), transparent 100%);
-      -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 28px), transparent 100%);
+      position: relative; overflow: auto; padding: 12px 16px calc(var(--dock-h) + 28px);
+      mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 36px), transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 36px), transparent 100%);
     }
     .canvas-bar {
       display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-      margin-bottom: 12px; position: sticky; top: 0; z-index: 3;
-      padding: 8px 0; background: color-mix(in srgb, var(--bg) 92%, transparent);
+      margin-bottom: 10px; position: sticky; top: 0; z-index: 3;
+      padding: 6px 0; background: color-mix(in srgb, var(--bg) 88%, transparent);
       backdrop-filter: blur(8px);
     }
     .canvas-help { color: var(--muted); font-size: 12px; flex: 1; min-width: 180px; }
-    .zoom-tools { display: flex; align-items: center; gap: 4px; }
+    .zoom-tools { display: none; }
     .zoom-label {
-      min-width: 48px; text-align: center; font-size: 11px; font-family: var(--mono); color: var(--muted);
+      min-width: 40px; text-align: center; font-size: 11px; font-family: var(--mono); color: var(--muted);
     }
+    .maestro-dock {
+      position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+      z-index: 40; display: flex; align-items: center; gap: 2px;
+      padding: 7px 9px;
+      border-radius: 22px;
+      background: color-mix(in srgb, var(--panel) 82%, transparent);
+      border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+      box-shadow: 0 10px 36px rgba(0,0,0,.32), inset 0 1px 0 color-mix(in srgb, var(--text) 8%, transparent);
+      backdrop-filter: blur(18px) saturate(1.45);
+      animation: dock-in .35s ease both;
+    }
+    @keyframes dock-in {
+      from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+    .maestro-dock .dock-btn {
+      appearance: none; border: none; background: transparent; color: var(--text);
+      width: 36px; height: 36px; border-radius: 12px; cursor: pointer;
+      font-size: 13px; font-weight: 650; display: inline-flex; align-items: center; justify-content: center;
+      transition: background .12s ease, transform .12s ease;
+    }
+    .maestro-dock .dock-btn:hover {
+      background: color-mix(in srgb, var(--hover) 90%, var(--accent) 10%);
+      transform: translateY(-2px);
+    }
+    .maestro-dock .dock-btn.active {
+      background: color-mix(in srgb, var(--accent) 28%, transparent);
+      color: var(--text);
+    }
+    .maestro-dock .dock-btn.primary {
+      background: color-mix(in srgb, var(--accent) 85%, transparent);
+      color: var(--accent-fg);
+    }
+    .maestro-dock .dock-btn.primary:hover { filter: brightness(1.06); }
+    .maestro-dock .dock-sep {
+      width: 1px; height: 22px; margin: 0 5px;
+      background: color-mix(in srgb, var(--border) 90%, transparent);
+    }
+    .maestro-dock .dock-zoom {
+      display: inline-flex; align-items: center; gap: 0;
+      padding: 0 2px; border-radius: 12px;
+      background: color-mix(in srgb, var(--bg) 35%, transparent);
+    }
+    .maestro-dock .dock-zoom .zoom-label { min-width: 38px; font-size: 10px; }
     .canvas-zoom {
       transform-origin: 0 0;
       transition: transform .12s ease;
@@ -606,15 +708,19 @@ export function getDesignerHtml(
       <div class="spacer"></div>
       <button class="btn" id="btnLink" title="Connect two flowchart nodes" style="display:none">Link</button>
       <button class="btn" id="btnAutoLayout" style="display:none">Auto Layout</button>
-      <button class="btn" id="btnPropsPanel" title="Show / focus properties panel" style="display:none">Properties</button>
-      <button class="btn" id="btnInsert" title="Insert activity (⌘K / Ctrl+K)">Insert</button>
-      <button class="btn" id="btnValidate">Validate</button>
-      <button class="btn" id="btnDryRun" title="Run All dry-run">Dry Run</button>
-      <button class="btn" id="btnStepThrough" title="Step through activities on the canvas">Step Through</button>
       <button class="btn primary" id="btnSave">Save</button>
     </div>
 
-    <aside class="panel left-rail" id="toolbox">
+    <aside class="panel left-rail frame-docked" id="toolbox">
+      <div class="frame-resize-x" id="leftResizeX" title="Drag to resize width"></div>
+      <div class="panel-chrome" id="leftChrome">
+        <div class="traffic" aria-label="Activities frame controls">
+          <button class="tl close" id="btnLeftCollapse" type="button" title="Collapse"></button>
+          <button class="tl min" id="btnLeftFloat" type="button" title="Float frame"></button>
+          <button class="tl max" id="btnLeftDock" type="button" title="Dock frame"></button>
+        </div>
+        <h2><span class="grow">Toolbox</span></h2>
+      </div>
       <div class="left-tabs" role="tablist" aria-label="Designer left panes">
         <button class="left-tab" type="button" data-left-tab="project" role="tab">Project</button>
         <button class="left-tab active" type="button" data-left-tab="activities" role="tab">Activities</button>
@@ -625,7 +731,6 @@ export function getDesignerHtml(
         <div class="project-tree" id="projectTree"></div>
       </div>
       <div class="left-pane active" id="paneActivities" data-left-pane="activities">
-        <h2><span class="grow">Activities</span></h2>
         <div class="panel-tools">
           <button class="btn" id="btnExpandCats" type="button" title="Expand all categories">Expand</button>
           <button class="btn" id="btnCollapseCats" type="button" title="Collapse all categories">Collapse</button>
@@ -643,6 +748,10 @@ export function getDesignerHtml(
           <button class="btn" id="btnAddVar">Add Variable</button>
         </div>
       </div>
+      <div class="frame-resize-y" id="leftResizeY" title="Drag to resize height (float mode)"></div>
+      <div class="collapsed-only">
+        <button class="btn" id="btnLeftExpand" type="button" title="Expand toolbox">Toolbox</button>
+      </div>
     </aside>
 
     <main class="canvas-wrap" id="canvasWrap">
@@ -656,10 +765,10 @@ export function getDesignerHtml(
       <div class="canvas-bar">
         <div class="canvas-help" id="canvasHelp"></div>
         <div class="zoom-tools">
-          <button class="btn" id="btnZoomOut" type="button" title="Zoom out">−</button>
-          <span class="zoom-label" id="zoomLabel">100%</span>
-          <button class="btn" id="btnZoomIn" type="button" title="Zoom in">+</button>
-          <button class="btn" id="btnZoomReset" type="button" title="Reset zoom">100%</button>
+          <button class="btn" id="btnZoomOutLegacy" type="button" title="Zoom out">−</button>
+          <span class="zoom-label" id="zoomLabelLegacy">100%</span>
+          <button class="btn" id="btnZoomInLegacy" type="button" title="Zoom in">+</button>
+          <button class="btn" id="btnZoomResetLegacy" type="button" title="Reset zoom">100%</button>
         </div>
       </div>
       <div class="canvas-zoom" id="canvasZoom">
@@ -680,21 +789,21 @@ export function getDesignerHtml(
       </div>
     </div>
 
-    <aside class="panel right" id="propsPanel">
-      <div class="panel-resize-x" id="propsResizeX" title="Drag to resize width"></div>
+    <aside class="panel right frame-docked" id="propsPanel">
+      <div class="frame-resize-x" id="propsResizeX" title="Drag to resize width"></div>
       <div class="panel-chrome" id="propsChrome">
+        <div class="traffic" aria-label="Properties frame controls">
+          <button class="tl close" id="btnPropsCollapse" type="button" title="Collapse"></button>
+          <button class="tl min" id="btnPropsFloat" type="button" title="Float frame"></button>
+          <button class="tl max" id="btnPropsDock" type="button" title="Dock frame"></button>
+        </div>
         <h2><span class="grow">Properties</span></h2>
         <div class="panel-chrome-actions">
-          <button class="icon-btn" id="btnPropsFloat" type="button" title="Float panel">⧉</button>
-          <button class="icon-btn" id="btnPropsDock" type="button" title="Dock panel" style="display:none">▣</button>
-          <button class="icon-btn" id="btnPropsCollapse" type="button" title="Collapse panel">—</button>
+          <button class="btn" id="btnExpandProps" type="button" title="Expand all property groups" style="padding:3px 7px;font-size:10px;">Expand</button>
+          <button class="btn" id="btnCollapseProps" type="button" title="Collapse all property groups" style="padding:3px 7px;font-size:10px;">Collapse</button>
         </div>
       </div>
       <div class="panel-scroll" id="propsScroll">
-        <div class="panel-tools">
-          <button class="btn" id="btnExpandProps" type="button" title="Expand all property groups">Expand</button>
-          <button class="btn" id="btnCollapseProps" type="button" title="Collapse all property groups">Collapse</button>
-        </div>
         <div class="props" id="props"></div>
         <div class="side-section" id="connectionsSection" data-section="connections" style="display:none">
           <button type="button" class="side-section-head" id="btnToggleConnections">
@@ -710,11 +819,30 @@ export function getDesignerHtml(
           <button class="btn danger" id="btnDelete" disabled>Delete activity</button>
         </div>
       </div>
-      <div class="panel-resize-y" id="propsResizeY" title="Drag to resize height (float mode)"></div>
+      <div class="frame-resize-y" id="propsResizeY" title="Drag to resize height (float mode)"></div>
       <div class="collapsed-only">
         <button class="btn" id="btnPropsExpand" type="button" title="Expand properties panel">Properties</button>
       </div>
     </aside>
+
+    <nav class="maestro-dock" id="maestroDock" aria-label="Canvas dock">
+      <button class="dock-btn" id="dockLeft" type="button" title="Toggle toolbox">▢</button>
+      <button class="dock-btn" id="btnInsert" type="button" title="Insert activity (⌘K)">＋</button>
+      <span class="dock-sep" aria-hidden="true"></span>
+      <div class="dock-zoom">
+        <button class="dock-btn" id="btnZoomOut" type="button" title="Zoom out">−</button>
+        <span class="zoom-label" id="zoomLabel">100%</span>
+        <button class="dock-btn" id="btnZoomIn" type="button" title="Zoom in">+</button>
+        <button class="dock-btn" id="btnZoomReset" type="button" title="Fit 100%">⛶</button>
+      </div>
+      <span class="dock-sep" aria-hidden="true"></span>
+      <button class="dock-btn" id="btnValidate" type="button" title="Validate">✓</button>
+      <button class="dock-btn" id="btnDryRun" type="button" title="Dry Run">▶</button>
+      <button class="dock-btn" id="btnStepThrough" type="button" title="Step Through">⏭</button>
+      <span class="dock-sep" aria-hidden="true"></span>
+      <button class="dock-btn" id="dockProps" type="button" title="Toggle properties">☰</button>
+      <button class="dock-btn primary" id="dockSave" type="button" title="Save">Save</button>
+    </nav>
   </div>
 
   <script nonce="${nonce}">
@@ -740,6 +868,10 @@ export function getDesignerHtml(
       propsWidth: 300,
       propsHeight: Math.round(window.innerHeight * 0.7),
       propsFloatPos: { x: null, y: null },
+      leftMode: 'docked', // docked | floating | collapsed
+      leftWidth: 280,
+      leftHeight: Math.round(window.innerHeight * 0.72),
+      leftFloatPos: { x: null, y: null },
       playback: null, // { steps, index, timer, doneIds }
       paletteOpen: false,
       paletteQuery: '',
@@ -749,6 +881,7 @@ export function getDesignerHtml(
     const els = {
       app: document.querySelector('.app'),
       propsPanel: document.getElementById('propsPanel'),
+      toolbox: document.getElementById('toolbox'),
       propsScroll: document.getElementById('propsScroll'),
       catalog: document.getElementById('catalog'),
       projectTree: document.getElementById('projectTree'),
@@ -770,7 +903,9 @@ export function getDesignerHtml(
       zoomLabel: document.getElementById('zoomLabel'),
       btnDelete: document.getElementById('btnDelete'),
       btnLink: document.getElementById('btnLink'),
-      btnAutoLayout: document.getElementById('btnAutoLayout')
+      btnAutoLayout: document.getElementById('btnAutoLayout'),
+      dockLeft: document.getElementById('dockLeft'),
+      dockProps: document.getElementById('dockProps')
     };
 
     function setLeftTab(tab) {
@@ -1102,48 +1237,77 @@ export function getDesignerHtml(
       refreshPreview();
     }
 
-    function applyPropsPanelLayout() {
-      const panel = els.propsPanel;
+    function persistFrameState() {
+      try {
+        vscode.setState({
+          propsMode: state.propsMode,
+          propsWidth: state.propsWidth,
+          propsHeight: state.propsHeight,
+          propsFloatPos: state.propsFloatPos,
+          leftMode: state.leftMode,
+          leftWidth: state.leftWidth,
+          leftHeight: state.leftHeight,
+          leftFloatPos: state.leftFloatPos
+        });
+      } catch (e) {}
+    }
+    function syncDockActive() {
+      if (els.dockLeft) els.dockLeft.classList.toggle('active', state.leftMode !== 'collapsed');
+      if (els.dockProps) els.dockProps.classList.toggle('active', state.propsMode !== 'collapsed');
+    }
+    function applyFrameLayouts() {
       const app = els.app;
-      if (!panel || !app) return;
+      const props = els.propsPanel;
+      const left = els.toolbox;
+      if (!app || !props || !left) return;
       document.documentElement.style.setProperty('--props-width', state.propsWidth + 'px');
       document.documentElement.style.setProperty('--props-height', state.propsHeight + 'px');
-      panel.classList.remove('floating', 'collapsed-strip');
-      app.classList.remove('props-floating', 'props-collapsed');
-      panel.style.left = '';
-      panel.style.top = '';
-      panel.style.right = '';
-      panel.style.width = '';
-      panel.style.height = '';
-      const btnFloat = document.getElementById('btnPropsFloat');
-      const btnDock = document.getElementById('btnPropsDock');
-      const btnToolbar = document.getElementById('btnPropsPanel');
+      document.documentElement.style.setProperty('--left-width', state.leftWidth + 'px');
+      document.documentElement.style.setProperty('--left-height', state.leftHeight + 'px');
+
+      app.classList.remove('props-floating', 'props-collapsed', 'left-floating', 'left-collapsed');
+      props.classList.remove('floating', 'collapsed-strip', 'frame-docked');
+      left.classList.remove('floating', 'collapsed-strip', 'frame-docked');
+      props.style.left = ''; props.style.top = ''; props.style.right = ''; props.style.width = ''; props.style.height = '';
+      left.style.left = ''; left.style.top = ''; left.style.right = ''; left.style.width = ''; left.style.height = '';
+
       if (state.propsMode === 'floating') {
-        panel.classList.add('floating');
+        props.classList.add('floating');
         app.classList.add('props-floating');
-        panel.style.width = state.propsWidth + 'px';
-        panel.style.height = state.propsHeight + 'px';
+        props.style.width = state.propsWidth + 'px';
+        props.style.height = state.propsHeight + 'px';
         if (state.propsFloatPos.x != null) {
-          panel.style.left = state.propsFloatPos.x + 'px';
-          panel.style.top = state.propsFloatPos.y + 'px';
-          panel.style.right = 'auto';
+          props.style.left = state.propsFloatPos.x + 'px';
+          props.style.top = state.propsFloatPos.y + 'px';
+          props.style.right = 'auto';
         }
-        if (btnFloat) btnFloat.style.display = 'none';
-        if (btnDock) btnDock.style.display = '';
-        if (btnToolbar) btnToolbar.style.display = 'none';
       } else if (state.propsMode === 'collapsed') {
-        panel.classList.add('collapsed-strip');
+        props.classList.add('collapsed-strip');
         app.classList.add('props-collapsed');
-        if (btnFloat) btnFloat.style.display = '';
-        if (btnDock) btnDock.style.display = 'none';
-        if (btnToolbar) btnToolbar.style.display = '';
       } else {
-        if (btnFloat) btnFloat.style.display = '';
-        if (btnDock) btnDock.style.display = 'none';
-        if (btnToolbar) btnToolbar.style.display = 'none';
+        props.classList.add('frame-docked');
       }
-      try { vscode.setState({ propsMode: state.propsMode, propsWidth: state.propsWidth, propsHeight: state.propsHeight, propsFloatPos: state.propsFloatPos }); } catch (e) {}
+
+      if (state.leftMode === 'floating') {
+        left.classList.add('floating');
+        app.classList.add('left-floating');
+        left.style.width = state.leftWidth + 'px';
+        left.style.height = state.leftHeight + 'px';
+        if (state.leftFloatPos.x != null) {
+          left.style.left = state.leftFloatPos.x + 'px';
+          left.style.top = state.leftFloatPos.y + 'px';
+        }
+      } else if (state.leftMode === 'collapsed') {
+        left.classList.add('collapsed-strip');
+        app.classList.add('left-collapsed');
+      } else {
+        left.classList.add('frame-docked');
+      }
+
+      syncDockActive();
+      persistFrameState();
     }
+    function applyPropsPanelLayout() { applyFrameLayouts(); }
     function restorePropsPanelState() {
       try {
         const saved = vscode.getState && vscode.getState();
@@ -1152,6 +1316,10 @@ export function getDesignerHtml(
         if (saved.propsWidth) state.propsWidth = saved.propsWidth;
         if (saved.propsHeight) state.propsHeight = saved.propsHeight;
         if (saved.propsFloatPos) state.propsFloatPos = saved.propsFloatPos;
+        if (saved.leftMode) state.leftMode = saved.leftMode;
+        if (saved.leftWidth) state.leftWidth = saved.leftWidth;
+        if (saved.leftHeight) state.leftHeight = saved.leftHeight;
+        if (saved.leftFloatPos) state.leftFloatPos = saved.leftFloatPos;
       } catch (e) {}
     }
 
@@ -1949,8 +2117,8 @@ export function getDesignerHtml(
       els.btnLink.style.display = isFlow() ? '' : 'none';
       els.btnAutoLayout.style.display = isFlow() ? '' : 'none';
       els.canvasHelp.textContent = isFlow()
-        ? 'Flowchart mode: drop on the grid, drag nodes, use blue ports for links. Hover for details. Zoom with +/−.'
-        : 'Sequence mode: drag activities onto the sequence. Hover for details. Double-click Invoke Workflow to open it.';
+        ? 'Flowchart · drag nodes · blue ports to link · bottom dock for zoom & run'
+        : 'Sequence · drag activities onto the board · bottom dock for zoom, insert & run';
       applyZoom();
       renderCatalog();
       renderProjectTree();
@@ -1958,6 +2126,7 @@ export function getDesignerHtml(
       renderProps();
       renderVariables();
       renderConnectionsPanel();
+      syncDockActive();
     }
 
     function persist(rerender) {
@@ -1995,79 +2164,129 @@ export function getDesignerHtml(
     });
     document.getElementById('btnPropsFloat')?.addEventListener('click', () => {
       state.propsMode = 'floating';
-      applyPropsPanelLayout();
-      toast('Properties panel floating');
+      applyFrameLayouts();
+      toast('Properties floating');
     });
     document.getElementById('btnPropsDock')?.addEventListener('click', () => {
       state.propsMode = 'docked';
       state.propsFloatPos = { x: null, y: null };
-      applyPropsPanelLayout();
-      toast('Properties panel docked');
+      applyFrameLayouts();
+      toast('Properties docked');
     });
     document.getElementById('btnPropsCollapse')?.addEventListener('click', () => {
       state.propsMode = 'collapsed';
-      applyPropsPanelLayout();
+      applyFrameLayouts();
     });
     document.getElementById('btnPropsExpand')?.addEventListener('click', () => {
       state.propsMode = 'docked';
-      applyPropsPanelLayout();
+      applyFrameLayouts();
     });
-    document.getElementById('btnPropsPanel')?.addEventListener('click', () => {
-      state.propsMode = state.propsMode === 'collapsed' ? 'docked' : state.propsMode;
-      if (state.propsMode === 'collapsed') state.propsMode = 'docked';
-      applyPropsPanelLayout();
+    document.getElementById('btnLeftFloat')?.addEventListener('click', () => {
+      state.leftMode = 'floating';
+      applyFrameLayouts();
+      toast('Toolbox floating');
+    });
+    document.getElementById('btnLeftDock')?.addEventListener('click', () => {
+      state.leftMode = 'docked';
+      state.leftFloatPos = { x: null, y: null };
+      applyFrameLayouts();
+      toast('Toolbox docked');
+    });
+    document.getElementById('btnLeftCollapse')?.addEventListener('click', () => {
+      state.leftMode = 'collapsed';
+      applyFrameLayouts();
+    });
+    document.getElementById('btnLeftExpand')?.addEventListener('click', () => {
+      state.leftMode = 'docked';
+      applyFrameLayouts();
+    });
+    document.getElementById('dockLeft')?.addEventListener('click', () => {
+      state.leftMode = state.leftMode === 'collapsed' ? 'docked' : 'collapsed';
+      applyFrameLayouts();
+    });
+    document.getElementById('dockProps')?.addEventListener('click', () => {
+      state.propsMode = state.propsMode === 'collapsed' ? 'docked' : 'collapsed';
+      applyFrameLayouts();
+    });
+    document.getElementById('dockSave')?.addEventListener('click', () => {
+      document.getElementById('btnSave')?.click();
     });
 
-    // Width resize
-    (function bindPropsResize() {
-      const handleX = document.getElementById('propsResizeX');
-      const handleY = document.getElementById('propsResizeY');
-      const chrome = document.getElementById('propsChrome');
-      let mode = null; // 'x' | 'y' | 'move'
+    (function bindFrameInteractions() {
+      const propsX = document.getElementById('propsResizeX');
+      const propsY = document.getElementById('propsResizeY');
+      const propsChrome = document.getElementById('propsChrome');
+      const leftX = document.getElementById('leftResizeX');
+      const leftY = document.getElementById('leftResizeY');
+      const leftChrome = document.getElementById('leftChrome');
+      let mode = null;
       let start = { x: 0, y: 0, w: 0, h: 0, left: 0, top: 0 };
-      handleX?.addEventListener('mousedown', (e) => {
+      const begin = (nextMode, e, handle) => {
         e.preventDefault();
-        mode = 'x';
-        handleX.classList.add('dragging');
-        start = { x: e.clientX, y: e.clientY, w: state.propsWidth, h: state.propsHeight, left: 0, top: 0 };
-      });
-      handleY?.addEventListener('mousedown', (e) => {
+        mode = nextMode;
+        handle?.classList.add('dragging');
+        start = {
+          x: e.clientX, y: e.clientY,
+          w: nextMode.startsWith('left') ? state.leftWidth : state.propsWidth,
+          h: nextMode.startsWith('left') ? state.leftHeight : state.propsHeight,
+          left: 0, top: 0
+        };
+      };
+      propsX?.addEventListener('mousedown', (e) => begin('props-x', e, propsX));
+      propsY?.addEventListener('mousedown', (e) => {
         if (state.propsMode !== 'floating') return;
-        e.preventDefault();
-        mode = 'y';
-        handleY.classList.add('dragging');
-        start = { x: e.clientX, y: e.clientY, w: state.propsWidth, h: state.propsHeight, left: 0, top: 0 };
+        begin('props-y', e, propsY);
       });
-      chrome?.addEventListener('mousedown', (e) => {
+      propsChrome?.addEventListener('mousedown', (e) => {
         if (state.propsMode !== 'floating') return;
         if (e.target.closest('button')) return;
-        mode = 'move';
+        mode = 'props-move';
         const rect = els.propsPanel.getBoundingClientRect();
         start = { x: e.clientX, y: e.clientY, w: state.propsWidth, h: state.propsHeight, left: rect.left, top: rect.top };
       });
+      leftX?.addEventListener('mousedown', (e) => begin('left-x', e, leftX));
+      leftY?.addEventListener('mousedown', (e) => {
+        if (state.leftMode !== 'floating') return;
+        begin('left-y', e, leftY);
+      });
+      leftChrome?.addEventListener('mousedown', (e) => {
+        if (state.leftMode !== 'floating') return;
+        if (e.target.closest('button')) return;
+        mode = 'left-move';
+        const rect = els.toolbox.getBoundingClientRect();
+        start = { x: e.clientX, y: e.clientY, w: state.leftWidth, h: state.leftHeight, left: rect.left, top: rect.top };
+      });
       window.addEventListener('mousemove', (e) => {
         if (!mode) return;
-        if (mode === 'x') {
-          // Left-edge handle: drag left → wider
+        if (mode === 'props-x') {
           state.propsWidth = Math.min(560, Math.max(240, start.w + (start.x - e.clientX)));
-          applyPropsPanelLayout();
-        } else if (mode === 'y') {
+        } else if (mode === 'props-y') {
           state.propsHeight = Math.min(window.innerHeight - 90, Math.max(280, start.h + (e.clientY - start.y)));
-          applyPropsPanelLayout();
-        } else if (mode === 'move') {
+        } else if (mode === 'props-move') {
           state.propsFloatPos = {
             x: Math.max(8, start.left + (e.clientX - start.x)),
             y: Math.max(8, start.top + (e.clientY - start.y))
           };
-          applyPropsPanelLayout();
+        } else if (mode === 'left-x') {
+          state.leftWidth = Math.min(480, Math.max(220, start.w + (e.clientX - start.x)));
+        } else if (mode === 'left-y') {
+          state.leftHeight = Math.min(window.innerHeight - 90, Math.max(280, start.h + (e.clientY - start.y)));
+        } else if (mode === 'left-move') {
+          state.leftFloatPos = {
+            x: Math.max(8, start.left + (e.clientX - start.x)),
+            y: Math.max(8, start.top + (e.clientY - start.y))
+          };
         }
+        applyFrameLayouts();
       });
       window.addEventListener('mouseup', () => {
         if (!mode) return;
         mode = null;
-        handleX?.classList.remove('dragging');
-        handleY?.classList.remove('dragging');
-        applyPropsPanelLayout();
+        propsX?.classList.remove('dragging');
+        propsY?.classList.remove('dragging');
+        leftX?.classList.remove('dragging');
+        leftY?.classList.remove('dragging');
+        applyFrameLayouts();
       });
     })();
 
