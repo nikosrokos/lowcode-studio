@@ -2855,10 +2855,34 @@ export function getDesignerHtml(
           text: 'Build Data Table is Windows-only — Save→Studio Web rewrites to New DataTable + Add Data Column'
         });
       }
-      if (node.type === 'UI.UseApplicationBrowser') {
+      if (node.type === 'Programming.MultipleAssign') {
         items.push({
           ok: true,
-          text: 'Use Browser exports as NApplicationCard + TargetApp (Url/BrowserType on TargetApp, not the card)'
+          text: 'Multiple Assign is Windows-only — Save→Studio Web expands to Assign sequence'
+        });
+      }
+      if (node.type === 'System.MessageBox') {
+        items.push({
+          ok: true,
+          text: 'Message Box is Windows-only — Save→Studio Web rewrites to Log Message'
+        });
+      }
+      if (node.type === 'System.DeleteFile' || node.type === 'Excel.ExcelApplicationScope' || String(node.type || '').startsWith('Python.')) {
+        items.push({
+          ok: false,
+          text: 'Windows-only activity — Studio Web Save emits a Comment placeholder (use Windows export or replace)'
+        });
+      }
+      if (node.type === 'UI.UseApplicationBrowser' || node.type === 'UI.OpenApplication') {
+        items.push({
+          ok: true,
+          text: 'Exports as NApplicationCard + TargetApp (Studio Web–safe modern shape)'
+        });
+      }
+      if (node.type === 'UI.ElementExists' || node.type === 'UI.WaitElement') {
+        items.push({
+          ok: true,
+          text: 'Exports as modern NCheckState (classic ElementExists/OnElementAppear break Studio Web)'
         });
       }
       if (!def) {

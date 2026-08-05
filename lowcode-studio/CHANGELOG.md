@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.34] — 2026-08-05
+
+### Fixed
+- Full Studio Web Portable audit of the activity catalog:
+  - **Multiple Assign** → Sequence of Assign; **Message Box** → Log Message
+  - **Delete File**, **Excel Application Scope**, **Python.*** → Comment placeholders (Windows-only / not cross-platform)
+  - **Open Application** → `NApplicationCard`+`TargetApp` (never fake `NOpenApplication`)
+  - **Element Exists / Wait Element** → modern `NCheckState` (not classic tags in `uia:` ns)
+  - **Type Into** → `EmptyFieldMode` (bool `EmptyField` broke Studio Web load)
+  - **FlowSwitch** in Sequence export → `Switch`; **Read/Write CSV** emit FilePath/DataTable
+
 ## [0.6.33] — 2026-08-05
 
 ### Fixed
