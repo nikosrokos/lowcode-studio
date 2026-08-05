@@ -1,12 +1,12 @@
 # LowCode Studio
 
-**Version 0.6.35** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.6.36** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.6.35-0ea5e9)
+![version](https://img.shields.io/badge/version-0.6.36-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
@@ -42,12 +42,11 @@ Design on Mac (REFramework)
 1. **Designer** — framed toolbox + properties, sequence board, macOS-style bottom dock  
 2. **Floating frames** — traffic-light controls to float / dock / collapse either side panel  
 
-## What’s in 0.6.35
+## What’s in 0.6.36
 
-- **Bidirectional Studio Web Local sync** — pull `.xaml` → `.lcs.json`, push on Save; `.lcs-sync-trash/` backups
-- **Portable activity fixes** — Use Browser / Build Data Table / catalog so Studio Web does not show “activity missing”
-- **Assist** — Explain, scenarios, selector repair, VB expression repair (✦ help)
-- **Pull from Studio Web Local** command when Studio Web is ahead
+- **Open Studio Web solution** imports `.xaml` → `.lcs.json` (sibling `*.lcs` project) and **opens Main** in the designer
+- Simpler **Open folder** (auto-detects LCS vs `.uipx`) — no more “solution shows up without `.lcs.json`”
+- Bidirectional Local sync + Portable activity fixes from 0.6.33–0.6.35
 
 Full history: [CHANGELOG.md](CHANGELOG.md)
 
@@ -62,7 +61,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.35.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.36.vsix` → reload.
 
 ## Easy path
 
@@ -70,11 +69,11 @@ In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.
 
 **REFramework path:**
 
-1. **Open Local Project** (Project Explorer title) *or* **New REFramework Project**
+1. **Open folder** (LCS project *or* Studio Web `.uipx` solution — Main opens automatically) *or* **New REFramework Project**
 2. Edit `Framework/Process.lcs.json`
 3. Tune `Data/Config.json` (or import classic `Config.xlsx`)
 4. **Shift+F5** → run scenarios (or **Manage Scenarios** to add a quick smoke test)
-5. **Validate Packages** (optional) → **Connect / Open Studio Web Local Workspace** → open that folder in Studio Web Local Workspace → **Save** to sync
+5. **Validate Packages** (optional) → **Create / link Studio Web Local Workspace** → open that folder in Studio Web → **Save** to sync
 
 ```
 MyREFramework/

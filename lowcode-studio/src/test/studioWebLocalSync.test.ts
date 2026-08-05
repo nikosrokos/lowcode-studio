@@ -44,9 +44,12 @@ function run(): void {
   const link = synced.link!;
   const mainXaml = path.join(link.solutionDir, link.projectFolder, 'Main.xaml');
   assert.ok(fs.existsSync(mainXaml));
-  const older = new Date(Date.now() - 60_000);
-  fs.utimesSync(mainXaml, older, older);
-  fs.utimesSync(mainLcs, new Date(), new Date());
+  // Change LCS content so fingerprints report lcs-newer (mtime alone is not enough)
+  const doc = JSON.parse(fs.readFileSync(mainLcs, 'utf8')) as {
+    description?: string;
+  };
+  doc.description = `edited-for-sync-badge ${Date.now()}`;
+  fs.writeFileSync(mainLcs, JSON.stringify(doc, null, 2) + '\n', 'utf8');
 
   const stale = getStudioWebLocalSyncStatus(lcsDir);
   assert.strictEqual(stale.inSync, false);
