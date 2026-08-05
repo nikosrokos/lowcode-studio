@@ -325,9 +325,23 @@ ${pad}</ui:MultipleAssign>`;
   }
 
   if (activity.type === 'ControlFlow.Switch') {
-    const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
+    const kids = (activity.children || []).map((c) => renderActivity(c, indent + 3)).join('\n');
+    const caseLabels = String(activity.properties.cases || 'Default')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const nonDefault = caseLabels.filter((c) => c.toLowerCase() !== 'default');
+    const caseXml = nonDefault
+      .map((label) => {
+        return `${pad}  <Switch.Case x:Key="${escapeAttr(label)}">
+${pad}    <Sequence>
+${pad}      <ui:Comment Text="Case ${escapeAttr(label)} — edit body in Studio or nest via Default for dry-run" />
+${pad}    </Sequence>
+${pad}  </Switch.Case>`;
+      })
+      .join('\n');
     return `${pad}<Switch x:TypeArguments="x:String" Expression="[${escapeAttr(String(activity.properties.expression ?? 'status'))}]" DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
-${pad}  <Switch.Default>
+${caseXml ? caseXml + '\n' : ''}${pad}  <Switch.Default>
 ${pad}    <Sequence>
 ${kids}
 ${pad}    </Sequence>
@@ -360,7 +374,19 @@ ${pad}</ui:ForEachRow>`;
   }
 
   if (activity.type === 'Data.FilterDataTable') {
-    return `${pad}<ui:FilterDataTable DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" FilterRowsDataTable="[${escapeAttr(String(activity.properties.result || 'filteredDt'))}]" />`;
+    return `${pad}<ui:FilterDataTable DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" FilterRowsDataTable="[${escapeAttr(String(activity.properties.result || 'filteredDt'))}]" ColumnName="${escapeAttr(String(activity.properties.columnName || 'Status'))}" Operator="${escapeAttr(String(activity.properties.operator || '='))}" Value="[${escapeAttr(String(activity.properties.value ?? '""'))}]" />`;
+  }
+
+  if (activity.type === 'Data.JoinDataTable') {
+    return `${pad}<ui:JoinDataTables DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" DataTable1="[${escapeAttr(String(activity.properties.dataTable1 || 'dtLeft'))}]" DataTable2="[${escapeAttr(String(activity.properties.dataTable2 || 'dtRight'))}]" JoinType="${escapeAttr(String(activity.properties.joinType || 'Inner'))}" Column1="${escapeAttr(String(activity.properties.column1 || 'Id'))}" Column2="${escapeAttr(String(activity.properties.column2 || 'Id'))}" DataTable="[${escapeAttr(String(activity.properties.result || 'joinedDt'))}]" />`;
+  }
+
+  if (activity.type === 'Data.LookupDataTable') {
+    return `${pad}<ui:LookupDataTable DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" LookupColumnName="${escapeAttr(String(activity.properties.lookupColumn || 'Id'))}" LookupValue="[${escapeAttr(String(activity.properties.lookupValue ?? '""'))}]" TargetColumnName="${escapeAttr(String(activity.properties.targetColumn || 'Name'))}" Value="[${escapeAttr(String(activity.properties.result || 'lookupResult'))}]" />`;
+  }
+
+  if (activity.type === 'Data.SortDataTable') {
+    return `${pad}<ui:SortDataTable DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" ColumnName="${escapeAttr(String(activity.properties.columnName || 'Id'))}" Order="${escapeAttr(String(activity.properties.order || 'Ascending'))}" SortDataTable="[${escapeAttr(String(activity.properties.result || 'sortedDt'))}]" />`;
   }
 
   if (activity.type === 'Data.ClearDataTable') {
@@ -426,7 +452,8 @@ ${pad}</DoWhile>`;
 
   if (activity.type === 'ControlFlow.RetryScope') {
     const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
-    return `${pad}<ui:RetryScope DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" NumberOfRetries="${Number(activity.properties.numberOfRetries ?? 3)}">
+    const intervalMs = Number(activity.properties.retryIntervalMs ?? 1000);
+    return `${pad}<ui:RetryScope DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" NumberOfRetries="${Number(activity.properties.numberOfRetries ?? 3)}" RetryInterval="${msToTimeSpan(intervalMs)}">
 ${pad}  <ui:RetryScope.Activity>
 ${pad}    <ActivityAction>
 ${pad}      <Sequence>
@@ -435,6 +462,41 @@ ${pad}      </Sequence>
 ${pad}    </ActivityAction>
 ${pad}  </ui:RetryScope.Activity>
 ${pad}</ui:RetryScope>`;
+  }
+
+  if (activity.type === 'ControlFlow.Parallel') {
+    const kids = (activity.children || []).map((c) => renderActivity(c, indent + 1)).join('\n');
+    return `${pad}<Parallel DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
+${kids}
+${pad}</Parallel>`;
+  }
+
+  if (activity.type === 'ControlFlow.ParallelForEach') {
+    const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
+    return `${pad}<ParallelForEach x:TypeArguments="x:Object" Values="[${escapeAttr(String(activity.properties.values || 'collection'))}]" DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
+${pad}  <ActivityAction x:TypeArguments="x:Object">
+${pad}    <ActivityAction.Argument>
+${pad}      <DelegateInArgument x:TypeArguments="x:Object" Name="${escapeAttr(String(activity.properties.item || 'item'))}" />
+${pad}    </ActivityAction.Argument>
+${pad}    <Sequence>
+${kids}
+${pad}    </Sequence>
+${pad}  </ActivityAction>
+${pad}</ParallelForEach>`;
+  }
+
+  if (activity.type === 'ControlFlow.TimeoutScope') {
+    const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
+    const timeoutMs = Number(activity.properties.timeoutMs ?? 30000);
+    return `${pad}<ui:TimeoutScope DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Timeout="${msToTimeSpan(timeoutMs)}">
+${pad}  <ui:TimeoutScope.Body>
+${pad}    <ActivityAction>
+${pad}      <Sequence>
+${kids}
+${pad}      </Sequence>
+${pad}    </ActivityAction>
+${pad}  </ui:TimeoutScope.Body>
+${pad}</ui:TimeoutScope>`;
   }
 
   if (activity.type === 'ControlFlow.Break') {
@@ -468,7 +530,7 @@ ${pad}</uia:NApplicationCard>`;
   }
 
   if (activity.type.startsWith('Excel.')) {
-    return renderExcelActivity(activity, pad);
+    return renderExcelActivity(activity, pad, indent);
   }
 
   if (activity.type === 'Messaging.SendEmail') {
@@ -476,7 +538,62 @@ ${pad}</uia:NApplicationCard>`;
   }
 
   if (activity.type === 'Messaging.HttpRequest') {
-    return `${pad}<ui:HttpClient DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Method="${escapeAttr(String(activity.properties.method || 'GET'))}" EndPoint="[${escapeAttr(String(activity.properties.url || '""'))}]" />`;
+    const headers = String(activity.properties.headers || '')
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    const authType = String(activity.properties.authType || 'None');
+    if (authType === 'Bearer' && activity.properties.token) {
+      headers.push('Authorization: Bearer ' + String(activity.properties.token).replace(/^\[|\]$/g, ''));
+    }
+    const headerAttrs = headers.length
+      ? ` Headers="${escapeAttr(headers.join('; '))}"`
+      : '';
+    const body = String(activity.properties.body || '');
+    const bodyAttr = body ? ` Body="[${escapeAttr(body)}]"` : '';
+    const statusVar = String(activity.properties.statusCode || '').replace(/^\[|\]$/g, '');
+    const statusAttr = statusVar ? ` StatusCode="[${escapeAttr(statusVar)}]"` : '';
+    const resultVar = String(activity.properties.result || '').replace(/^\[|\]$/g, '');
+    const resultAttr = resultVar ? ` Result="[${escapeAttr(resultVar)}]"` : '';
+    return `${pad}<ui:HttpClient DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Method="${escapeAttr(String(activity.properties.method || 'GET'))}" EndPoint="[${escapeAttr(String(activity.properties.url || '""'))}]"${headerAttrs}${bodyAttr}${statusAttr}${resultAttr} />`;
+  }
+
+  if (activity.type === 'Messaging.GetEmail') {
+    return `${pad}<mail:GetIMAPMailMessages DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" MailFolder="${escapeAttr(String(activity.properties.mailFolder || 'Inbox'))}" Top="${Number(activity.properties.top ?? 10)}" Filter="${escapeAttr(String(activity.properties.filter || ''))}" Messages="[${escapeAttr(String(activity.properties.result || 'mails'))}]" />`;
+  }
+
+  if (activity.type === 'Messaging.SelectToken') {
+    return `${pad}<ui:SelectToken DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Json="[${escapeAttr(String(activity.properties.json || 'jsonObj'))}]" Path="${escapeAttr(String(activity.properties.path || 'data.id'))}" Result="[${escapeAttr(String(activity.properties.result || 'tokenValue'))}]" />`;
+  }
+
+  if (activity.type === 'Orchestrator.GetTransactionItem') {
+    const folder = String(activity.properties.folderPath || '');
+    const folderAttr = folder ? ` FolderPath="${escapeAttr(folder)}"` : '';
+    const ref = String(activity.properties.reference || '');
+    const refAttr = ref ? ` Reference="${escapeAttr(ref)}"` : '';
+    return `${pad}<ui:GetQueueItem DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" QueueName="${escapeAttr(String(activity.properties.queueName || 'MainQueue'))}"${folderAttr}${refAttr} TransactionItem="[${escapeAttr(String(activity.properties.result || 'TransactionItem'))}]" />`;
+  }
+
+  if (activity.type === 'Orchestrator.AddQueueItem') {
+    const folder = String(activity.properties.folderPath || '');
+    const folderAttr = folder ? ` FolderPath="${escapeAttr(folder)}"` : '';
+    return `${pad}<ui:AddQueueItem DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" QueueName="${escapeAttr(String(activity.properties.queueName || 'MainQueue'))}"${folderAttr} Reference="[${escapeAttr(String(activity.properties.reference ?? '""'))}]" Priority="${escapeAttr(String(activity.properties.priority || 'Normal'))}" ItemInformation="[${escapeAttr(String(activity.properties.itemInformation || '{}'))}]" />`;
+  }
+
+  if (activity.type === 'Orchestrator.GetAsset') {
+    const folder = String(activity.properties.folderPath || '');
+    const folderAttr = folder ? ` FolderPath="${escapeAttr(folder)}"` : '';
+    return `${pad}<ui:GetRobotAsset DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" AssetName="${escapeAttr(String(activity.properties.assetName || 'AssetName'))}"${folderAttr} Value="[${escapeAttr(String(activity.properties.result || 'assetValue'))}]" />`;
+  }
+
+  if (activity.type === 'Orchestrator.SetAsset') {
+    const folder = String(activity.properties.folderPath || '');
+    const folderAttr = folder ? ` FolderPath="${escapeAttr(folder)}"` : '';
+    return `${pad}<ui:SetAsset DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" AssetName="${escapeAttr(String(activity.properties.assetName || 'AssetName'))}"${folderAttr} Value="[${escapeAttr(String(activity.properties.value ?? '""'))}]" />`;
+  }
+
+  if (activity.type === 'REFramework.SetTransactionStatus') {
+    return `${pad}<ui:SetTransactionStatus DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" TransactionItem="[${escapeAttr(String(activity.properties.transactionItem || 'TransactionItem'))}]" Status="${escapeAttr(String(activity.properties.status || 'Success'))}" ErrorType="${escapeAttr(String(activity.properties.status || 'Success'))}" Reason="[${escapeAttr(String(activity.properties.reason ?? '""'))}]" />`;
   }
 
   if (activity.type.startsWith('Python.')) {
@@ -705,7 +822,7 @@ ${target}
 ${pad}</${openTag}>`;
 }
 
-function renderExcelActivity(activity: ActivityNode, pad: string): string {
+function renderExcelActivity(activity: ActivityNode, pad: string, indent = 0): string {
   const path = escapeAttr(String(activity.properties.workbookPath || 'data.xlsx'));
   const sheet = escapeAttr(String(activity.properties.sheetName || 'Sheet1'));
   const range = escapeAttr(String(activity.properties.range || ''));
@@ -715,6 +832,21 @@ function renderExcelActivity(activity: ActivityNode, pad: string): string {
       return `${pad}<excel:ReadRange DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" SheetName="${sheet}" Range="${range}" />`;
     case 'Excel.WriteRange':
       return `${pad}<excel:WriteRange DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" SheetName="${sheet}" DataTable="[${escapeAttr(String(activity.properties.data || 'dt'))}]" />`;
+    case 'Excel.AppendRange':
+      return `${pad}<excel:AppendRange DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" SheetName="${sheet}" DataTable="[${escapeAttr(String(activity.properties.data || 'dt'))}]" />`;
+    case 'Excel.ExcelApplicationScope': {
+      const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
+      const create = activity.properties.createIfNotExists === false || activity.properties.createIfNotExists === 'false' ? 'False' : 'True';
+      return `${pad}<excel:ExcelApplicationScope DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" CreateNewFile="${create}">
+${pad}  <excel:ExcelApplicationScope.Body>
+${pad}    <ActivityAction>
+${pad}      <Sequence>
+${kids}
+${pad}      </Sequence>
+${pad}    </ActivityAction>
+${pad}  </excel:ExcelApplicationScope.Body>
+${pad}</excel:ExcelApplicationScope>`;
+    }
     case 'Excel.ReadCell':
       return `${pad}<excel:ReadCell DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" SheetName="${sheet}" Cell="${cell}" />`;
     case 'Excel.WriteCell':

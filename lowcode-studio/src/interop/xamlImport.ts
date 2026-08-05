@@ -663,6 +663,27 @@ function mapActivity(
   }
 
   if (localName === 'Switch') {
+    const caseKeys: string[] = [];
+    const visitCases = (node: unknown) => {
+      if (!node || typeof node !== 'object') return;
+      if (Array.isArray(node)) {
+        node.forEach(visitCases);
+        return;
+      }
+      const obj = node as Record<string, unknown>;
+      for (const [k, v] of Object.entries(obj)) {
+        if (k === 'Case' || k === 'Switch.Case') {
+          for (const c of asArray(v) as Array<Record<string, unknown>>) {
+            const key = String(c['@_Key'] || c['@_x:Key'] || '').trim();
+            if (key) caseKeys.push(key);
+          }
+        } else if (!k.startsWith('@_')) {
+          visitCases(v);
+        }
+      }
+    };
+    visitCases(raw);
+    if (!caseKeys.includes('Default')) caseKeys.push('Default');
     return {
       id: newId(),
       type: 'ControlFlow.Switch',
@@ -671,12 +692,197 @@ function mapActivity(
         expression: cleanExpr(
           raw['@_Expression'] || extractArgument(raw, 'Expression') || 'status'
         ),
-        cases: 'Success,Failed,Default'
+        cases: caseKeys.join(',') || 'Default'
       },
       children: collectActivities(
         raw['Default'] || raw['Switch.Default'] || raw,
         warnings
       )
+    };
+  }
+
+  if (localName === 'Parallel') {
+    return {
+      id: newId(),
+      type: 'ControlFlow.Parallel',
+      displayName,
+      properties: {},
+      children: collectActivities(raw, warnings)
+    };
+  }
+
+  if (localName === 'ParallelForEach') {
+    return {
+      id: newId(),
+      type: 'ControlFlow.ParallelForEach',
+      displayName,
+      properties: {
+        item: stripBrackets(
+          cleanExpr(raw['@_Item'] || extractArgument(raw, 'Item') || 'item')
+        ),
+        values: stripBrackets(
+          cleanExpr(raw['@_Values'] || extractArgument(raw, 'Values') || 'collection')
+        )
+      },
+      children: collectActivities(raw['Body'] || raw['Action'] || raw, warnings)
+    };
+  }
+
+  if (localName === 'TimeoutScope') {
+    return {
+      id: newId(),
+      type: 'ControlFlow.TimeoutScope',
+      displayName,
+      properties: {
+        timeoutMs: parseDurationMs(String(raw['@_Timeout'] || '00:00:30'))
+      },
+      children: collectActivities(raw['Body'] || raw['TimeoutScope.Body'] || raw, warnings)
+    };
+  }
+
+  if (localName === 'JoinDataTables' || localName === 'JoinDataTable') {
+    return {
+      id: newId(),
+      type: 'Data.JoinDataTable',
+      displayName,
+      properties: {
+        dataTable1: stripBrackets(cleanExpr(raw['@_DataTable1'] || extractArgument(raw, 'DataTable1') || 'dtLeft')),
+        dataTable2: stripBrackets(cleanExpr(raw['@_DataTable2'] || extractArgument(raw, 'DataTable2') || 'dtRight')),
+        joinType: String(raw['@_JoinType'] || 'Inner'),
+        column1: cleanExpr(raw['@_Column1'] || extractArgument(raw, 'Column1') || 'Id'),
+        column2: cleanExpr(raw['@_Column2'] || extractArgument(raw, 'Column2') || 'Id'),
+        result: stripBrackets(cleanExpr(raw['@_DataTable'] || extractArgument(raw, 'DataTable') || 'joinedDt'))
+      }
+    };
+  }
+
+  if (localName === 'LookupDataTable') {
+    return {
+      id: newId(),
+      type: 'Data.LookupDataTable',
+      displayName,
+      properties: {
+        dataTable: stripBrackets(cleanExpr(raw['@_DataTable'] || extractArgument(raw, 'DataTable') || 'dt')),
+        lookupColumn: cleanExpr(raw['@_LookupColumnName'] || extractArgument(raw, 'LookupColumnName') || 'Id'),
+        lookupValue: cleanExpr(raw['@_LookupValue'] || extractArgument(raw, 'LookupValue') || '""'),
+        targetColumn: cleanExpr(raw['@_TargetColumnName'] || extractArgument(raw, 'TargetColumnName') || 'Name'),
+        result: stripBrackets(cleanExpr(raw['@_Value'] || extractArgument(raw, 'Value') || 'lookupResult'))
+      }
+    };
+  }
+
+  if (localName === 'SortDataTable') {
+    return {
+      id: newId(),
+      type: 'Data.SortDataTable',
+      displayName,
+      properties: {
+        dataTable: stripBrackets(cleanExpr(raw['@_DataTable'] || extractArgument(raw, 'DataTable') || 'dt')),
+        columnName: cleanExpr(raw['@_ColumnName'] || extractArgument(raw, 'ColumnName') || 'Id'),
+        order: String(raw['@_Order'] || 'Ascending'),
+        result: stripBrackets(cleanExpr(raw['@_SortDataTable'] || extractArgument(raw, 'SortDataTable') || 'sortedDt'))
+      }
+    };
+  }
+
+  if (localName === 'GetQueueItem' || localName === 'GetTransactionItem') {
+    return {
+      id: newId(),
+      type: 'Orchestrator.GetTransactionItem',
+      displayName,
+      properties: {
+        queueName: cleanExpr(raw['@_QueueName'] || extractArgument(raw, 'QueueName') || 'MainQueue'),
+        folderPath: cleanExpr(raw['@_FolderPath'] || extractArgument(raw, 'FolderPath') || ''),
+        reference: cleanExpr(raw['@_Reference'] || extractArgument(raw, 'Reference') || ''),
+        result: stripBrackets(cleanExpr(raw['@_TransactionItem'] || extractArgument(raw, 'TransactionItem') || 'TransactionItem'))
+      }
+    };
+  }
+
+  if (localName === 'AddQueueItem') {
+    return {
+      id: newId(),
+      type: 'Orchestrator.AddQueueItem',
+      displayName,
+      properties: {
+        queueName: cleanExpr(raw['@_QueueName'] || extractArgument(raw, 'QueueName') || 'MainQueue'),
+        folderPath: cleanExpr(raw['@_FolderPath'] || extractArgument(raw, 'FolderPath') || ''),
+        reference: cleanExpr(raw['@_Reference'] || extractArgument(raw, 'Reference') || '""'),
+        itemInformation: cleanExpr(raw['@_ItemInformation'] || extractArgument(raw, 'ItemInformation') || '{}'),
+        priority: String(raw['@_Priority'] || 'Normal')
+      }
+    };
+  }
+
+  if (localName === 'GetRobotAsset' || localName === 'GetAsset') {
+    return {
+      id: newId(),
+      type: 'Orchestrator.GetAsset',
+      displayName,
+      properties: {
+        assetName: cleanExpr(raw['@_AssetName'] || extractArgument(raw, 'AssetName') || 'AssetName'),
+        folderPath: cleanExpr(raw['@_FolderPath'] || extractArgument(raw, 'FolderPath') || ''),
+        result: stripBrackets(cleanExpr(raw['@_Value'] || extractArgument(raw, 'Value') || 'assetValue'))
+      }
+    };
+  }
+
+  if (localName === 'SetAsset') {
+    return {
+      id: newId(),
+      type: 'Orchestrator.SetAsset',
+      displayName,
+      properties: {
+        assetName: cleanExpr(raw['@_AssetName'] || extractArgument(raw, 'AssetName') || 'AssetName'),
+        value: cleanExpr(raw['@_Value'] || extractArgument(raw, 'Value') || '""'),
+        folderPath: cleanExpr(raw['@_FolderPath'] || extractArgument(raw, 'FolderPath') || '')
+      }
+    };
+  }
+
+  if (localName === 'SetTransactionStatus') {
+    return {
+      id: newId(),
+      type: 'REFramework.SetTransactionStatus',
+      displayName,
+      properties: {
+        transactionItem: stripBrackets(cleanExpr(raw['@_TransactionItem'] || extractArgument(raw, 'TransactionItem') || 'TransactionItem')),
+        status: String(raw['@_Status'] || raw['@_ErrorType'] || 'Success'),
+        reason: cleanExpr(raw['@_Reason'] || extractArgument(raw, 'Reason') || '""')
+      }
+    };
+  }
+
+  if (localName === 'SelectToken' || localName === 'DeserializeAndSelectToken') {
+    return {
+      id: newId(),
+      type: 'Messaging.SelectToken',
+      displayName,
+      properties: {
+        json: stripBrackets(cleanExpr(raw['@_Json'] || extractArgument(raw, 'Json') || 'jsonObj')),
+        path: cleanExpr(raw['@_Path'] || extractArgument(raw, 'Path') || 'data.id'),
+        result: stripBrackets(cleanExpr(raw['@_Result'] || extractArgument(raw, 'Result') || 'tokenValue'))
+      }
+    };
+  }
+
+  if (
+    localName === 'GetIMAPMailMessages' ||
+    localName === 'GetOutlookMailMessages' ||
+    localName === 'GetPOP3MailMessages' ||
+    localName === 'GetEmail' ||
+    localName === 'GetMail'
+  ) {
+    return {
+      id: newId(),
+      type: 'Messaging.GetEmail',
+      displayName,
+      properties: {
+        mailFolder: cleanExpr(raw['@_MailFolder'] || extractArgument(raw, 'MailFolder') || 'Inbox'),
+        top: Number(raw['@_Top'] || 10),
+        filter: cleanExpr(raw['@_Filter'] || extractArgument(raw, 'Filter') || ''),
+        result: stripBrackets(cleanExpr(raw['@_Messages'] || extractArgument(raw, 'Messages') || 'mails'))
+      }
     };
   }
 
@@ -746,6 +952,7 @@ function mapActivity(
         columnName: cleanExpr(
           raw['@_ColumnName'] || extractArgument(raw, 'ColumnName') || 'Status'
         ),
+        operator: String(raw['@_Operator'] || '='),
         value: cleanExpr(raw['@_Value'] || extractArgument(raw, 'Value') || '""'),
         result: stripBrackets(
           cleanExpr(
@@ -895,6 +1102,10 @@ function mapActivity(
       mapped === 'UI.OpenApplication' ||
       mapped === 'Data.ForEachRow' ||
       mapped === 'ControlFlow.Switch' ||
+      mapped === 'ControlFlow.Parallel' ||
+      mapped === 'ControlFlow.ParallelForEach' ||
+      mapped === 'ControlFlow.TimeoutScope' ||
+      mapped === 'Excel.ExcelApplicationScope' ||
       mapped === 'UI.WaitElement'
     ) {
       const kids = collectActivities(
@@ -1064,13 +1275,16 @@ function pickCommonProps(
     if (result) {
       props.result = stripBrackets(cleanExpr(result));
     }
-    if (mapped === 'Excel.WriteRange') {
+    if (mapped === 'Excel.WriteRange' || mapped === 'Excel.AppendRange') {
       props.data = stripBrackets(
         cleanExpr(raw['@_DataTable'] || extractArgument(raw, 'DataTable') || 'dt')
       );
     }
     if (mapped === 'Excel.WriteCell') {
       props.value = cleanExpr(raw['@_Value'] || extractArgument(raw, 'Value') || '""');
+    }
+    if (mapped === 'Excel.ExcelApplicationScope') {
+      props.createIfNotExists = String(raw['@_CreateNewFile'] ?? 'True') !== 'False';
     }
   }
 
@@ -1101,6 +1315,22 @@ function pickCommonProps(
     props.url = cleanExpr(url || raw['@_EndPoint'] || '"https://api.example.com"');
     props.result = stripBrackets(cleanExpr(result || 'response'));
     props.body = cleanExpr(raw['@_Body'] || extractArgument(raw, 'Body') || '');
+    props.headers = String(raw['@_Headers'] || extractArgument(raw, 'Headers') || '')
+      .split(';')
+      .map((h) => h.trim())
+      .filter(Boolean)
+      .join('\n');
+    props.statusCode = stripBrackets(
+      cleanExpr(raw['@_StatusCode'] || extractArgument(raw, 'StatusCode') || 'statusCode')
+    );
+    const authHeader = String(props.headers || '');
+    if (/Authorization:\s*Bearer/i.test(authHeader)) {
+      props.authType = 'Bearer';
+    } else if (/Authorization:\s*Basic/i.test(authHeader)) {
+      props.authType = 'Basic';
+    } else {
+      props.authType = 'None';
+    }
   }
 
   if (mapped === 'UI.Click') {

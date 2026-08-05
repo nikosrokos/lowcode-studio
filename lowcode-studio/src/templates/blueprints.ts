@@ -16,7 +16,8 @@ import { GeneratedFile } from './reframework';
 export type BlueprintId =
   | 'web-scrape-excel'
   | 'login-extract-email'
-  | 'api-datatable-process';
+  | 'api-datatable-process'
+  | 'queue-orchestrator';
 
 export interface RobotBlueprint {
   id: BlueprintId;
@@ -47,6 +48,13 @@ export const ROBOT_BLUEPRINTS: RobotBlueprint[] = [
     description: 'HTTP GET → JSON → table → for each row',
     detail: 'HttpRequest, Deserialize JSON, Build Data Table, For Each Row',
     defaultProjectName: 'ApiDataTableProcess'
+  },
+  {
+    id: 'queue-orchestrator',
+    label: 'Queue → Process → Set Status',
+    description: 'Get Transaction Item → process → Set Transaction Status',
+    detail: 'Orchestrator queue/asset activities with scenario fixtures',
+    defaultProjectName: 'QueueOrchestrator'
   }
 ];
 
@@ -143,6 +151,8 @@ function buildBody(id: BlueprintId): {
       return loginExtractEmail();
     case 'api-datatable-process':
       return apiDataTableProcess();
+    case 'queue-orchestrator':
+      return queueOrchestrator();
   }
 }
 
@@ -334,6 +344,53 @@ function apiDataTableProcess(): {
   };
 }
 
+function queueOrchestrator(): {
+  variables: WorkflowVariable[];
+  activities: ActivityNode[];
+} {
+  return {
+    variables: [
+      v('TransactionItem', 'Object', null),
+      v('assetValue', 'String', '""'),
+      v('statusCode', 'Int32', 0),
+      v('response', 'Object', null),
+      v('MaxTransactions', 'Int32', 3),
+      v('TransactionNumber', 'Int32', 1)
+    ],
+    activities: [
+      log('"Queue orchestrator start"', 'Info'),
+      act('Orchestrator.GetAsset', 'Get Config Asset', {
+        assetName: 'AppUrl',
+        result: 'assetValue'
+      }),
+      act('Orchestrator.GetTransactionItem', 'Get next queue item', {
+        queueName: 'MainQueue',
+        result: 'TransactionItem'
+      }),
+      act('Messaging.HttpRequest', 'Call process API', {
+        method: 'POST',
+        url: 'assetValue',
+        authType: 'None',
+        body: '',
+        result: 'response',
+        statusCode: 'statusCode'
+      }),
+      act('REFramework.SetTransactionStatus', 'Mark Success', {
+        transactionItem: 'TransactionItem',
+        status: 'Success',
+        reason: '""'
+      }),
+      act('Orchestrator.AddQueueItem', 'Optional requeue example', {
+        queueName: 'MainQueue',
+        reference: '"follow-up"',
+        itemInformation: '{ "Source": "LCS" }',
+        priority: 'Normal'
+      }),
+      log('"Queue orchestrator done"', 'Info')
+    ]
+  };
+}
+
 function buildScenarios(projectName: string, id: BlueprintId) {
   switch (id) {
     case 'web-scrape-excel':
@@ -414,6 +471,31 @@ function buildScenarios(projectName: string, id: BlueprintId) {
               minSteps: 5,
               variables: { processedCount: 2 },
               logIncludes: ['API → DataTable', 'API process complete']
+            }
+          }
+        ]
+      };
+    case 'queue-orchestrator':
+      return {
+        schemaVersion: '1.0',
+        scenarios: [
+          {
+            name: 'queue-happy',
+            description: `Queue item + asset fixtures (${projectName})`,
+            variables: { TransactionNumber: 1, MaxTransactions: 3 },
+            fixtures: {
+              assets: { AppUrl: 'https://api.example.com/process' },
+              queueItems: {
+                MainQueue: [{ Reference: 'REF-1', SpecificContent: { Id: 1 } }]
+              },
+              http: {
+                'api.example.com': { status: 200, body: { ok: true } }
+              }
+            },
+            expect: {
+              ok: true,
+              minSteps: 5,
+              logIncludes: ['Queue orchestrator start', 'GetTransactionItem', 'SetTransactionStatus']
             }
           }
         ]
