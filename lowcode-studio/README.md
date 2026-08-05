@@ -1,12 +1,12 @@
 # LowCode Studio
 
-**Version 0.6.13** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.6.14** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.6.13-0ea5e9)
+![version](https://img.shields.io/badge/version-0.6.14-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
@@ -45,7 +45,12 @@ Design on Mac (REFramework)
 2. **Project Explorer** — title actions with tooltips (Open, Scenarios, Connect, Validate…)  
 3. **Extract Table Data** — smart page → DataTable extraction for Windows UI automation
 
-## What’s in 0.6.13
+## What’s in 0.6.14
+
+- **Open** accepts Studio Web Local Workspace solutions (`.uipx`) even when no workspace folder is open — no more “Open a workspace folder first”
+- Opening a solution adds it to Project Explorer; optional Link & Sync to the active LCS project
+
+### Also in 0.6.13
 
 - Fix Studio Web parse error: `entryPoints[0].uniqueId` is now a real Guid (names like "RPA Workflow" previously broke open)
 - Linked Studio Web solutions appear in Project Explorer; **Remove** / **Unlink** supported (designer × and context menu)
@@ -117,7 +122,7 @@ Design on Mac (REFramework)
 - **Variables panel collapsed** by default in the designer (expand when needed)
 - **Package validation warnings** — Validate Packages + pre-check on Connect to Studio Web
 - **Project Explorer title actions** — Open Local Project · Scenarios · Connect · Validate · Refresh (create/import in `…` menu)
-- **Open Local Project** — browse to a folder with `project.json` and open the main workflow
+- **Open Local Project** — browse to an LCS `project.json` **or** a Studio Web `.uipx` solution folder
 
 ### Also in 0.6.1
 
@@ -143,7 +148,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.13.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.14.vsix` → reload.
 
 ## Easy path
 

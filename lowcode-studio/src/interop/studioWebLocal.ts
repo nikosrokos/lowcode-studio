@@ -68,7 +68,12 @@ export function isStudioWebLocalLinked(lcsProjectDir: string): boolean {
   return fs.existsSync(link.solutionDir) && findUipx(link.solutionDir) !== undefined;
 }
 
-function findUipx(solutionDir: string): string | undefined {
+/** True when folder is a Studio Web Local Workspace solution (contains a .uipx). */
+export function isStudioWebSolutionDir(folder: string): boolean {
+  return findUipx(folder) !== undefined;
+}
+
+export function findUipx(solutionDir: string): string | undefined {
   if (!fs.existsSync(solutionDir)) {
     return undefined;
   }

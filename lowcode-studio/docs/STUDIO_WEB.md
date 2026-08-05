@@ -70,4 +70,5 @@ From the Connect picker choose **Legacy: export .uip package once** or **Export 
 |---|---|
 | `Failed to parse JSON` / `uniqueId` Guid error | Update to **0.6.13+** and **Save** or Connect → Sync (rewrites a valid Guid) |
 | "targets Windows" on Mac | Update to **0.6.12+** and Sync (rewrites Portable) |
-| Solution not in Project Explorer | Connect → Sync/Open again (adds the solution folder); use × / context menu to remove |
+| Solution not in Project Explorer | Connect → Sync/Open again, or **Open** and pick the `.uipx` solution folder (works with no workspace open) |
+| "Open a workspace folder first" when opening a solution | Update to **0.6.14+** — Open accepts Studio Web `.uipx` solutions without a prior workspace |

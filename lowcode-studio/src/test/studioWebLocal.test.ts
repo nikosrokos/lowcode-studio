@@ -5,6 +5,7 @@ import * as path from 'path';
 import { generateREFrameworkProject } from '../templates/reframework';
 import {
   getStudioWebLocalLink,
+  isStudioWebSolutionDir,
   linkStudioWebLocalWorkspace,
   syncToStudioWebLocal,
   unlinkStudioWebLocalWorkspace,
@@ -42,6 +43,11 @@ function run(): void {
 
   assert.ok(fs.existsSync(linked.link.solutionDir));
   assert.ok(fs.existsSync(linked.uipxPath));
+  assert.ok(
+    isStudioWebSolutionDir(linked.link.solutionDir),
+    'Open Local Project must recognize .uipx solution folders'
+  );
+  assert.ok(!isStudioWebSolutionDir(lcsDir), 'LCS project folder is not a Studio Web solution');
   assert.ok(fs.existsSync(path.join(linked.targetDir, 'project.json')));
   assert.ok(fs.existsSync(path.join(linked.targetDir, 'Main.xaml')));
   assert.ok(fs.existsSync(path.join(linked.link.solutionDir, 'OPEN_IN_STUDIO_WEB_LOCAL.md')));

@@ -37,6 +37,7 @@ import {
 } from './interop/studioWebConnect';
 import {
   getStudioWebLocalLink,
+  isStudioWebSolutionDir,
   trySyncToStudioWebLocal,
   unlinkStudioWebLocalWorkspace,
   validateStudioWebLocalOpenability
@@ -476,8 +477,9 @@ async function openLocalProjectCommand(): Promise<void> {
     canSelectFiles: false,
     canSelectFolders: true,
     canSelectMany: false,
-    openLabel: 'Open LowCode Studio Project',
-    title: 'Select a LowCode Studio project folder (contains project.json)'
+    openLabel: 'Open Folder',
+    title:
+      'Select a LowCode Studio project (project.json) or Studio Web Local Workspace solution (.uipx)'
   });
   const folderUri = picked?.[0];
   if (!folderUri) {
@@ -486,6 +488,12 @@ async function openLocalProjectCommand(): Promise<void> {
 
   const projectDir = resolveLcsProjectFromFolder(folderUri.fsPath);
   if (!projectDir) {
+    // Studio Web Local Workspace solution — add to explorer (do not require a prior workspace)
+    if (isStudioWebSolutionDir(folderUri.fsPath)) {
+      await openStudioWebSolutionFolder(folderUri.fsPath);
+      return;
+    }
+
     const importInstead = await vscode.window.showWarningMessage(
       'No LowCode Studio project.json (schemaVersion 1.0) found in that folder.',
       'Import as UiPath Project',
@@ -497,44 +505,15 @@ async function openLocalProjectCommand(): Promise<void> {
     return;
   }
 
-  const alreadyOpen = vscode.workspace.workspaceFolders?.some(
-    (f) =>
-      projectDir === f.uri.fsPath ||
-      projectDir.startsWith(f.uri.fsPath + path.sep) ||
-      f.uri.fsPath.startsWith(projectDir + path.sep)
-  );
-
-  if (!alreadyOpen) {
-    const choice = await vscode.window.showInformationMessage(
-      `Open project "${path.basename(projectDir)}" in this window?`,
-      'Open Folder',
-      'Add to Workspace',
-      'Cancel'
-    );
-    if (!choice || choice === 'Cancel') {
-      return;
-    }
-    if (choice === 'Open Folder') {
-      await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(projectDir), {
-        forceNewWindow: false
-      });
-      return; // window reloads
-    }
-    const folders = vscode.workspace.workspaceFolders;
-    const index = folders?.length ?? 0;
-    const added = vscode.workspace.updateWorkspaceFolders(index, 0, {
-      uri: vscode.Uri.file(projectDir),
-      name: path.basename(projectDir)
-    });
-    if (!added) {
-      // Fallback: open folder
-      await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(projectDir), false);
-      return;
-    }
+  const opened = await ensureFolderInWorkspace(projectDir, path.basename(projectDir));
+  if (opened === 'reloading') {
+    return;
   }
 
   await setActiveProjectDir(projectDir);
   refreshCustomActivityOverlay();
+  projectProvider.refresh();
+  editorProvider?.refreshProjectTree?.();
 
   const main = readProjectMainWorkflow(projectDir);
   if (main) {
@@ -550,6 +529,73 @@ async function openLocalProjectCommand(): Promise<void> {
   void vscode.window.showInformationMessage(
     `Opened LowCode Studio project "${path.basename(projectDir)}".`
   );
+}
+
+/** Open/add a Studio Web .uipx solution folder into Project Explorer without a prior workspace. */
+async function openStudioWebSolutionFolder(solutionDir: string): Promise<void> {
+  const label = `${path.basename(solutionDir)} (Studio Web)`;
+  const opened = await ensureFolderInWorkspace(solutionDir, label);
+  if (opened === 'reloading') {
+    return;
+  }
+  projectProvider.refresh();
+  editorProvider?.refreshProjectTree?.();
+
+  const activeLcs =
+    extensionContext.workspaceState.get<string>('lowcodeStudio.activeProjectDir') ||
+    (await resolveLcsProjectDirQuiet());
+  if (activeLcs && isLcsProjectDir(activeLcs) && !getStudioWebLocalLink(activeLcs)) {
+    const linkNow = await vscode.window.showInformationMessage(
+      `Opened Studio Web solution "${path.basename(solutionDir)}". Link it to "${path.basename(activeLcs)}" for Save sync?`,
+      'Link & Sync',
+      'Not now'
+    );
+    if (linkNow === 'Link & Sync') {
+      try {
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: `Linking Studio Web Local Workspace for ${path.basename(activeLcs)}…`
+          },
+          async () =>
+            connectToStudioWeb(activeLcs, {
+              local: { mode: 'open', targetDir: solutionDir }
+            })
+        );
+        projectProvider.refresh();
+        editorProvider?.refreshProjectTree?.();
+        void vscode.window.showInformationMessage(
+          `Linked Local Workspace → ${path.basename(solutionDir)}. Save syncs automatically.`
+        );
+      } catch (err) {
+        vscode.window.showErrorMessage(
+          err instanceof Error ? err.message : 'Studio Web link failed'
+        );
+      }
+      return;
+    }
+  }
+
+  void vscode.window.showInformationMessage(
+    `Opened Studio Web Local Workspace "${path.basename(solutionDir)}" in Project Explorer.`
+  );
+}
+
+/** Resolve LCS project without prompting the user to open anything. */
+async function resolveLcsProjectDirQuiet(): Promise<string | undefined> {
+  const fromDoc = projectDirFromOpenDocument();
+  if (fromDoc && isLcsProjectDir(fromDoc)) {
+    return fromDoc;
+  }
+  const remembered = extensionContext.workspaceState.get<string>(
+    'lowcodeStudio.activeProjectDir'
+  );
+  if (remembered && isLcsProjectDir(remembered)) {
+    return remembered;
+  }
+  const roots = (vscode.workspace.workspaceFolders || []).map((f) => f.uri.fsPath);
+  const all = findAllLcsProjects(roots);
+  return all.length === 1 ? all[0] : undefined;
 }
 
 function resolveLcsProjectFromFolder(folder: string): string | undefined {
@@ -874,11 +920,6 @@ async function newWorkflow(): Promise<void> {
 }
 
 async function importUiPathProjectCommand(preselected?: vscode.Uri): Promise<void> {
-  const workspace = vscode.workspace.workspaceFolders?.[0];
-  if (!workspace) {
-    vscode.window.showErrorMessage('Open a workspace folder first.');
-    return;
-  }
   let sourceUri = preselected;
   if (!sourceUri) {
     const picked = await vscode.window.showOpenDialog({
@@ -892,14 +933,45 @@ async function importUiPathProjectCommand(preselected?: vscode.Uri): Promise<voi
   if (!sourceUri) {
     return;
   }
+
+  // Prefer an existing workspace root; otherwise ask where to place the import
+  let destRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!destRoot) {
+    if (isStudioWebSolutionDir(sourceUri.fsPath)) {
+      await openStudioWebSolutionFolder(sourceUri.fsPath);
+      return;
+    }
+    const dest = await vscode.window.showOpenDialog({
+      canSelectFiles: false,
+      canSelectFolders: true,
+      canSelectMany: false,
+      openLabel: 'Import into this folder',
+      title: 'Choose a destination folder for the imported LowCode Studio project'
+    });
+    if (!dest?.[0]) {
+      return;
+    }
+    destRoot = dest[0].fsPath;
+  }
+
   try {
     const result = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
         title: 'Importing UiPath project…'
       },
-      async () => importUiPathProjectFolder(sourceUri!.fsPath, workspace.uri.fsPath)
+      async () => importUiPathProjectFolder(sourceUri!.fsPath, destRoot!)
     );
+
+    const opened = await ensureFolderInWorkspace(
+      result.targetDir,
+      path.basename(result.targetDir)
+    );
+    if (opened === 'reloading') {
+      return;
+    }
+
+    await setActiveProjectDir(result.targetDir);
     projectProvider.refresh();
     const mainUri = vscode.Uri.file(path.join(result.targetDir, result.mainWorkflow));
     await vscode.commands.executeCommand(
@@ -923,11 +995,6 @@ async function importUiPathProjectCommand(preselected?: vscode.Uri): Promise<voi
 }
 
 async function importUiPathPackageCommand(): Promise<void> {
-  const workspace = vscode.workspace.workspaceFolders?.[0];
-  if (!workspace) {
-    vscode.window.showErrorMessage('Open a workspace folder first.');
-    return;
-  }
   const picked = await vscode.window.showOpenDialog({
     canSelectFiles: true,
     canSelectFolders: false,
@@ -938,14 +1005,38 @@ async function importUiPathPackageCommand(): Promise<void> {
   if (!picked?.[0]) {
     return;
   }
+
+  let destRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!destRoot) {
+    const dest = await vscode.window.showOpenDialog({
+      canSelectFiles: false,
+      canSelectFolders: true,
+      canSelectMany: false,
+      openLabel: 'Import into this folder',
+      title: 'Choose a destination folder for the imported LowCode Studio project'
+    });
+    if (!dest?.[0]) {
+      return;
+    }
+    destRoot = dest[0].fsPath;
+  }
+
   try {
     const result = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
         title: 'Importing UiPath package…'
       },
-      async () => importUiPathNupkg(picked[0].fsPath, workspace.uri.fsPath)
+      async () => importUiPathNupkg(picked[0].fsPath, destRoot!)
     );
+    const opened = await ensureFolderInWorkspace(
+      result.targetDir,
+      path.basename(result.targetDir)
+    );
+    if (opened === 'reloading') {
+      return;
+    }
+    await setActiveProjectDir(result.targetDir);
     projectProvider.refresh();
     const mainUri = vscode.Uri.file(path.join(result.targetDir, result.mainWorkflow));
     await vscode.commands.executeCommand(
@@ -1056,9 +1147,16 @@ async function setActiveProjectDir(projectDir: string): Promise<void> {
   editorProvider?.refreshProjectTree?.();
 }
 
-async function ensureFolderInWorkspace(folderPath: string, name?: string): Promise<void> {
+/**
+ * Ensure a folder is visible in the VS Code / Cursor workspace (Project Explorer).
+ * Returns `reloading` when the window will reload (caller should stop).
+ */
+async function ensureFolderInWorkspace(
+  folderPath: string,
+  name?: string
+): Promise<'ok' | 'reloading' | 'skipped'> {
   if (!folderPath || !fs.existsSync(folderPath)) {
-    return;
+    return 'skipped';
   }
   const resolved = path.resolve(folderPath);
   const folders = vscode.workspace.workspaceFolders || [];
@@ -1068,14 +1166,49 @@ async function ensureFolderInWorkspace(folderPath: string, name?: string): Promi
       resolved.startsWith(path.resolve(f.uri.fsPath) + path.sep)
   );
   if (already) {
-    return;
+    return 'ok';
   }
+
+  // Empty window: openFolder is the reliable path (updateWorkspaceFolders often fails)
+  if (!folders.length) {
+    await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(resolved), false);
+    return 'reloading';
+  }
+
   const added = vscode.workspace.updateWorkspaceFolders(folders.length, 0, {
     uri: vscode.Uri.file(resolved),
     name: name || path.basename(resolved)
   });
-  if (!added) {
-    // Multi-root may be unavailable; ignore quietly
+  if (added) {
+    return 'ok';
+  }
+
+  // Multi-root unavailable — write a .code-workspace and reopen
+  try {
+    const wsDir = path.dirname(resolved);
+    const wsName = `${path.basename(resolved)}.code-workspace`;
+    const wsPath = path.join(wsDir, wsName);
+    const entries = [
+      ...folders.map((f) => ({
+        path: f.uri.fsPath,
+        name: f.name
+      })),
+      { path: resolved, name: name || path.basename(resolved) }
+    ];
+    const payload = {
+      folders: entries.map((e) => ({
+        path: e.path,
+        ...(e.name ? { name: e.name } : {})
+      }))
+    };
+    fs.writeFileSync(wsPath, JSON.stringify(payload, null, 2) + '\n', 'utf8');
+    await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsPath), false);
+    return 'reloading';
+  } catch {
+    void vscode.window.showWarningMessage(
+      `Could not add "${path.basename(resolved)}" to the workspace. Use File → Add Folder to Workspace.`
+    );
+    return 'skipped';
   }
 }
 
@@ -1453,7 +1586,13 @@ async function connectStudioWebCommand(treeItem?: ProjectTreeItem): Promise<void
 
     const solutionDir = result.local?.link.solutionDir || result.targetDir;
     // Surface the solution in Project Explorer (workspace + designer rail)
-    await ensureFolderInWorkspace(solutionDir, path.basename(solutionDir) + ' (Studio Web)');
+    const opened = await ensureFolderInWorkspace(
+      solutionDir,
+      path.basename(solutionDir) + ' (Studio Web)'
+    );
+    if (opened === 'reloading') {
+      return;
+    }
     projectProvider.refresh();
     editorProvider?.refreshProjectTree?.();
 
