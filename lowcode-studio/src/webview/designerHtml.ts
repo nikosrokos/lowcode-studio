@@ -1881,8 +1881,8 @@ export function getDesignerHtml(
       setZoom(state.zoom + (e.deltaY < 0 ? 0.1 : -0.1));
     }, { passive: false });
     document.getElementById('btnSave').addEventListener('click', () => {
-      vscode.postMessage({ type: 'save' });
-      toast('Saved');
+      // Flush current workflow with Save so Studio Web Local sync sees latest edits
+      vscode.postMessage({ type: 'save', workflow: state.workflow });
     });
     document.getElementById('btnValidate').addEventListener('click', () => {
       vscode.postMessage({ type: 'validate', workflow: state.workflow });

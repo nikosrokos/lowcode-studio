@@ -29,12 +29,14 @@ import {
   buildCurrentProjectTree,
   findProjectRoot
 } from '../interop/projectResolve';
+import { trySyncToStudioWebLocal } from '../interop/studioWebLocal';
 
 export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
   public static readonly viewType = 'lowcodeStudio.workflowEditor';
 
   private activePanel: vscode.WebviewPanel | undefined;
   private activeDocument: vscode.TextDocument | undefined;
+  private lastSyncLabel = '';
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -43,6 +45,40 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
 
   getActiveDocumentPath(): string | undefined {
     return this.activeDocument?.uri.fsPath;
+  }
+
+  /**
+   * After Save: rewrite linked Studio Web Local Workspace .xaml / project.json
+   * so Studio Web Local Workspace reads the latest files on disk.
+   */
+  private async syncLinkedStudioWebLocal(document: vscode.TextDocument): Promise<void> {
+    this.lastSyncLabel = '';
+    const syncOnSave = vscode.workspace
+      .getConfiguration('lowcodeStudio')
+      .get<boolean>('syncStudioWebOnSave', true);
+    if (!syncOnSave) {
+      return;
+    }
+    const projectRoot = findProjectRoot(path.dirname(document.uri.fsPath));
+    if (!projectRoot) {
+      return;
+    }
+    try {
+      const synced = trySyncToStudioWebLocal(projectRoot);
+      if (synced) {
+        this.lastSyncLabel = path.basename(synced.link.solutionDir);
+        void vscode.window.setStatusBarMessage(
+          `Synced → Studio Web Local (${this.lastSyncLabel})`,
+          2500
+        );
+      }
+    } catch (err) {
+      void vscode.window.showWarningMessage(
+        err instanceof Error
+          ? `Studio Web Local sync failed: ${err.message}`
+          : 'Studio Web Local sync failed'
+      );
+    }
   }
 
   refreshProjectTree(): void {
@@ -221,7 +257,17 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           break;
         }
         case 'save': {
+          // Flush latest designer state before disk save (Save button may not have persisted last keystroke)
+          if (message.workflow) {
+            await this.updateTextDocument(document, message.workflow as WorkflowDocument);
+            this.onWorkflowChanged(message.workflow as WorkflowDocument);
+          }
           await document.save();
+          await this.syncLinkedStudioWebLocal(document);
+          webviewPanel.webview.postMessage({
+            type: 'toast',
+            message: 'Saved' + (this.lastSyncLabel ? ` · synced ${this.lastSyncLabel}` : '')
+          });
           break;
         }
         case 'validate': {
