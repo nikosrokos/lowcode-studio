@@ -1162,12 +1162,26 @@ function mapActivity(
     },
     extractSelectorProps(raw)
   );
-  return {
+  const node: ActivityNode = {
     id: newId(),
     type: unknownActivityType(localName),
     displayName: `${displayName} (imported)`,
     properties: placeholderProps
   };
+  const body =
+    raw['Body'] ||
+    raw['Activity'] ||
+    raw['Handler'] ||
+    raw['Then'] ||
+    raw[`${localName}.Body`] ||
+    raw[`${localName}.Activity`];
+  if (body) {
+    const kids = collectActivities(body, warnings);
+    if (kids.length) {
+      node.children = kids;
+    }
+  }
+  return node;
 }
 
 function importFlowchart(

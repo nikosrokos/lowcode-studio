@@ -1,12 +1,12 @@
 # LowCode Studio
 
-**Version 0.6.36** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.6.37** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.6.36-0ea5e9)
+![version](https://img.shields.io/badge/version-0.6.37-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
@@ -42,11 +42,11 @@ Design on Mac (REFramework)
 1. **Designer** — framed toolbox + properties, sequence board, macOS-style bottom dock  
 2. **Floating frames** — traffic-light controls to float / dock / collapse either side panel  
 
-## What’s in 0.6.36
+## What’s in 0.6.37
 
-- **Open Studio Web solution** imports `.xaml` → `.lcs.json` (sibling `*.lcs` project) and **opens Main** in the designer
-- Simpler **Open folder** (auto-detects LCS vs `.uipx`) — no more “solution shows up without `.lcs.json`”
-- Bidirectional Local sync + Portable activity fixes from 0.6.33–0.6.35
+- Designer UX: **⋯ menu** + reliable right-click, **properties for imported types**, **drag-to-reorder** cards, slightly narrower activities
+- **Open Studio Web solution** imports `.xaml` → `.lcs.json` and opens Main (0.6.36)
+- Bidirectional Local sync + Portable activity fixes (0.6.33–0.6.35)
 
 Full history: [CHANGELOG.md](CHANGELOG.md)
 
@@ -61,7 +61,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.36.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.37.vsix` → reload.
 
 ## Easy path
 

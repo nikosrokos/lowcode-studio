@@ -5,6 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.37] — 2026-08-05
+
+### Fixed
+- **Activity context menu** no longer disappears immediately (right-click / ⋯) — ignored the trailing click that hid the menu
+- **Properties** for unknown / `Imported.*` activities show editable raw fields; selecting a step re-opens a collapsed Properties panel
+- **Drag & drop**: sequence cards can be reordered onto drop targets; failed drops toast instead of silent no-op; larger drop zones
+- Imported unknown containers keep **Body** children when present
+
+### Changed
+- Slightly **narrower** activity column (560px) and flowchart nodes (156px)
+- Each activity card has a **⋯** menu button (same actions as right-click)
+
 ## [0.6.36] — 2026-08-05
 
 ### Fixed
