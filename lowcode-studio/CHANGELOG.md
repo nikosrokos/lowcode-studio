@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.29] — 2026-08-05
+
+### Added
+- **A2** Import map shrink — File IO (`ReadTextFile`, `WriteTextFile`, `AppendLine`, `PathExists`, `CreateDirectory`, `CopyFile`, `DeleteFile`) and **FlowSwitch** map to real LCS types (not `Imported.*`)
+- **C2** Opt-in real HTTP + local Python in dry-run (`lowcodeStudio.dryRun.realHttp` / `realPython`, host allow list; fixtures always win)
+- **F0** Assist — **Explain / critique workflow** (deterministic report in Output)
+- **F1** Assist — **Generate scenarios from description** (Manage Scenarios + command palette)
+
+### Changed
+- Dry-run uses project directory for real File IO stubs; File IO steps classify as `real`
+
 ## [0.6.28] — 2026-08-05
 
 ### Added

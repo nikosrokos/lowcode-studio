@@ -13,13 +13,19 @@ import {
   WorkflowDocument
 } from './models/workflow';
 import {
-  dryRunWorkflow,
+  dryRunWorkflowAsync,
   formatDryRunReport,
   toPseudocode,
   validateWorkflow
 } from './commands/simulator';
 import { getLowCodeOutput } from './util/outputChannel';
+import { readDryRunSettings } from './util/dryRunSettings';
 import { maybeShowWhatsNew, showWhatsNewCommand } from './util/whatsNew';
+import { explainWorkflow } from './commands/assistExplain';
+import {
+  applyGeneratedScenarios,
+  generateScenariosFromDescription
+} from './commands/assistScenarios';
 import {
   createQuickScenario,
   duplicateScenario,
@@ -240,7 +246,17 @@ export function activate(context: vscode.ExtensionContext): void {
       if (!mode) {
         return;
       }
-      const result = dryRunWorkflow(doc);
+      const projectDir =
+        projectDirFromOpenDocument() ||
+        (await resolveLcsProjectDirQuiet()) ||
+        undefined;
+      const drySettings = readDryRunSettings(
+        vscode.workspace.getConfiguration('lowcodeStudio')
+      );
+      const result = await dryRunWorkflowAsync(doc, {
+        projectDir,
+        ...drySettings
+      });
       const channel = getOutput();
       channel.clear();
       channel.appendLine(formatDryRunReport(result, `Dry Run — ${doc.name}`));
@@ -268,6 +284,12 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand('lowcodeStudio.manageScenarios', () =>
       manageScenariosCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.explainWorkflow', () =>
+      explainWorkflowCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.generateScenarios', () =>
+      generateScenariosCommand()
     ),
     vscode.commands.registerCommand('lowcodeStudio.registerCustomActivity', () =>
       registerCustomActivityCommand()
@@ -2388,6 +2410,11 @@ async function manageScenariosCommand(): Promise<void> {
         value: 'add'
       },
       {
+        label: '$(sparkle) Generate from description…',
+        description: 'Assist F1 — keyword templates → scenarios.json',
+        value: 'generate'
+      },
+      {
         label: '$(copy) Duplicate scenario',
         value: 'duplicate'
       },
@@ -2412,6 +2439,10 @@ async function manageScenariosCommand(): Promise<void> {
   }
   if (action.value === 'add') {
     await addQuickScenarioCommand(projectDir);
+    return;
+  }
+  if (action.value === 'generate') {
+    await generateScenariosCommand(projectDir);
     return;
   }
   if (action.value === 'open') {
@@ -2448,6 +2479,70 @@ async function manageScenariosCommand(): Promise<void> {
   }
   if (action.value === 'run-one') {
     await dryRunScenarioCommand();
+  }
+}
+
+async function explainWorkflowCommand(): Promise<void> {
+  const doc = await getActiveWorkflowDocument();
+  if (!doc) {
+    return;
+  }
+  const projectDir =
+    projectDirFromOpenDocument() || (await resolveLcsProjectDirQuiet()) || undefined;
+  let workflowRel: string | undefined;
+  const active = vscode.window.activeTextEditor?.document;
+  if (projectDir && active?.fileName.endsWith('.lcs.json')) {
+    workflowRel = path.relative(projectDir, active.fileName).replace(/\\/g, '/');
+  }
+  const report = explainWorkflow(doc, { projectDir, workflowRel });
+  const channel = getOutput();
+  channel.clear();
+  channel.appendLine(report.markdown);
+  channel.show(true);
+  vscode.window.showInformationMessage(
+    report.critiqueCount
+      ? `Explain: ${report.critiqueCount} critique item(s) — see Output`
+      : 'Explain: no local critique items — see Output'
+  );
+}
+
+async function generateScenariosCommand(projectDirArg?: string): Promise<void> {
+  const projectDir = projectDirArg || (await resolveLcsProjectDir());
+  if (!projectDir) {
+    return;
+  }
+  const description = await vscode.window.showInputBox({
+    prompt: 'Describe the process (queue, HTTP, login, Excel, fail…)',
+    placeHolder: 'e.g. REFramework queue with HTTP API and login UI',
+    ignoreFocusOut: true
+  });
+  if (description == null) {
+    return;
+  }
+  const projectName = path.basename(projectDir);
+  const generated = generateScenariosFromDescription(description, projectName);
+  const file = ensureScenariosFile(projectDir, projectName);
+  const next = applyGeneratedScenarios(file, generated);
+  saveScenariosFile(projectDir, next);
+  projectProvider.refresh();
+  const channel = getOutput();
+  channel.clear();
+  channel.appendLine(`Assist F1 — generated ${generated.length} scenario(s) for ${projectName}`);
+  for (const s of generated) {
+    channel.appendLine(`- ${s.name}: ${s.description || ''}`);
+  }
+  channel.show(true);
+  const runNow = await vscode.window.showInformationMessage(
+    `Generated ${generated.length} scenario(s) into Data/Test/scenarios.json`,
+    'Run all',
+    'Open file'
+  );
+  if (runNow === 'Run all') {
+    await showScenarioResults(runAllScenarios(projectDir));
+  }
+  if (runNow === 'Open file') {
+    const doc = await vscode.workspace.openTextDocument(scenariosFilePath(projectDir));
+    await vscode.window.showTextDocument(doc);
   }
 }
 

@@ -441,6 +441,31 @@ ${argsXml}${pad}</ui:InvokeWorkflowFile>`;
     return `${pad}<WriteLine DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Text="[${escapeAttr(toVbStringArgument(activity.properties.text))}]" />`;
   }
 
+  if (activity.type === 'System.ReadTextFile') {
+    return `${pad}<ui:ReadTextFile DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" FileName="[${escapeAttr(toVbStringArgument(activity.properties.fileName))}]" Content="[${escapeAttr(String(activity.properties.result || 'fileText'))}]" />`;
+  }
+  if (activity.type === 'System.WriteTextFile') {
+    return `${pad}<ui:WriteTextFile DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" FileName="[${escapeAttr(toVbStringArgument(activity.properties.fileName))}]" Text="[${escapeAttr(toVbStringArgument(activity.properties.text))}]" />`;
+  }
+  if (activity.type === 'System.AppendLine') {
+    return `${pad}<ui:AppendLine DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" FileName="[${escapeAttr(toVbStringArgument(activity.properties.fileName))}]" Text="[${escapeAttr(toVbStringArgument(activity.properties.text))}]" />`;
+  }
+  if (activity.type === 'System.PathExists') {
+    return `${pad}<ui:PathExists DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Path="[${escapeAttr(toVbStringArgument(activity.properties.path))}]" PathType="${escapeAttr(String(activity.properties.pathType || 'Any'))}" Exists="[${escapeAttr(String(activity.properties.result || 'exists'))}]" />`;
+  }
+  if (activity.type === 'System.CreateDirectory') {
+    return `${pad}<ui:CreateDirectory DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Path="[${escapeAttr(toVbStringArgument(activity.properties.path))}]" />`;
+  }
+  if (activity.type === 'System.CopyFile') {
+    return `${pad}<ui:CopyFile DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Path="[${escapeAttr(toVbStringArgument(activity.properties.path))}]" Destination="[${escapeAttr(toVbStringArgument(activity.properties.destination))}]" Overwrite="${activity.properties.overwrite === false ? 'False' : 'True'}" />`;
+  }
+  if (activity.type === 'System.DeleteFile') {
+    return `${pad}<ui:DeleteFile DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Path="[${escapeAttr(toVbStringArgument(activity.properties.path))}]" />`;
+  }
+  if (activity.type === 'Flowchart.FlowSwitch') {
+    return `${pad}<FlowSwitch x:TypeArguments="x:String" Expression="[${escapeAttr(String(activity.properties.expression || 'key'))}]" DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" />`;
+  }
+
   if (activity.type === 'ControlFlow.DoWhile') {
     const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
     return `${pad}<DoWhile Condition="[${escapeAttr(String(activity.properties.condition ?? 'True'))}]" DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
@@ -600,7 +625,7 @@ ${pad}</uia:NApplicationCard>`;
     return renderPythonActivity(activity, pad, indent);
   }
 
-  if (activity.type === 'System.Comment' || activity.type.startsWith('Imported.') || activity.type.startsWith('Flowchart.')) {
+  if (activity.type === 'System.Comment' || activity.type.startsWith('Imported.') || activity.type === 'Flowchart.Start' || activity.type === 'Flowchart.End' || activity.type === 'Flowchart.FlowDecision') {
     // Preserve selector on imported placeholders when present
     const sel = selectorAttribute(activity.properties);
     return `${pad}<ui:Comment DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Text="${escapeAttr(String(activity.properties.text || activity.properties.hint || activity.type))}"${sel} />`;

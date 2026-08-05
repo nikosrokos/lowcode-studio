@@ -279,7 +279,8 @@ export function runScenario(
 
   const dryRun = dryRunWorkflow(doc, {
     initialVariables,
-    fixtures: scenario.fixtures
+    fixtures: scenario.fixtures,
+    projectDir
   });
   const assertions = evaluateExpect(scenario.expect, dryRun);
   const passed = assertions.every((a) => a.ok);

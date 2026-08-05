@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Activity mc:Ignorable="sap sap2010"
+  xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities"
+  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation"
+  xmlns:sap2010="http://schemas.microsoft.com/netfx/2010/xaml/activities/presentation"
+  xmlns:ui="http://schemas.uipath.com/workflow/activities"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  x:Class="FileIoDemo">
+  <Sequence DisplayName="FileIoDemo">
+    <ui:ReadTextFile DisplayName="Read notes" FileName="[&quot;notes.txt&quot;]" Content="[fileText]" />
+    <ui:WriteTextFile DisplayName="Write out" FileName="[&quot;out.txt&quot;]" Text="[&quot;hello&quot;]" />
+    <ui:AppendLine DisplayName="Append log" FileName="[&quot;log.txt&quot;]" Text="[&quot;line&quot;]" />
+    <ui:PathExists DisplayName="Path check" Path="[&quot;notes.txt&quot;]" PathType="File" Exists="[exists]" />
+    <ui:CreateDirectory DisplayName="Mkdir" Path="[&quot;tmp/out&quot;]" />
+    <ui:CopyFile DisplayName="Copy" Path="[&quot;notes.txt&quot;]" Destination="[&quot;notes.copy.txt&quot;]" Overwrite="True" />
+    <ui:DeleteFile DisplayName="Delete copy" Path="[&quot;notes.copy.txt&quot;]" />
+  </Sequence>
+</Activity>

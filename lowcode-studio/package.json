@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Mac-first low-code RPA for VS Code/Cursor: REFramework design, scenario dry-runs (Shift+F5), and the easiest Connect to Studio Web handoff for Orchestrator publish.",
-  "version": "0.6.28",
+  "version": "0.6.29",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -275,6 +275,20 @@
         "icon": "$(rocket)",
         "shortTitle": "Wizard",
         "category": "LowCode Studio"
+      },
+      {
+        "command": "lowcodeStudio.explainWorkflow",
+        "title": "Explain / critique workflow (Assist)",
+        "icon": "$(info)",
+        "shortTitle": "Explain",
+        "category": "LowCode Studio"
+      },
+      {
+        "command": "lowcodeStudio.generateScenarios",
+        "title": "Generate scenarios from description (Assist)",
+        "icon": "$(sparkle)",
+        "shortTitle": "Gen scenarios",
+        "category": "LowCode Studio"
       }
     ],
     "menus": {
@@ -391,6 +405,11 @@
           "command": "lowcodeStudio.managePackages",
           "when": "view == lowcodeStudio.projects",
           "group": "navigation@4"
+        },
+        {
+          "command": "lowcodeStudio.explainWorkflow",
+          "when": "view == lowcodeStudio.projects",
+          "group": "navigation@5"
         }
       ],
       "view/item/context": [
@@ -438,6 +457,11 @@
         },
         {
           "command": "lowcodeStudio.dryRunScenario",
+          "when": "resourceFilename =~ /\\.lcs\\.json$/",
+          "group": "navigation"
+        },
+        {
+          "command": "lowcodeStudio.explainWorkflow",
           "when": "resourceFilename =~ /\\.lcs\\.json$/",
           "group": "navigation"
         },
@@ -556,6 +580,32 @@
           "type": "boolean",
           "default": true,
           "description": "When a project is linked to a Studio Web Local Workspace, sync .xaml / project.json into that folder on every Save."
+        },
+        "lowcodeStudio.dryRun.realHttp": {
+          "type": "boolean",
+          "default": false,
+          "description": "Opt-in: perform real HTTP requests during dry-run for Messaging.HttpRequest (host must be on the allow list). Fixtures always win."
+        },
+        "lowcodeStudio.dryRun.httpAllowHosts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Hostnames allowed for real HTTP dry-run (exact or parent domain). Empty = no real HTTP."
+        },
+        "lowcodeStudio.dryRun.httpTimeoutMs": {
+          "type": "number",
+          "default": 10000,
+          "description": "Timeout in ms for real HTTP dry-run requests."
+        },
+        "lowcodeStudio.dryRun.realPython": {
+          "type": "boolean",
+          "default": false,
+          "description": "Opt-in: run Python.LoadScript / RunScript with a local interpreter when Python Scope path is set."
+        },
+        "lowcodeStudio.dryRun.pythonTimeoutMs": {
+          "type": "number",
+          "default": 15000,
+          "description": "Timeout in ms for real Python dry-run."
         }
       }
     }
@@ -568,7 +618,7 @@
     "package": "npm run bundle && vsce package --no-dependencies",
     "lint": "tsc --noEmit",
     "docs:activities": "npm run compile && node scripts/generate-activities-md.js",
-    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && node out/test/windowsTarget.test.js && node out/test/extractTableData.test.js && node out/test/selectorBuilder.test.js && node out/test/windowsTodo.test.js && node out/test/strongDryRun.test.js && node out/test/blueprints.test.js && node out/test/activityPaletteSmartProps.test.js && node out/test/inputMethod.test.js && node out/test/projectResolve.test.js && node out/test/studioWebLocal.test.js && node out/test/useAppBrowserUx.test.js && node out/test/workflowArguments.test.js && node out/test/phaseBActivities.test.js && node out/test/dryRun2.test.js && node out/test/whatsNew.test.js && node out/test/studioWebLocalSync.test.js && node out/test/packageManager.test.js && npm run docs:activities"
+    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && node out/test/windowsTarget.test.js && node out/test/extractTableData.test.js && node out/test/selectorBuilder.test.js && node out/test/windowsTodo.test.js && node out/test/strongDryRun.test.js && node out/test/blueprints.test.js && node out/test/activityPaletteSmartProps.test.js && node out/test/inputMethod.test.js && node out/test/projectResolve.test.js && node out/test/studioWebLocal.test.js && node out/test/useAppBrowserUx.test.js && node out/test/workflowArguments.test.js && node out/test/phaseBActivities.test.js && node out/test/dryRun2.test.js && node out/test/whatsNew.test.js && node out/test/studioWebLocalSync.test.js && node out/test/packageManager.test.js && node out/test/a2ImportMap.test.js && node out/test/realRunners.test.js && node out/test/assist.test.js && npm run docs:activities"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",

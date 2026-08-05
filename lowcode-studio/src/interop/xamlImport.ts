@@ -1193,6 +1193,24 @@ function importFlowchart(
         continue;
       }
 
+      if (key === 'FlowSwitch' || obj['@_Expression'] !== undefined) {
+        const local = key.includes(':') ? key.split(':').pop()! : key;
+        if (local === 'FlowSwitch' || lcsTypeFromXamlName(local) === 'Flowchart.FlowSwitch') {
+          const sw = node(
+            'Flowchart.FlowSwitch',
+            String(obj['@_DisplayName'] || 'Flow Switch'),
+            pickCommonProps('FlowSwitch', obj, 'Flowchart.FlowSwitch'),
+            250,
+            y
+          );
+          activities.push(sw);
+          connections.push({ id: newId('conn'), from: prev, to: sw.id, label: '' });
+          prev = sw.id;
+          y += 140;
+          continue;
+        }
+      }
+
       // FlowStep usually wraps an activity under FlowStep.Action / Action
       const action =
         obj.Action ||
@@ -1368,6 +1386,45 @@ function pickCommonProps(
     if (interaction) {
       props.inputMethod = interaction;
     }
+  }
+
+  if (
+    mapped === 'System.ReadTextFile' ||
+    mapped === 'System.WriteTextFile' ||
+    mapped === 'System.AppendLine'
+  ) {
+    props.fileName = cleanExpr(
+      raw['@_FileName'] || raw['@_Path'] || extractArgument(raw, 'FileName') || url || '"data.txt"'
+    );
+    if (mapped === 'System.ReadTextFile') {
+      props.result = stripBrackets(
+        cleanExpr(raw['@_Content'] || result || extractArgument(raw, 'Content') || 'fileText')
+      );
+    } else {
+      props.text = cleanExpr(text || raw['@_Text'] || extractArgument(raw, 'Text') || '""');
+    }
+  }
+  if (mapped === 'System.PathExists') {
+    props.path = cleanExpr(raw['@_Path'] || extractArgument(raw, 'Path') || url || '"data.txt"');
+    props.pathType = String(raw['@_PathType'] || 'Any').replace('PathType.', '');
+    props.result = stripBrackets(
+      cleanExpr(raw['@_Exists'] || result || extractArgument(raw, 'Exists') || 'exists')
+    );
+  }
+  if (mapped === 'System.CreateDirectory' || mapped === 'System.DeleteFile') {
+    props.path = cleanExpr(raw['@_Path'] || extractArgument(raw, 'Path') || url || '"path"');
+  }
+  if (mapped === 'System.CopyFile') {
+    props.path = cleanExpr(raw['@_Path'] || extractArgument(raw, 'Path') || '"in.txt"');
+    props.destination = cleanExpr(
+      raw['@_Destination'] || extractArgument(raw, 'Destination') || '"out.txt"'
+    );
+    props.overwrite = String(raw['@_Overwrite'] ?? 'True') !== 'False';
+  }
+  if (mapped === 'Flowchart.FlowSwitch') {
+    props.expression = cleanExpr(
+      raw['@_Expression'] || extractArgument(raw, 'Expression') || 'key'
+    );
   }
 
   if (!Object.keys(props).length) {

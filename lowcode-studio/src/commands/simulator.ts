@@ -7,6 +7,9 @@ import { getActivityDefinition } from '../models/activities';
 import { CustomActivityDefinition } from '../models/customActivities';
 import { scoreSelector } from '../interop/selectorBuilder';
 import { isPlaceholderSelector } from '../interop/windowsTarget';
+import { enrichFixturesWithRealRunners } from '../interop/realRunners';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface ValidationIssue {
   severity: 'error' | 'warning';
@@ -63,6 +66,17 @@ export interface DryRunOptions {
   fixtures?: DryRunFixtures;
   /** Capture per-step variable snapshots (default true) */
   captureSnapshots?: boolean;
+  /** Opt-in real HTTP (host allow list required) — prefer dryRunWorkflowAsync */
+  realHttp?: boolean;
+  httpAllowHosts?: string[];
+  httpTimeoutMs?: number;
+  /** Opt-in real Python when Python Scope path is set */
+  realPython?: boolean;
+  pythonTimeoutMs?: number;
+  /** Project root for relative file / script paths */
+  projectDir?: string;
+  /** Activity ids that ran with a real runner (set by dryRunWorkflowAsync) */
+  realActivityIds?: Set<string> | string[];
 }
 
 export function validateWorkflow(doc: WorkflowDocument): ValidationIssue[] {
@@ -187,6 +201,14 @@ export function dryRunWorkflow(
 
   const fixtures = options.fixtures || {};
   const captureSnapshots = options.captureSnapshots !== false;
+  const realIds = new Set(
+    options.realActivityIds
+      ? Array.isArray(options.realActivityIds)
+        ? options.realActivityIds
+        : [...options.realActivityIds]
+      : []
+  );
+  const projectDir = options.projectDir;
   const steps: DryRunStep[] = [];
   const warnings: string[] = [];
   const log: string[] = [`Starting dry-run for "${doc.name}" (${doc.type})`];
@@ -197,6 +219,9 @@ export function dryRunWorkflow(
   }
   if (hasFixtures(fixtures)) {
     log.push('Using dry-run fixtures (UI / HTTP / tables).');
+  }
+  if (realIds.size) {
+    log.push(`Real runners used for ${realIds.size} activit(ies).`);
   }
   let index = 1;
   let ok = true;
@@ -215,7 +240,9 @@ export function dryRunWorkflow(
       type: activity.type,
       action,
       status,
-      executionKind: executionKind || classifyExecutionKind(activity.type)
+      executionKind:
+        executionKind ||
+        (realIds.has(activity.id) ? 'real' : classifyExecutionKind(activity.type))
     };
     if (captureSnapshots) {
       const snap = cloneVars(variables);
@@ -231,7 +258,7 @@ export function dryRunWorkflow(
       const indent = '  '.repeat(depth);
       const summary = summarize(activity, variables);
       try {
-        const warn = executeStub(activity, variables, log, indent, fixtures);
+        const warn = executeStub(activity, variables, log, indent, fixtures, projectDir);
         if (warn) {
           warnings.push(warn);
           log.push(`${indent}WARN: ${warn}`);
@@ -250,7 +277,7 @@ export function dryRunWorkflow(
   };
 
   if (doc.type === 'Flowchart') {
-    ok = runFlowchart(doc, variables, log, pushStep, fixtures, warnings) && ok;
+    ok = runFlowchart(doc, variables, log, pushStep, fixtures, warnings, projectDir) && ok;
   } else {
     runList(doc.activities);
   }
@@ -260,6 +287,40 @@ export function dryRunWorkflow(
     log.push(`${warnings.length} warning(s) during dry-run.`);
   }
   return { ok, steps, variables, log, warnings };
+}
+
+/**
+ * Async dry-run with optional real HTTP / Python runners (C2).
+ * Fixtures always win over real HTTP. Defaults remain simulated when settings are off.
+ */
+export async function dryRunWorkflowAsync(
+  doc: WorkflowDocument,
+  options: DryRunOptions = {}
+): Promise<DryRunResult> {
+  if (!options.realHttp && !options.realPython) {
+    return dryRunWorkflow(doc, options);
+  }
+  const enriched = await enrichFixturesWithRealRunners(doc, options.fixtures || {}, {
+    realHttp: options.realHttp,
+    httpAllowHosts: options.httpAllowHosts,
+    httpTimeoutMs: options.httpTimeoutMs,
+    realPython: options.realPython,
+    pythonTimeoutMs: options.pythonTimeoutMs,
+    projectDir: options.projectDir
+  });
+  const result = dryRunWorkflow(doc, {
+    ...options,
+    fixtures: enriched.fixtures,
+    realActivityIds: enriched.realActivityIds
+  });
+  if (enriched.log.length) {
+    result.log.splice(1, 0, ...enriched.log);
+  }
+  if (enriched.warnings.length) {
+    result.warnings.push(...enriched.warnings);
+    result.log.push(...enriched.warnings.map((w) => `WARN: ${w}`));
+  }
+  return result;
 }
 
 /** Human-readable dry-run report with per-step variable diffs. */
@@ -425,7 +486,8 @@ function runFlowchart(
   log: string[],
   pushStep: (activity: ActivityNode, action: string, status?: DryRunStep['status']) => void,
   fixtures: DryRunFixtures,
-  warnings: string[]
+  warnings: string[],
+  projectDir?: string
 ): boolean {
   const byId = new Map(doc.activities.map((a) => [a.id, a]));
   const outs = new Map<string, { to: string; label?: string }[]>();
@@ -465,7 +527,7 @@ function runFlowchart(
     }
 
     try {
-      const warn = executeStub(activity, variables, log, '', fixtures);
+      const warn = executeStub(activity, variables, log, '', fixtures, projectDir);
       if (warn) {
         warnings.push(warn);
         log.push(`WARN: ${warn}`);
@@ -498,6 +560,18 @@ function runFlowchart(
       const match =
         edges.find((e) => (e.label || '').toLowerCase() === label.toLowerCase()) ||
         edges.find((e) => (truthy ? !e.label || e.label.toLowerCase() === 'true' : e.label?.toLowerCase() === 'false')) ||
+        edges[0];
+      currentId = match?.to;
+    } else if (activity.type === 'Flowchart.FlowSwitch') {
+      const expr = String(activity.properties?.expression ?? 'key');
+      const raw = resolveExpression(expr, variables);
+      const value = String(raw ?? expr);
+      log.push(`FlowSwitch (${expr}) => ${value}`);
+      const match =
+        edges.find((e) => (e.label || '') === value) ||
+        edges.find((e) => (e.label || '').toLowerCase() === value.toLowerCase()) ||
+        edges.find((e) => (e.label || '').toLowerCase() === 'default') ||
+        edges.find((e) => !e.label) ||
         edges[0];
       currentId = match?.to;
     } else {
@@ -690,7 +764,8 @@ function executeStub(
   variables: Record<string, unknown>,
   log: string[],
   indent: string,
-  fixtures: DryRunFixtures = {}
+  fixtures: DryRunFixtures = {},
+  projectDir?: string
 ): string | undefined {
   let warning: string | undefined;
   const selector = String(activity.properties?.selector ?? '').trim();
@@ -716,6 +791,127 @@ function executeStub(
     case 'System.WriteLine':
       log.push(`${indent}WriteLine ${activity.properties.text}`);
       break;
+    case 'System.ReadTextFile': {
+      const result = String(activity.properties.result || 'fileText');
+      const fileName = String(
+        resolveExpression(String(activity.properties.fileName ?? ''), variables) ??
+          activity.properties.fileName ??
+          ''
+      ).replace(/^"|"$/g, '');
+      const abs = resolveProjectPath(fileName, projectDir);
+      if (abs && fs.existsSync(abs) && fs.statSync(abs).isFile()) {
+        variables[result] = fs.readFileSync(abs, 'utf8');
+        log.push(`${indent}ReadTextFile ${fileName} -> ${result} (real)`);
+      } else {
+        variables[result] = '';
+        log.push(`${indent}ReadTextFile ${fileName} -> ${result} (simulated empty)`);
+        warning = warning || `${activity.displayName}: file not found (${fileName})`;
+      }
+      break;
+    }
+    case 'System.WriteTextFile':
+    case 'System.AppendLine': {
+      const fileName = String(
+        resolveExpression(String(activity.properties.fileName ?? ''), variables) ??
+          activity.properties.fileName ??
+          ''
+      ).replace(/^"|"$/g, '');
+      const text = String(
+        resolveExpression(String(activity.properties.text ?? ''), variables) ??
+          activity.properties.text ??
+          ''
+      );
+      const abs = resolveProjectPath(fileName, projectDir);
+      if (abs) {
+        try {
+          fs.mkdirSync(path.dirname(abs), { recursive: true });
+          if (activity.type === 'System.AppendLine') {
+            fs.appendFileSync(abs, text + '\n', 'utf8');
+          } else {
+            fs.writeFileSync(abs, text, 'utf8');
+          }
+          log.push(`${indent}${activity.type.split('.')[1]} ${fileName} (real)`);
+        } catch (err) {
+          warning =
+            warning ||
+            `${activity.displayName}: write failed (${err instanceof Error ? err.message : String(err)})`;
+          log.push(`${indent}${activity.type} ${fileName} (simulated — write failed)`);
+        }
+      } else {
+        log.push(`${indent}${activity.type} ${fileName} (simulated)`);
+      }
+      break;
+    }
+    case 'System.PathExists': {
+      const result = String(activity.properties.result || 'exists');
+      const p = String(
+        resolveExpression(String(activity.properties.path ?? ''), variables) ??
+          activity.properties.path ??
+          ''
+      ).replace(/^"|"$/g, '');
+      const abs = resolveProjectPath(p, projectDir);
+      const pathType = String(activity.properties.pathType || 'Any');
+      let exists = false;
+      if (abs && fs.existsSync(abs)) {
+        const st = fs.statSync(abs);
+        exists =
+          pathType === 'Folder'
+            ? st.isDirectory()
+            : pathType === 'File'
+              ? st.isFile()
+              : true;
+      }
+      variables[result] = exists;
+      log.push(`${indent}PathExists ${p} -> ${exists} (real)`);
+      break;
+    }
+    case 'System.CreateDirectory': {
+      const p = String(
+        resolveExpression(String(activity.properties.path ?? ''), variables) ??
+          activity.properties.path ??
+          ''
+      ).replace(/^"|"$/g, '');
+      const abs = resolveProjectPath(p, projectDir);
+      if (abs) {
+        fs.mkdirSync(abs, { recursive: true });
+        log.push(`${indent}CreateDirectory ${p} (real)`);
+      } else {
+        log.push(`${indent}CreateDirectory ${p} (simulated)`);
+      }
+      break;
+    }
+    case 'System.CopyFile': {
+      const src = String(
+        resolveExpression(String(activity.properties.path ?? ''), variables) ?? ''
+      ).replace(/^"|"$/g, '');
+      const dest = String(
+        resolveExpression(String(activity.properties.destination ?? ''), variables) ?? ''
+      ).replace(/^"|"$/g, '');
+      const absSrc = resolveProjectPath(src, projectDir);
+      const absDest = resolveProjectPath(dest, projectDir);
+      if (absSrc && absDest && fs.existsSync(absSrc)) {
+        fs.mkdirSync(path.dirname(absDest), { recursive: true });
+        fs.copyFileSync(absSrc, absDest);
+        log.push(`${indent}CopyFile ${src} -> ${dest} (real)`);
+      } else {
+        log.push(`${indent}CopyFile ${src} -> ${dest} (simulated)`);
+        warning = warning || `${activity.displayName}: source missing`;
+      }
+      break;
+    }
+    case 'System.DeleteFile': {
+      const p = String(
+        resolveExpression(String(activity.properties.path ?? ''), variables) ?? ''
+      ).replace(/^"|"$/g, '');
+      const abs = resolveProjectPath(p, projectDir);
+      if (abs && fs.existsSync(abs)) {
+        fs.unlinkSync(abs);
+        log.push(`${indent}DeleteFile ${p} (real)`);
+      } else {
+        log.push(`${indent}DeleteFile ${p} (simulated)`);
+      }
+      break;
+    }
     case 'UI.Check':
       log.push(`${indent}Check ${activity.properties.action} selector=${JSON.stringify(activity.properties.selector)}`);
       break;
@@ -762,19 +958,36 @@ function executeStub(
       break;
     case 'Python.LoadScript': {
       const result = String(activity.properties.result || 'pythonScript');
-      variables[result] = {
-        kind: 'PythonObject',
-        file: activity.properties.file,
-        code: activity.properties.code
-      };
-      log.push(`${indent}LoadPythonScript ${activity.properties.file || '(inline)'} -> ${result}`);
+      const fromReal = lookupFixtureString(fixtures.uiText, activity, result, '');
+      if (fromReal !== undefined) {
+        variables[result] = { kind: 'PythonObject', stdout: fromReal, file: activity.properties.file };
+        log.push(`${indent}LoadPythonScript ${activity.properties.file || '(inline)'} -> ${result} (real)`);
+      } else {
+        variables[result] = {
+          kind: 'PythonObject',
+          file: activity.properties.file,
+          code: activity.properties.code
+        };
+        log.push(`${indent}LoadPythonScript ${activity.properties.file || '(inline)'} -> ${result}`);
+      }
       break;
     }
-    case 'Python.RunScript':
-      log.push(
-        `${indent}RunPythonScript ${activity.properties.file || ''} ${activity.properties.code ? '(inline code)' : ''}`.trim()
-      );
+    case 'Python.RunScript': {
+      const result = String(activity.properties.result || 'pythonResult');
+      const fromReal = lookupFixtureString(fixtures.uiText, activity, result, '');
+      if (fromReal !== undefined) {
+        variables[result] = fromReal;
+        log.push(
+          `${indent}RunPythonScript ${activity.properties.file || ''} ${activity.properties.code ? '(inline code)' : ''}`.trim() +
+            ` -> ${result} (real)`
+        );
+      } else {
+        log.push(
+          `${indent}RunPythonScript ${activity.properties.file || ''} ${activity.properties.code ? '(inline code)' : ''}`.trim()
+        );
+      }
       break;
+    }
     case 'Python.InvokeMethod': {
       const result = String(activity.properties.result || 'pythonResult');
       variables[result] = {
@@ -1390,6 +1603,13 @@ export function classifyExecutionKind(activityType: string): DryRunExecutionKind
     activityType === 'System.Delay' ||
     activityType === 'System.Throw' ||
     activityType === 'System.TerminateWorkflow' ||
+    activityType === 'System.ReadTextFile' ||
+    activityType === 'System.WriteTextFile' ||
+    activityType === 'System.AppendLine' ||
+    activityType === 'System.PathExists' ||
+    activityType === 'System.CreateDirectory' ||
+    activityType === 'System.CopyFile' ||
+    activityType === 'System.DeleteFile' ||
     activityType.startsWith('ControlFlow.') ||
     activityType.startsWith('Data.') ||
     activityType === 'Messaging.DeserializeJson' ||
@@ -1398,8 +1618,26 @@ export function classifyExecutionKind(activityType: string): DryRunExecutionKind
   ) {
     return 'real';
   }
-  // External / robot / UI — stubbed or fixture-driven on Mac
+  // External / robot / UI / HTTP / Python — stubbed or fixture-driven unless real runners mark the step
   return 'simulated';
+}
+
+/** Resolve a workflow-relative path against the project root (or absolute). */
+export function resolveProjectPath(
+  fileName: string,
+  projectDir?: string
+): string | undefined {
+  const p = String(fileName || '').trim().replace(/^"|"$/g, '');
+  if (!p) {
+    return undefined;
+  }
+  if (path.isAbsolute(p)) {
+    return p;
+  }
+  if (projectDir) {
+    return path.join(projectDir, p);
+  }
+  return path.resolve(p);
 }
 
 function hasFixtures(fixtures: DryRunFixtures): boolean {

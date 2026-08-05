@@ -9,10 +9,11 @@ import {
 } from '../models/workflow';
 import {
   DryRunResult,
-  dryRunWorkflow,
+  dryRunWorkflowAsync,
   formatDryRunReport,
   validateWorkflow
 } from '../commands/simulator';
+import { readDryRunSettings } from '../util/dryRunSettings';
 import { DesignerSettings, getDesignerHtml } from '../webview/designerHtml';
 import {
   getLowCodeOutput,
@@ -383,9 +384,16 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           break;
         }
         case 'dryRun': {
-          const result = dryRunWorkflow(message.workflow as WorkflowDocument, {
+          const projectDir =
+            findProjectRoot(path.dirname(document.uri.fsPath)) || undefined;
+          const drySettings = readDryRunSettings(
+            vscode.workspace.getConfiguration('lowcodeStudio')
+          );
+          const result = await dryRunWorkflowAsync(message.workflow as WorkflowDocument, {
             fixtures: message.fixtures,
-            initialVariables: message.initialVariables
+            initialVariables: message.initialVariables,
+            projectDir,
+            ...drySettings
           });
           const title = message.runToActivityId
             ? `Dry Run (run-to-here) — ${document.fileName}`
