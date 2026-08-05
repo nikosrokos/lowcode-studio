@@ -234,6 +234,18 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
     });
   }
 
+  /** Apply a workflow edit (e.g. Assist F3 selector repairs) and refresh the designer. */
+  async applyWorkflowDocument(workflow: WorkflowDocument): Promise<boolean> {
+    const document = this.activeDocument;
+    if (!document) {
+      return false;
+    }
+    await this.updateTextDocument(document, workflow);
+    this.onWorkflowChanged(workflow);
+    this.activePanel?.webview.postMessage({ type: 'setWorkflow', workflow });
+    return true;
+  }
+
   async resolveCustomTextEditor(
     document: vscode.TextDocument,
     webviewPanel: vscode.WebviewPanel,

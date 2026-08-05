@@ -175,11 +175,11 @@ See [docs/ACTIVITIES.md](docs/ACTIVITIES.md). Invoke Code / UI steps are dry-run
 - UI Input Method (Simulate / Chromium API / Window Messages / Hardware Events) exported to Studio Web
 - **A2** File IO + FlowSwitch import map (fewer `Imported.*`)
 - **C2** Opt-in real HTTP / Python dry-run runners
-- **F0/F1** Assist: Explain workflow + generate scenarios from description
+- **F0/F1/F3** Assist: Explain, generate scenarios, suggest/repair selectors
 
 ### Next
 1. More import map coverage beyond File IO / FlowSwitch
-2. Assist F2+ (scaffold / selectors) when catalog contracts stay solid
+2. Assist F2 scaffold / F4 dry-run repair
 3. Marketplace publish
 
 ## License

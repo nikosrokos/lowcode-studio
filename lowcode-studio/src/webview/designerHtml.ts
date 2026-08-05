@@ -1188,6 +1188,15 @@ export function getDesignerHtml(
             <code>Data/Test/scenarios.json</code>. Then run with <kbd>Shift+F5</kbd> or Dry Run Scenarios.
           </p>
 
+          <h3>Suggest / repair selectors (F3)</h3>
+          <span class="cmd">LowCode Studio: Suggest / repair selectors (Assist)</span>
+          <p>Two modes (propose first — nothing is applied until you confirm):</p>
+          <ul>
+            <li><strong>From HTML / Explorer paste</strong> — paste a DOM snippet, <code>#id</code>, or UI Explorer dump; copy the best classic <code>&lt;html&gt;/&lt;webctrl&gt;</code> into Selector Builder</li>
+            <li><strong>Repair weak selectors</strong> — scans the open workflow for empty / placeholder / weak UI steps; apply all or pick which proposals to write</li>
+          </ul>
+          <span class="cmd">&lt;button id="loginBtn" aria-label="Sign in"&gt;Sign in&lt;/button&gt;</span>
+
           <h3>Related dry-run settings (not Assist)</h3>
           <p>
             Optional real HTTP / Python live under Settings → VS Code

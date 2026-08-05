@@ -27,6 +27,12 @@ import {
   generateScenariosFromDescription
 } from './commands/assistScenarios';
 import {
+  applySelectorRepairs,
+  formatSelectorAssistReport,
+  proposeSelectorRepairs,
+  suggestSelectorsFromHtml
+} from './commands/assistSelectors';
+import {
   createQuickScenario,
   duplicateScenario,
   ensureScenariosFile,
@@ -290,6 +296,9 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand('lowcodeStudio.generateScenarios', () =>
       generateScenariosCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.suggestSelectors', () =>
+      suggestSelectorsCommand()
     ),
     vscode.commands.registerCommand('lowcodeStudio.registerCustomActivity', () =>
       registerCustomActivityCommand()
@@ -2503,6 +2512,144 @@ async function explainWorkflowCommand(): Promise<void> {
     report.critiqueCount
       ? `Explain: ${report.critiqueCount} critique item(s) — see Output`
       : 'Explain: no local critique items — see Output'
+  );
+}
+
+async function suggestSelectorsCommand(): Promise<void> {
+  const mode = await vscode.window.showQuickPick(
+    [
+      {
+        label: '$(code) From HTML / Explorer paste',
+        description: 'Paste HTML snippet, #id, or UI Explorer dump → classic selector',
+        value: 'html' as const
+      },
+      {
+        label: '$(tools) Repair weak selectors in workflow',
+        description: 'Propose fixes for empty / placeholder / weak UI steps (confirm to apply)',
+        value: 'repair' as const
+      }
+    ],
+    { placeHolder: 'Assist F3 — suggest / repair selectors' }
+  );
+  if (!mode) {
+    return;
+  }
+
+  const channel = getOutput();
+
+  if (mode.value === 'html') {
+    const paste = await vscode.window.showInputBox({
+      prompt: 'Paste HTML element, #id, or UI Explorer selector dump',
+      placeHolder: '<button id="login" aria-label="Sign in">Sign in</button>',
+      ignoreFocusOut: true
+    });
+    if (paste == null) {
+      return;
+    }
+    const suggestions = suggestSelectorsFromHtml(paste);
+    const report = formatSelectorAssistReport('Assist F3 — selectors from paste', suggestions, []);
+    channel.clear();
+    channel.appendLine(report);
+    channel.show(true);
+    if (!suggestions.length) {
+      vscode.window.showWarningMessage('Assist F3: could not build a selector from that paste.');
+      return;
+    }
+    const best = suggestions[0];
+    const action = await vscode.window.showInformationMessage(
+      `Best: ${best.quality.label} (score ${best.quality.score}) — ${best.rationale}`,
+      'Copy selector',
+      'Dismiss'
+    );
+    if (action === 'Copy selector') {
+      await vscode.env.clipboard.writeText(best.selector);
+      vscode.window.showInformationMessage('Selector copied — paste into Selector Builder.');
+    }
+    return;
+  }
+
+  const doc = await getActiveWorkflowDocument();
+  if (!doc) {
+    return;
+  }
+  const repairs = proposeSelectorRepairs(doc);
+  const report = formatSelectorAssistReport('Assist F3 — selector repairs', [], repairs);
+  channel.clear();
+  channel.appendLine(report);
+  channel.show(true);
+
+  const actionable = repairs.filter((r) => r.actionable);
+  if (!repairs.length) {
+    vscode.window.showInformationMessage('Assist F3: no empty/placeholder/weak UI selectors found.');
+    return;
+  }
+  if (!actionable.length) {
+    vscode.window.showInformationMessage(
+      `Assist F3: ${repairs.length} weak selector(s) noted — see Output (nothing safer to auto-propose).`
+    );
+    return;
+  }
+
+  const pick = await vscode.window.showQuickPick(
+    [
+      {
+        label: `$(check) Apply all ${actionable.length} proposal(s)`,
+        value: 'all' as const
+      },
+      {
+        label: '$(list-selection) Pick which to apply…',
+        value: 'pick' as const
+      },
+      {
+        label: '$(book) Report only (no changes)',
+        value: 'none' as const
+      }
+    ],
+    { placeHolder: `${actionable.length} actionable selector repair(s)` }
+  );
+  if (!pick || pick.value === 'none') {
+    return;
+  }
+
+  let toApply = actionable;
+  if (pick.value === 'pick') {
+    const chosen = await vscode.window.showQuickPick(
+      actionable.map((r) => ({
+        label: r.displayName,
+        description: `${r.currentQuality.label} → ${r.proposedQuality.label}`,
+        detail: r.rationale,
+        proposal: r
+      })),
+      { canPickMany: true, placeHolder: 'Select repairs to apply' }
+    );
+    if (!chosen?.length) {
+      return;
+    }
+    toApply = chosen.map((c) => c.proposal);
+  }
+
+  const next = applySelectorRepairs(doc, toApply);
+  const applied = await editorProvider.applyWorkflowDocument(next);
+  if (!applied) {
+    // Designer not active — write active text editor if it is the workflow
+    const active = vscode.window.activeTextEditor?.document;
+    if (active?.fileName.endsWith('.lcs.json')) {
+      const edit = new vscode.WorkspaceEdit();
+      const full = new vscode.Range(
+        active.positionAt(0),
+        active.positionAt(active.getText().length)
+      );
+      edit.replace(active.uri, full, stringifyWorkflow(next));
+      await vscode.workspace.applyEdit(edit);
+    } else {
+      vscode.window.showWarningMessage(
+        'Open the workflow in the LowCode Studio designer to apply repairs.'
+      );
+      return;
+    }
+  }
+  vscode.window.showInformationMessage(
+    `Assist F3: applied ${toApply.length} selector repair(s). Verify on Windows.`
   );
 }
 

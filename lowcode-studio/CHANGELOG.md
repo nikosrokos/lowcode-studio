@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.30] — 2026-08-05
+
+### Added
+- **F3** Assist — **Suggest / repair selectors** from HTML / Explorer paste, or propose repairs for empty / placeholder / weak UI steps (confirm before apply)
+- Assist help popup documents F3
+
 ## [0.6.29] — 2026-08-05
 
 ### Added

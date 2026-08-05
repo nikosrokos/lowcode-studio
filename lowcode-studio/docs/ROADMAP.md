@@ -161,12 +161,13 @@ Highest leverage for *not opening Studio Web to finish work*.
 
 ## Phase F — “Assist (AI) — greenfield”
 
-Only after A–C foundations; avoid Autopilot theater. **F0 + F1 shipped in 0.6.29** (deterministic, no LLM).
+Only after A–C foundations; avoid Autopilot theater. **F0 + F1 in 0.6.29; F3 in 0.6.30** (deterministic, no LLM).
 
-- Generate sequence from natural language → LCS activities (constrained to catalog) — later
-- Suggest selectors / repair placeholders from page HTML snippet or failed dry-run — later
+- Generate sequence from natural language → LCS activities (constrained to catalog) — later (F2)
+- Suggest selectors / repair placeholders from page HTML snippet or failed dry-run — **F3 shipped**
 - Scenario generator from Process description — **F1 shipped**
 - “Explain this workflow” / “why Studio Web will reject this Save” — **F0 shipped**
+- Repair from failed dry-run traces — later (F4)
 
 ---
 
