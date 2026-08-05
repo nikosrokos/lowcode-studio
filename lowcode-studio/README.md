@@ -53,7 +53,8 @@ Full history: [CHANGELOG.md](CHANGELOG.md)
 
 ### Also recent
 
-- **0.6.33** — Studio Web load fix for Use Browser (TargetApp) + Build Data Table (Portable rewrite)
+- **0.6.34** — Full Studio Web Portable activity audit (Multiple Assign, Message Box, Open App, Element Exists, Type Into, …)
+- **0.6.33** — Use Browser TargetApp + Build Data Table Portable rewrite
 - **0.6.32** — Inline VB repair hints; Variables/Args panel fix
 - **0.6.27** — A3 selectors + CHANGELOG / What's New
 
