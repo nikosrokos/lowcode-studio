@@ -1615,6 +1615,16 @@ export function getDesignerHtml(
         };
         input.addEventListener('change', apply);
         input.addEventListener('blur', apply);
+        // Keep in-memory state current while typing so Cmd+S / Save flush latest values
+        input.addEventListener('input', () => {
+          const key = input.getAttribute('data-prop');
+          if (!key) return;
+          let value = input.value;
+          const pdef = def?.properties.find(p => p.name === key);
+          if (pdef?.type === 'number') value = Number(value);
+          if (pdef?.type === 'boolean') value = value === 'true';
+          node.properties[key] = value;
+        });
       });
       document.getElementById('btnSetStart')?.addEventListener('click', () => {
         state.workflow.startActivityId = node.id;
@@ -2063,6 +2073,10 @@ export function getDesignerHtml(
         renderProjectTree();
       }
       if (msg.type === 'toast' && msg.message) toast(msg.message);
+      if (msg.type === 'requestFlush') {
+        // Flush typed-but-not-blurred property values into state.workflow before Cmd+S
+        vscode.postMessage({ type: 'flushState', workflow: state.workflow });
+      }
       if (msg.type === 'dryRunPlayback' && msg.result) {
         startPlayback(msg.result);
       }

@@ -433,14 +433,25 @@ export function activate(context: vscode.ExtensionContext): void {
           .getConfiguration('lowcodeStudio')
           .get<boolean>('syncStudioWebOnSave', true);
         if (syncOnSave) {
+          // Designer Save path syncs after save with in-memory overrides
+          if (editorProvider?.consumeSkipDidSaveSync?.(doc.uri.fsPath)) {
+            return;
+          }
           const projectRoot = findProjectRoot(path.dirname(doc.fileName));
           if (projectRoot && getStudioWebLocalLink(projectRoot)) {
             try {
-              const synced = trySyncToStudioWebLocal(projectRoot);
+              const rel = path.relative(projectRoot, doc.uri.fsPath).replace(/\\/g, '/');
+              const overrides =
+                rel.endsWith('.lcs.json') && !rel.startsWith('..')
+                  ? { [rel]: doc.getText() }
+                  : undefined;
+              const synced = trySyncToStudioWebLocal(projectRoot, {
+                contentOverrides: overrides
+              });
               if (synced) {
                 void vscode.window.setStatusBarMessage(
-                  `Synced → Studio Web Local (${path.basename(synced.link.solutionDir)})`,
-                  2500
+                  `Synced → Studio Web Local (${path.basename(synced.link.solutionDir)}) · ${synced.files.filter((f) => f.endsWith('.xaml')).length} xaml`,
+                  3500
                 );
               }
             } catch (err) {

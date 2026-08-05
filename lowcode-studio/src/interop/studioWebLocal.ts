@@ -248,7 +248,10 @@ No \`.uip\` export is required for this loop.
  * Sync the LCS project into its linked Studio Web Local Workspace project folder.
  * No-op-friendly: throws if not linked.
  */
-export function syncToStudioWebLocal(lcsProjectDir: string): StudioWebLocalSyncResult {
+export function syncToStudioWebLocal(
+  lcsProjectDir: string,
+  options: { contentOverrides?: Record<string, string> } = {}
+): StudioWebLocalSyncResult {
   const link = getStudioWebLocalLink(lcsProjectDir);
   if (!link) {
     throw new Error(
@@ -265,12 +268,14 @@ export function syncToStudioWebLocal(lcsProjectDir: string): StudioWebLocalSyncR
   const { uipxPath, data } = readOrCreateUipx(link.solutionDir, solutionName, link.solutionId);
   data.SolutionId = link.solutionId || data.SolutionId;
   ensureProjectInUipx(data, link.projectFolder, link.projectId);
+  // Rewrite .uipx so Studio Web Local Workspace watchers refresh
   fs.writeFileSync(uipxPath, JSON.stringify(data, null, 2) + '\n', 'utf8');
 
   const projectDir = path.join(link.solutionDir, link.projectFolder);
   const exported = writeUiPathProjectToDir(lcsProjectDir, projectDir, {
     writeReadme: false,
-    targetFramework: 'Portable'
+    targetFramework: 'Portable',
+    contentOverrides: options.contentOverrides
   });
 
   return {
@@ -283,12 +288,13 @@ export function syncToStudioWebLocal(lcsProjectDir: string): StudioWebLocalSyncR
 }
 
 export function trySyncToStudioWebLocal(
-  lcsProjectDir: string
+  lcsProjectDir: string,
+  options: { contentOverrides?: Record<string, string> } = {}
 ): StudioWebLocalSyncResult | undefined {
   if (!getStudioWebLocalLink(lcsProjectDir)) {
     return undefined;
   }
-  return syncToStudioWebLocal(lcsProjectDir);
+  return syncToStudioWebLocal(lcsProjectDir, options);
 }
 
 /** Remove studioWebLocal link from LCS project.json (does not delete solution files). */

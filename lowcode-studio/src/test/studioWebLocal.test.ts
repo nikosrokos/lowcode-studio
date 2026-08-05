@@ -118,6 +118,60 @@ function run(): void {
   const after = fs.readFileSync(processXaml, 'utf8');
   assert.notStrictEqual(before, after, 'Studio-readable Process.xaml must change on sync');
   assert.ok(after.includes(marker), 'marker from Save must appear in Studio XAML');
+
+  // contentOverrides must win over stale disk (Save race with custom editor)
+  const overrideMarker = `OVERRIDE_${Date.now()}`;
+  const staleOnDisk = parseWorkflow(fs.readFileSync(processLcs, 'utf8'));
+  // Leave disk with old content; pass newer override as Save would
+  const overrideDoc = parseWorkflow(stringifyWorkflow(staleOnDisk));
+  overrideDoc.activities.push({
+    id: 'act_override',
+    type: 'System.LogMessage',
+    displayName: 'Override Probe',
+    properties: { message: overrideMarker, level: 'Info' }
+  });
+  const overrideJson = stringifyWorkflow(overrideDoc);
+  syncToStudioWebLocal(lcsDir, {
+    contentOverrides: { 'Framework/Process.lcs.json': overrideJson }
+  });
+  const overrideXaml = fs.readFileSync(processXaml, 'utf8');
+  assert.ok(
+    overrideXaml.includes(overrideMarker),
+    'contentOverrides must update .xaml even when disk .lcs.json is stale'
+  );
+
+  // Workflows missing from manifest.workflows must still sync
+  const orphanRel = 'Orphan.lcs.json';
+  const orphanMarker = `ORPHAN_${Date.now()}`;
+  fs.writeFileSync(
+    path.join(lcsDir, orphanRel),
+    stringifyWorkflow({
+      schemaVersion: '1.0',
+      name: 'Orphan',
+      type: 'Sequence',
+      activities: [
+        {
+          id: 'a1',
+          type: 'System.LogMessage',
+          displayName: 'Orphan Log',
+          properties: { message: orphanMarker, level: 'Info' }
+        }
+      ],
+      variables: [],
+      arguments: [],
+      connections: []
+    }),
+    'utf8'
+  );
+  syncToStudioWebLocal(lcsDir);
+  assert.ok(
+    fs.existsSync(path.join(linked.targetDir, 'Orphan.xaml')),
+    'discovered .lcs.json must export even when not in project.json workflows'
+  );
+  assert.ok(
+    fs.readFileSync(path.join(linked.targetDir, 'Orphan.xaml'), 'utf8').includes(orphanMarker)
+  );
+
   const mainXaml = fs.readFileSync(path.join(synced.targetDir, 'Main.xaml'), 'utf8');
   assert.ok(mainXaml.includes('Activity') || mainXaml.length > 20);
   const afterPj = JSON.parse(

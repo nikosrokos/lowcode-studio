@@ -241,6 +241,11 @@ export function writeUiPathProjectToDir(
     writeReadme?: boolean;
     /** Override target; Local Workspace must use Portable. */
     targetFramework?: UiPathTargetFramework;
+    /**
+     * Latest workflow JSON keyed by project-relative path (e.g. `Main.lcs.json`).
+     * Used on Save so sync does not race the disk write of the custom editor.
+     */
+    contentOverrides?: Record<string, string>;
   } = {}
 ): ExportedStudioWebProject {
   const manifestPath = path.join(lcsProjectDir, 'project.json');
@@ -260,26 +265,29 @@ export function writeUiPathProjectToDir(
   const projectName = sanitizeName(manifest.name || path.basename(lcsProjectDir));
   fs.mkdirSync(outDir, { recursive: true });
 
-  const workflowRels =
-    manifest.workflows?.length
-      ? manifest.workflows
-      : listFiles(lcsProjectDir, (f) => f.endsWith('.lcs.json')).map((f) =>
-          path.relative(lcsProjectDir, f).replace(/\\/g, '/')
-        );
+  // Always include on-disk .lcs.json files — manifest.workflows can be stale after New Workflow
+  const discovered = listFiles(lcsProjectDir, (f) => f.endsWith('.lcs.json')).map((f) =>
+    path.relative(lcsProjectDir, f).replace(/\\/g, '/')
+  );
+  const workflowRels = [
+    ...new Set([...(manifest.workflows || []), ...discovered, ...Object.keys(options.contentOverrides || {})])
+  ].filter((rel) => rel.endsWith('.lcs.json'));
 
   const written: string[] = [];
   const docs: WorkflowDocument[] = [];
   for (const rel of workflowRels) {
     const abs = path.join(lcsProjectDir, rel);
-    if (!fs.existsSync(abs)) {
+    const override = options.contentOverrides?.[rel] ?? options.contentOverrides?.[rel.replace(/\\/g, '/')];
+    if (!override && !fs.existsSync(abs)) {
       continue;
     }
-    const doc = parseWorkflow(fs.readFileSync(abs, 'utf8'));
+    const raw = override ?? fs.readFileSync(abs, 'utf8');
+    const doc = parseWorkflow(raw);
     docs.push(doc);
     const xamlRel = rel.replace(/\.lcs\.json$/i, '.xaml');
     const xamlAbs = path.join(outDir, xamlRel);
     fs.mkdirSync(path.dirname(xamlAbs), { recursive: true });
-    fs.writeFileSync(xamlAbs, exportWorkflowToXaml(doc), 'utf8');
+    writeFileAtomic(xamlAbs, exportWorkflowToXaml(doc));
     written.push(xamlRel);
   }
 
@@ -303,7 +311,7 @@ export function writeUiPathProjectToDir(
   );
 
   const projectJsonPath = path.join(outDir, 'project.json');
-  fs.writeFileSync(
+  writeFileAtomic(
     projectJsonPath,
     exportUiPathProjectJson({
       name: projectName,
@@ -314,8 +322,7 @@ export function writeUiPathProjectToDir(
       requiresUserInteraction,
       // Reuse a valid Guid across syncs; never emit the old broken pseudo-uuid
       existingProjectJsonPath: projectJsonPath
-    }),
-    'utf8'
+    })
   );
   written.push('project.json');
 
@@ -376,6 +383,29 @@ ${depList}
     files: written,
     dependencies
   };
+}
+
+/** Atomic replace so Studio Web Local Workspace file watchers notice the change. */
+function writeFileAtomic(filePath: string, content: string): void {
+  const dir = path.dirname(filePath);
+  fs.mkdirSync(dir, { recursive: true });
+  const tmp = path.join(
+    dir,
+    `.${path.basename(filePath)}.${process.pid}.${Date.now()}.tmp`
+  );
+  try {
+    fs.writeFileSync(tmp, content, 'utf8');
+    fs.renameSync(tmp, filePath);
+  } catch {
+    try {
+      if (fs.existsSync(tmp)) {
+        fs.unlinkSync(tmp);
+      }
+    } catch {
+      // ignore
+    }
+    fs.writeFileSync(filePath, content, 'utf8');
+  }
 }
 
 export function exportToStudioWebProject(
