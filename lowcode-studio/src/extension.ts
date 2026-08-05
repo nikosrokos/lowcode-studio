@@ -142,6 +142,9 @@ export function activate(context: vscode.ExtensionContext): void {
     variablesProvider.setWorkflow(doc);
   });
 
+  // Finish a quiet open after workspace reload (no auto-open Main / dialog cascade)
+  void consumePendingQuietOpen();
+
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider(
       WorkflowEditorProvider.viewType,
@@ -486,28 +489,73 @@ export function deactivate(): void {
   // no-op
 }
 
+const PENDING_OPEN_KEY = 'lowcodeStudio.pendingQuietOpen';
+
 async function openLocalProjectCommand(): Promise<void> {
+  const mode = await vscode.window.showQuickPick(
+    [
+      {
+        id: 'lcs',
+        label: '$(file-code) Open LowCode Studio project',
+        detail: 'Folder with LCS project.json — design .lcs.json workflows'
+      },
+      {
+        id: 'solution',
+        label: '$(cloud) Open Studio Web Local Workspace solution',
+        detail: 'Folder with a .uipx — link/sync RPA .xaml for Studio Web'
+      },
+      {
+        id: 'create',
+        label: '$(new-folder) Create Studio Web Local Workspace',
+        detail: 'From the active LCS project: write a .uipx solution and sync .xaml'
+      }
+    ] as Array<vscode.QuickPickItem & { id: string }>,
+    {
+      title: 'LowCode Studio',
+      placeHolder: 'Open a project or Studio Web solution'
+    }
+  );
+  if (!mode) {
+    return;
+  }
+
+  if (mode.id === 'create') {
+    await connectStudioWebCommand();
+    return;
+  }
+
   const picked = await vscode.window.showOpenDialog({
     canSelectFiles: false,
     canSelectFolders: true,
     canSelectMany: false,
-    openLabel: 'Open Folder',
+    openLabel: mode.id === 'solution' ? 'Open solution' : 'Open project',
     title:
-      'Select a LowCode Studio project (project.json) or Studio Web Local Workspace solution (.uipx)'
+      mode.id === 'solution'
+        ? 'Select a Studio Web Local Workspace solution folder (.uipx)'
+        : 'Select a LowCode Studio project folder (project.json)'
   });
   const folderUri = picked?.[0];
   if (!folderUri) {
     return;
   }
 
+  if (mode.id === 'solution' || isStudioWebSolutionDir(folderUri.fsPath)) {
+    if (!isStudioWebSolutionDir(folderUri.fsPath)) {
+      void vscode.window.showErrorMessage(
+        'That folder is not a Studio Web Local Workspace (no .uipx found).'
+      );
+      return;
+    }
+    await openStudioWebSolutionFolder(folderUri.fsPath);
+    return;
+  }
+
   const projectDir = resolveLcsProjectFromFolder(folderUri.fsPath);
   if (!projectDir) {
-    // Studio Web Local Workspace solution — add to explorer (do not require a prior workspace)
     if (isStudioWebSolutionDir(folderUri.fsPath)) {
       await openStudioWebSolutionFolder(folderUri.fsPath);
       return;
     }
-
     const importInstead = await vscode.window.showWarningMessage(
       'No LowCode Studio project.json (schemaVersion 1.0) found in that folder.',
       'Import as UiPath Project',
@@ -519,41 +567,44 @@ async function openLocalProjectCommand(): Promise<void> {
     return;
   }
 
+  await openLcsProjectQuiet(projectDir);
+}
+
+/** Open an LCS project in explorer without cascading dialogs or forced Main open. */
+async function openLcsProjectQuiet(projectDir: string): Promise<void> {
+  projectProvider.unhidePath(projectDir);
+  await persistHiddenExplorerPaths();
+
+  const folders = vscode.workspace.workspaceFolders || [];
+  if (!folders.length) {
+    await extensionContext.workspaceState.update(PENDING_OPEN_KEY, {
+      kind: 'lcs',
+      path: projectDir
+    });
+  }
+
   const opened = await ensureFolderInWorkspace(projectDir, path.basename(projectDir));
   if (opened === 'reloading') {
     return;
   }
 
-  projectProvider.unhidePath(projectDir);
-  await persistHiddenExplorerPaths();
   await setActiveProjectDir(projectDir);
   refreshCustomActivityOverlay();
   projectProvider.refresh();
   editorProvider?.refreshProjectTree?.();
-
-  const main = readProjectMainWorkflow(projectDir);
-  if (main) {
-    const uri = vscode.Uri.file(main);
-    await vscode.commands.executeCommand(
-      'vscode.openWith',
-      uri,
-      WorkflowEditorProvider.viewType,
-      { preview: false }
-    );
-  }
-
-  void vscode.window.showInformationMessage(
-    `Opened LowCode Studio project "${path.basename(projectDir)}".`
+  void vscode.window.setStatusBarMessage(
+    `LowCode Studio: ${path.basename(projectDir)}`,
+    4000
   );
 }
 
-/** Open/add a Studio Web .uipx solution folder into Project Explorer without a prior workspace. */
+/** Open/link a Studio Web .uipx solution without reload→open-Main cascades. */
 async function openStudioWebSolutionFolder(solutionDir: string): Promise<void> {
   const activeLcs =
     extensionContext.workspaceState.get<string>('lowcodeStudio.activeProjectDir') ||
     (await resolveLcsProjectDirQuiet());
 
-  // If an LCS project is already open, link the solution under it — do not add a second workspace root
+  // Prefer linking under an open LCS project (no second workspace root, no reload)
   if (activeLcs && isLcsProjectDir(activeLcs)) {
     const existing = getStudioWebLocalLink(activeLcs);
     if (
@@ -564,60 +615,86 @@ async function openStudioWebSolutionFolder(solutionDir: string): Promise<void> {
       await persistHiddenExplorerPaths();
       projectProvider.refresh();
       editorProvider?.refreshProjectTree?.();
-      void vscode.window.showInformationMessage(
-        `Studio Web solution "${path.basename(solutionDir)}" is already linked.`
+      void vscode.window.setStatusBarMessage(
+        `Studio Web: ${path.basename(solutionDir)} (linked)`,
+        4000
       );
       return;
     }
 
-    const linkNow = await vscode.window.showInformationMessage(
-      `Link Studio Web solution "${path.basename(solutionDir)}" to "${path.basename(activeLcs)}" for Save sync?`,
-      'Link & Sync',
-      'Open solution only'
-    );
-    if (linkNow === 'Link & Sync') {
-      try {
-        await vscode.window.withProgress(
-          {
-            location: vscode.ProgressLocation.Notification,
-            title: `Linking Studio Web Local Workspace for ${path.basename(activeLcs)}…`
-          },
-          async () =>
-            connectToStudioWeb(activeLcs, {
-              local: { mode: 'open', targetDir: solutionDir }
-            })
-        );
-        projectProvider.unhidePath(solutionDir);
-        await persistHiddenExplorerPaths();
-        projectProvider.refresh();
-        editorProvider?.refreshProjectTree?.();
-        void vscode.window.showInformationMessage(
-          `Linked Local Workspace → ${path.basename(solutionDir)}. Save syncs automatically.`
-        );
-      } catch (err) {
-        vscode.window.showErrorMessage(
-          err instanceof Error ? err.message : 'Studio Web link failed'
-        );
-      }
-      return;
+    try {
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: `Linking ${path.basename(solutionDir)}…`
+        },
+        async () =>
+          connectToStudioWeb(activeLcs, {
+            local: { mode: 'open', targetDir: solutionDir }
+          })
+      );
+      projectProvider.unhidePath(solutionDir);
+      await persistHiddenExplorerPaths();
+      projectProvider.refresh();
+      editorProvider?.refreshProjectTree?.();
+      void vscode.window.setStatusBarMessage(
+        `Linked → ${path.basename(solutionDir)}. Save syncs .xaml`,
+        5000
+      );
+    } catch (err) {
+      vscode.window.showErrorMessage(
+        err instanceof Error ? err.message : 'Studio Web link failed'
+      );
     }
-    if (linkNow !== 'Open solution only') {
-      return;
-    }
+    return;
   }
 
-  // Standalone solution (no LCS to nest under) — add as the only explorer root when needed
+  // Standalone solution — add workspace root; avoid auto-opening workflows after reload
   const label = `${path.basename(solutionDir)} (Studio Web)`;
   projectProvider.unhidePath(solutionDir);
   await persistHiddenExplorerPaths();
+  const folders = vscode.workspace.workspaceFolders || [];
+  if (!folders.length) {
+    await extensionContext.workspaceState.update(PENDING_OPEN_KEY, {
+      kind: 'solution',
+      path: solutionDir
+    });
+  }
   const opened = await ensureFolderInWorkspace(solutionDir, label);
   if (opened === 'reloading') {
     return;
   }
   projectProvider.refresh();
   editorProvider?.refreshProjectTree?.();
-  void vscode.window.showInformationMessage(
-    `Opened Studio Web Local Workspace "${path.basename(solutionDir)}" in Project Explorer.`
+  void vscode.window.setStatusBarMessage(
+    `Studio Web solution: ${path.basename(solutionDir)}`,
+    4000
+  );
+}
+
+/** After a workspace reload, finish a quiet open (no Main auto-open, no dialogs). */
+async function consumePendingQuietOpen(): Promise<void> {
+  const pending = extensionContext.workspaceState.get<{
+    kind?: string;
+    path?: string;
+  }>(PENDING_OPEN_KEY);
+  if (!pending?.path) {
+    return;
+  }
+  await extensionContext.workspaceState.update(PENDING_OPEN_KEY, undefined);
+  if (pending.kind === 'lcs' && isLcsProjectDir(pending.path)) {
+    await setActiveProjectDir(pending.path);
+    refreshCustomActivityOverlay();
+  }
+  projectProvider.unhidePath(pending.path);
+  await persistHiddenExplorerPaths();
+  projectProvider.refresh();
+  editorProvider?.refreshProjectTree?.();
+  void vscode.window.setStatusBarMessage(
+    pending.kind === 'solution'
+      ? `Studio Web solution: ${path.basename(pending.path)}`
+      : `LowCode Studio: ${path.basename(pending.path)}`,
+    4000
   );
 }
 
@@ -1216,8 +1293,15 @@ async function ensureFolderInWorkspace(
     return 'ok';
   }
 
-  // Empty window: openFolder is the reliable path (updateWorkspaceFolders often fails)
+  // Prefer adding without openFolder (avoids full window reload when possible)
   if (!folders.length) {
+    const addedFirst = vscode.workspace.updateWorkspaceFolders(0, null, {
+      uri: vscode.Uri.file(resolved),
+      name: name || path.basename(resolved)
+    });
+    if (addedFirst) {
+      return 'ok';
+    }
     await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(resolved), false);
     return 'reloading';
   }
@@ -1677,33 +1761,29 @@ async function connectStudioWebCommand(treeItem?: ProjectTreeItem): Promise<void
     channel.appendLine('');
     channel.appendLine('Checklist:');
     result.checklist.forEach((c, i) => channel.appendLine(`  ${i + 1}. ${c}`));
-    channel.show(true);
 
     if (!openability.ok) {
+      channel.show(true);
       void vscode.window.showWarningMessage(
-        `Local Workspace linked, but open checks failed: ${openability.errors[0]}`
+        `Linked, but open checks failed: ${openability.errors[0]} — see LowCode Studio output.`
       );
+      return;
     }
 
+    void vscode.window.setStatusBarMessage(
+      `Linked → ${path.basename(solutionDir)}. Save syncs .xaml`,
+      5000
+    );
     const next = await vscode.window.showInformationMessage(
-      `Linked Local Workspace → ${path.basename(solutionDir)}. Save syncs automatically.`,
-      'Reveal Solution',
+      `Linked Local Workspace → ${path.basename(solutionDir)}`,
       'Open Studio Web',
-      'Open Checklist',
-      'Show Guide'
+      'Reveal Solution'
     );
     if (next === 'Reveal Solution') {
       await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(solutionDir));
     }
     if (next === 'Open Studio Web') {
       await vscode.env.openExternal(vscode.Uri.parse(STUDIO_WEB_URL));
-    }
-    if (next === 'Open Checklist' && fs.existsSync(result.guidePath)) {
-      const doc = await vscode.workspace.openTextDocument(result.guidePath);
-      await vscode.window.showTextDocument(doc);
-    }
-    if (next === 'Show Guide') {
-      await vscode.commands.executeCommand('lowcodeStudio.showStudioWebGuide');
     }
   } catch (err) {
     vscode.window.showErrorMessage(

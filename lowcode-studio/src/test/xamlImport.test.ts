@@ -2,7 +2,7 @@ import assert from 'assert';
 import * as fs from 'fs';
 import * as path from 'path';
 import { importXaml } from '../interop/xamlImport';
-import { exportWorkflowToXaml, exportUiPathProjectJson } from '../interop/xamlExport';
+import { exportWorkflowToXaml, exportUiPathProjectJson, normalizeLogLevel } from '../interop/xamlExport';
 import { validateWorkflow, dryRunWorkflow } from '../commands/simulator';
 import {
   collectActivityTypes,
@@ -48,6 +48,17 @@ function run(): void {
   assert.ok(!/\bsapc\b/.test(exported), 'sapc must not appear without xmlns:sapc');
   assert.ok(exported.includes('xmlns:sap='));
   assert.ok(exported.includes('xmlns:sap2010='));
+  assert.ok(
+    /Level="Info"/.test(exported),
+    'Studio Web rejects Level="TraceLevel.Info" — emit bare enum name'
+  );
+  assert.ok(!/TraceLevel\./.test(exported), 'TraceLevel. prefix must not appear in Level');
+
+  assert.strictEqual(normalizeLogLevel('Info'), 'Info');
+  assert.strictEqual(normalizeLogLevel('TraceLevel.Info'), 'Info');
+  assert.strictEqual(normalizeLogLevel('TraceLevel.Warn'), 'Warn');
+  assert.strictEqual(normalizeLogLevel('warning'), 'Warn');
+  assert.strictEqual(normalizeLogLevel(''), 'Info');
 
   const deps = resolveUiPathDependencies({
     activityTypes: collectActivityTypes([workflow]),
