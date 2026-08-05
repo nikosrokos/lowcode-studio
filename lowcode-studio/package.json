@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Mac-first low-code RPA for VS Code/Cursor: REFramework design, scenario dry-runs (Shift+F5), and the easiest Connect to Studio Web handoff for Orchestrator publish.",
-  "version": "0.6.37",
+  "version": "0.6.38",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -52,6 +52,11 @@
     },
     "views": {
       "lowcodeStudio": [
+        {
+          "id": "lowcodeStudio.home",
+          "name": "Home",
+          "type": "webview"
+        },
         {
           "id": "lowcodeStudio.projects",
           "name": "Project Explorer"
@@ -264,6 +269,13 @@
         "title": "LowCode Studio: Getting Started"
       },
       {
+        "command": "lowcodeStudio.openHome",
+        "title": "Open Home Screen",
+        "icon": "$(home)",
+        "shortTitle": "Home",
+        "category": "LowCode Studio"
+      },
+      {
         "command": "lowcodeStudio.showWhatsNew",
         "title": "What's New (changelog)",
         "shortTitle": "What's New",
@@ -310,10 +322,36 @@
         "icon": "$(symbol-operator)",
         "shortTitle": "VB repair",
         "category": "LowCode Studio"
+      },
+      {
+        "command": "lowcodeStudio.scaffoldFromDescription",
+        "title": "Scaffold sequence from description (Assist)",
+        "icon": "$(sparkle)",
+        "shortTitle": "Scaffold",
+        "category": "LowCode Studio"
+      },
+      {
+        "command": "lowcodeStudio.repairFromDryRunTrace",
+        "title": "Repair from dry-run trace (Assist)",
+        "icon": "$(debug-alt)",
+        "shortTitle": "Trace repair",
+        "category": "LowCode Studio"
       }
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "lowcodeStudio.openHome",
+          "when": "view == lowcodeStudio.home",
+          "group": "navigation@0",
+          "tooltip": "Open Home as a full editor tab"
+        },
+        {
+          "command": "lowcodeStudio.openLocalProject",
+          "when": "view == lowcodeStudio.home",
+          "group": "navigation@1",
+          "tooltip": "Open Local Project — LCS project or Studio Web solution (.uipx)"
+        },
         {
           "command": "lowcodeStudio.openLocalProject",
           "when": "view == lowcodeStudio.projects",
@@ -612,6 +650,36 @@
           ],
           "description": "Designer canvas background: plain board or subtle dot grid."
         },
+        "lowcodeStudio.showCardSummaries": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show one-line property summaries under activity titles on the canvas."
+        },
+        "lowcodeStudio.compactCards": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use tighter padding on sequence activity cards."
+        },
+        "lowcodeStudio.showConnectors": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show spine connectors between sequence steps."
+        },
+        "lowcodeStudio.defaultZoom": {
+          "type": "number",
+          "default": 1,
+          "enum": [
+            0.75,
+            1,
+            1.25
+          ],
+          "description": "Default designer zoom when opening a workflow (75%, 100%, or 125%)."
+        },
+        "lowcodeStudio.openHomeOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Focus the LowCode Studio Home view when the extension activates."
+        },
         "lowcodeStudio.syncStudioWebOnSave": {
           "type": "boolean",
           "default": true,
@@ -656,7 +724,7 @@
     "package": "npm run bundle && vsce package --no-dependencies",
     "lint": "tsc --noEmit",
     "docs:activities": "npm run compile && node scripts/generate-activities-md.js",
-    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && node out/test/windowsTarget.test.js && node out/test/extractTableData.test.js && node out/test/selectorBuilder.test.js && node out/test/windowsTodo.test.js && node out/test/strongDryRun.test.js && node out/test/blueprints.test.js && node out/test/activityPaletteSmartProps.test.js && node out/test/inputMethod.test.js && node out/test/projectResolve.test.js && node out/test/studioWebLocal.test.js && node out/test/useAppBrowserUx.test.js && node out/test/designerUxFixes.test.js && node out/test/workflowArguments.test.js && node out/test/phaseBActivities.test.js && node out/test/dryRun2.test.js && node out/test/whatsNew.test.js && node out/test/studioWebLocalSync.test.js && node out/test/packageManager.test.js && node out/test/a2ImportMap.test.js && node out/test/realRunners.test.js && node out/test/assist.test.js && node out/test/studioWebActivityExport.test.js && node out/test/studioWebBidirectional.test.js && node out/test/studioWebAdopt.test.js && npm run docs:activities"
+    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && node out/test/windowsTarget.test.js && node out/test/extractTableData.test.js && node out/test/selectorBuilder.test.js && node out/test/windowsTodo.test.js && node out/test/strongDryRun.test.js && node out/test/blueprints.test.js && node out/test/activityPaletteSmartProps.test.js && node out/test/inputMethod.test.js && node out/test/projectResolve.test.js && node out/test/studioWebLocal.test.js && node out/test/useAppBrowserUx.test.js && node out/test/designerUxFixes.test.js && node out/test/workflowArguments.test.js && node out/test/phaseBActivities.test.js && node out/test/dryRun2.test.js && node out/test/whatsNew.test.js && node out/test/studioWebLocalSync.test.js && node out/test/packageManager.test.js && node out/test/a2ImportMap.test.js && node out/test/realRunners.test.js && node out/test/assist.test.js && node out/test/assistF2.test.js && node out/test/studioWebActivityExport.test.js && node out/test/studioWebBidirectional.test.js && node out/test/studioWebAdopt.test.js && npm run docs:activities"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",

@@ -5,6 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.38] — 2026-08-05
+
+### Added
+- **Home Screen** — activity-bar Home webview + full-tab Home (open project, Studio Web, latest changes collapsed, next 5 steps)
+- **Assist F2** — scaffold sequence from description; repair from dry-run trace
+- New canvas/default settings: card summaries, compact cards, connectors, default zoom, open Home on startup
+- Refreshed **logo** (`media/icon.png`, `media/logo.png`)
+
+### Changed
+- Variables / Arguments panels are compact **single-row** (name + type; args also show direction)
+- Settings / Assist toolbar icons are slightly larger
+
 ## [0.6.37] — 2026-08-05
 
 ### Fixed
