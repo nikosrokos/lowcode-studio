@@ -10,7 +10,7 @@ import {
 } from '../models/workflow';
 import { importXaml, ImportWarning } from './xamlImport';
 import { exportUiPathProjectJson, exportWorkflowToXaml } from './xamlExport';
-import { resolveUiPathTarget } from './windowsTarget';
+import { resolveUiPathTarget, UiPathTargetFramework } from './windowsTarget';
 import {
   collectActivityTypes,
   resolveUiPathDependencies
@@ -229,11 +229,19 @@ export function importUiPathNupkg(
 /**
  * Write / overwrite a UiPath-compatible project folder from an LCS project.
  * Used by Studio Web Local Workspace sync and classic folder export.
+ *
+ * Studio Web Local Workspace (esp. on Mac) requires **Portable**.
+ * Windows-target projects show: "Windows projects can only be opened in Studio Web
+ * on a Windows machine or in Studio Desktop."
  */
 export function writeUiPathProjectToDir(
   lcsProjectDir: string,
   outDir: string,
-  options: { writeReadme?: boolean } = {}
+  options: {
+    writeReadme?: boolean;
+    /** Override target; Local Workspace must use Portable. */
+    targetFramework?: UiPathTargetFramework;
+  } = {}
 ): ExportedStudioWebProject {
   const manifestPath = path.join(lcsProjectDir, 'project.json');
   if (!fs.existsSync(manifestPath)) {
@@ -287,7 +295,9 @@ export function writeUiPathProjectToDir(
     extraPackages: collectCustomNugetPackages(customActivities, activityTypes)
   });
 
-  const targetFramework = resolveUiPathTarget(manifest.uipathTargetFramework);
+  const targetFramework = options.targetFramework
+    ? resolveUiPathTarget(options.targetFramework)
+    : resolveUiPathTarget(manifest.uipathTargetFramework);
   const requiresUserInteraction = activityTypes.some(
     (t) => t.startsWith('UI.') || t.startsWith('Imported.')
   );
@@ -326,14 +336,20 @@ export function writeUiPathProjectToDir(
     const depList = Object.entries(dependencies)
       .map(([name, ver]) => `- \`${name}\`: ${ver}`)
       .join('\n');
+    const compatNote =
+      targetFramework === 'Portable'
+        ? 'Synced as **Portable** so Studio Web Local Workspace can open it on Mac and Windows.'
+        : 'Synced as **Windows** for Studio Desktop / Windows robots (not editable in Studio Web on Mac).';
 
     fs.writeFileSync(
       path.join(outDir, 'README_STUDIO_WEB.md'),
-      `# ${projectName} — Studio Web local project (Windows)
+      `# ${projectName} — Studio Web project (${targetFramework})
 
-Synced from **LowCode Studio** as a **Windows** UiPath project (\`targetFramework: ${targetFramework}\`).
+Synced from **LowCode Studio** (\`targetFramework: ${targetFramework}\`).
 
-Open this solution folder in Studio Web → **Local Workspace**, or in Studio Desktop (Windows).
+${compatNote}
+
+Open the parent solution folder in Studio Web → **Local Workspace**.
 
 Main entry: \`${mainXaml}\`
 

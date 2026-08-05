@@ -43,6 +43,17 @@ function run(): void {
   assert.ok(fs.existsSync(path.join(linked.targetDir, 'Main.xaml')));
   assert.ok(fs.existsSync(path.join(linked.link.solutionDir, 'OPEN_IN_STUDIO_WEB_LOCAL.md')));
 
+  // Studio Web Local Workspace on Mac rejects Windows-target projects
+  const linkedPj = JSON.parse(
+    fs.readFileSync(path.join(linked.targetDir, 'project.json'), 'utf8')
+  ) as { targetFramework?: string; runtimeOptions?: { netCore?: { targetFramework?: string } } };
+  assert.strictEqual(
+    linkedPj.targetFramework,
+    'Portable',
+    'Local Workspace project must be Portable (not Windows)'
+  );
+  assert.strictEqual(linkedPj.runtimeOptions?.netCore?.targetFramework, 'net8.0');
+
   const uipx = JSON.parse(fs.readFileSync(linked.uipxPath, 'utf8')) as {
     DocVersion?: string;
     SolutionId?: string;
@@ -88,6 +99,23 @@ function run(): void {
   assert.ok(after.includes(marker), 'marker from Save must appear in Studio XAML');
   const mainXaml = fs.readFileSync(path.join(synced.targetDir, 'Main.xaml'), 'utf8');
   assert.ok(mainXaml.includes('Activity') || mainXaml.length > 20);
+  const afterPj = JSON.parse(
+    fs.readFileSync(path.join(synced.targetDir, 'project.json'), 'utf8')
+  ) as { targetFramework?: string };
+  assert.strictEqual(afterPj.targetFramework, 'Portable');
+
+  // Detect Windows-target as not openable in Studio Web on Mac
+  fs.writeFileSync(
+    path.join(linked.targetDir, 'project.json'),
+    JSON.stringify({ name: 'LocalSyncDemo', main: 'Main.xaml', targetFramework: 'Windows' }, null, 2),
+    'utf8'
+  );
+  const windowsBlocked = validateStudioWebLocalOpenability(lcsDir);
+  assert.ok(!windowsBlocked.ok);
+  assert.ok(windowsBlocked.errors.some((e) => /Windows/i.test(e)));
+  // Restore Portable via sync
+  syncToStudioWebLocal(lcsDir);
+  assert.ok(validateStudioWebLocalOpenability(lcsDir).ok);
 
   // Connect helper with existing link
   const connected = connectToStudioWeb(lcsDir);
