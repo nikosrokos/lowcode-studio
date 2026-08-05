@@ -236,7 +236,6 @@ export function getDesignerHtml(
       transition: transform .12s ease, filter .12s ease;
     }
     .traffic .tl:hover { transform: scale(1.08); filter: brightness(1.08); }
-    .traffic .tl.close { background: #ff5f57; }
     .traffic .tl.min { background: #febc2e; }
     .traffic .tl.max { background: #28c840; }
     .panel.floating {
@@ -368,6 +367,11 @@ export function getDesignerHtml(
       background: color-mix(in srgb, var(--bg) 35%, transparent);
     }
     .maestro-dock .dock-zoom .zoom-label { min-width: 38px; font-size: 10px; }
+    .panel-tools .btn.symbol,
+    .panel-chrome-actions .btn.symbol {
+      min-width: 28px; padding: 4px 7px; font-size: 12px; line-height: 1;
+      letter-spacing: -0.04em;
+    }
     .canvas-zoom {
       transform-origin: 0 0;
       transition: transform .12s ease;
@@ -715,7 +719,6 @@ export function getDesignerHtml(
       <div class="frame-resize-x" id="leftResizeX" title="Drag to resize width"></div>
       <div class="panel-chrome" id="leftChrome">
         <div class="traffic" aria-label="Activities frame controls">
-          <button class="tl close" id="btnLeftCollapse" type="button" title="Collapse"></button>
           <button class="tl min" id="btnLeftFloat" type="button" title="Float frame"></button>
           <button class="tl max" id="btnLeftDock" type="button" title="Dock frame"></button>
         </div>
@@ -732,8 +735,8 @@ export function getDesignerHtml(
       </div>
       <div class="left-pane active" id="paneActivities" data-left-pane="activities">
         <div class="panel-tools">
-          <button class="btn" id="btnExpandCats" type="button" title="Expand all categories">Expand</button>
-          <button class="btn" id="btnCollapseCats" type="button" title="Collapse all categories">Collapse</button>
+          <button class="btn symbol" id="btnExpandCats" type="button" title="Expand all categories">▾▾</button>
+          <button class="btn symbol" id="btnCollapseCats" type="button" title="Collapse all categories">▸▸</button>
         </div>
         <input class="search" id="search" placeholder="Search activities..." />
         <div id="catalog"></div>
@@ -793,14 +796,13 @@ export function getDesignerHtml(
       <div class="frame-resize-x" id="propsResizeX" title="Drag to resize width"></div>
       <div class="panel-chrome" id="propsChrome">
         <div class="traffic" aria-label="Properties frame controls">
-          <button class="tl close" id="btnPropsCollapse" type="button" title="Collapse"></button>
           <button class="tl min" id="btnPropsFloat" type="button" title="Float frame"></button>
           <button class="tl max" id="btnPropsDock" type="button" title="Dock frame"></button>
         </div>
         <h2><span class="grow">Properties</span></h2>
         <div class="panel-chrome-actions">
-          <button class="btn" id="btnExpandProps" type="button" title="Expand all property groups" style="padding:3px 7px;font-size:10px;">Expand</button>
-          <button class="btn" id="btnCollapseProps" type="button" title="Collapse all property groups" style="padding:3px 7px;font-size:10px;">Collapse</button>
+          <button class="btn symbol" id="btnExpandProps" type="button" title="Expand all property groups">▾▾</button>
+          <button class="btn symbol" id="btnCollapseProps" type="button" title="Collapse all property groups">▸▸</button>
         </div>
       </div>
       <div class="panel-scroll" id="propsScroll">
@@ -826,22 +828,21 @@ export function getDesignerHtml(
     </aside>
 
     <nav class="maestro-dock" id="maestroDock" aria-label="Canvas dock">
-      <button class="dock-btn" id="dockLeft" type="button" title="Toggle toolbox">▢</button>
-      <button class="dock-btn" id="btnInsert" type="button" title="Insert activity (⌘K)">＋</button>
+      <button class="dock-btn" id="dockLeft" type="button" title="Show / hide toolbox">▢</button>
+      <button class="dock-btn" id="btnInsert" type="button" title="Insert activity (⌘K / Ctrl+K)">＋</button>
       <span class="dock-sep" aria-hidden="true"></span>
       <div class="dock-zoom">
         <button class="dock-btn" id="btnZoomOut" type="button" title="Zoom out">−</button>
-        <span class="zoom-label" id="zoomLabel">100%</span>
+        <span class="zoom-label" id="zoomLabel" title="Current zoom">100%</span>
         <button class="dock-btn" id="btnZoomIn" type="button" title="Zoom in">+</button>
-        <button class="dock-btn" id="btnZoomReset" type="button" title="Fit 100%">⛶</button>
+        <button class="dock-btn" id="btnZoomReset" type="button" title="Reset zoom to 100%">⛶</button>
       </div>
       <span class="dock-sep" aria-hidden="true"></span>
-      <button class="dock-btn" id="btnValidate" type="button" title="Validate">✓</button>
-      <button class="dock-btn" id="btnDryRun" type="button" title="Dry Run">▶</button>
-      <button class="dock-btn" id="btnStepThrough" type="button" title="Step Through">⏭</button>
+      <button class="dock-btn" id="btnValidate" type="button" title="Validate workflow">✓</button>
+      <button class="dock-btn" id="btnDryRun" type="button" title="Dry Run (run all)">▶</button>
+      <button class="dock-btn" id="btnStepThrough" type="button" title="Step through on canvas">⏭</button>
       <span class="dock-sep" aria-hidden="true"></span>
-      <button class="dock-btn" id="dockProps" type="button" title="Toggle properties">☰</button>
-      <button class="dock-btn primary" id="dockSave" type="button" title="Save">Save</button>
+      <button class="dock-btn" id="dockProps" type="button" title="Show / hide properties">☰</button>
     </nav>
   </div>
 
@@ -2173,10 +2174,6 @@ export function getDesignerHtml(
       applyFrameLayouts();
       toast('Properties docked');
     });
-    document.getElementById('btnPropsCollapse')?.addEventListener('click', () => {
-      state.propsMode = 'collapsed';
-      applyFrameLayouts();
-    });
     document.getElementById('btnPropsExpand')?.addEventListener('click', () => {
       state.propsMode = 'docked';
       applyFrameLayouts();
@@ -2192,10 +2189,6 @@ export function getDesignerHtml(
       applyFrameLayouts();
       toast('Toolbox docked');
     });
-    document.getElementById('btnLeftCollapse')?.addEventListener('click', () => {
-      state.leftMode = 'collapsed';
-      applyFrameLayouts();
-    });
     document.getElementById('btnLeftExpand')?.addEventListener('click', () => {
       state.leftMode = 'docked';
       applyFrameLayouts();
@@ -2207,9 +2200,6 @@ export function getDesignerHtml(
     document.getElementById('dockProps')?.addEventListener('click', () => {
       state.propsMode = state.propsMode === 'collapsed' ? 'docked' : 'collapsed';
       applyFrameLayouts();
-    });
-    document.getElementById('dockSave')?.addEventListener('click', () => {
-      document.getElementById('btnSave')?.click();
     });
 
     (function bindFrameInteractions() {
