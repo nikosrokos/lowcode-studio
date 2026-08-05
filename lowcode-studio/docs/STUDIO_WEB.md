@@ -23,11 +23,18 @@ If you already linked a project before this fix: run **Connect → Sync & open**
 ```
 Design on Mac (LowCode Studio)
    → Dry Run / Scenarios (F5 / Shift+F5)
-   → Connect / Open Studio Web Local Workspace (once)
-   → Open that folder in Studio Web → Local Workspace (Allow file access)
+   → Open → Create Studio Web Local Workspace  (or Connect)
+   → In Studio Web: Local Workspace → open the .uipx folder → Allow
    → Save in LowCode Studio → Portable .xaml syncs on disk
-   → Publish from Studio Web
+   → Edit/publish in Studio Web
 ```
+
+**Open** (Project Explorer title) offers three clear choices:
+1. Open LowCode Studio project
+2. Open Studio Web Local Workspace solution (`.uipx`)
+3. Create Studio Web Local Workspace from the active LCS project
+
+Opening a solution links it quietly under the active project when possible (no cascade of dialogs / auto-open Main).
 
 ## One-time connect
 
@@ -71,7 +78,9 @@ From the Connect picker choose **Legacy: export .uip package once** or **Export 
 | `Failed to parse JSON` / `uniqueId` Guid error | Update to **0.6.13+** and **Save** or Connect → Sync (rewrites a valid Guid) |
 | "targets Windows" on Mac | Update to **0.6.12+** and Sync (rewrites Portable) |
 | Solution not in Project Explorer | Connect → Sync/Open again, or **Open** and pick the `.uipx` solution folder (works with no workspace open) |
+| `Failed to create a 'Level' from 'TraceLevel.Info'` | Update to **0.6.17+** and **Save** (rewrites LogMessage `Level="Info"`) |
 | `'sapc' prefix is not defined` when opening .xaml | Update to **0.6.16+** and **Save** (rewrites Ignorable to `sap sap2010`) |
 | Duplicate / stuck projects in Project Explorer | Update to **0.6.16+**; Remove hides + unlinks; Connect no longer adds a second workspace root for the solution |
+| Open solution reloads then opens Main / many dialogs | Update to **0.6.17+** — quieter Open picker; no auto-open Main after solution open |
 | Changes in LCS not visible in Studio Web | Update to **0.6.15+**, ensure project is **linked** (Save toast says `synced .xaml`), then reopen the workflow in Studio Web if it still shows a cached copy |
 | "Open a workspace folder first" when opening a solution | Update to **0.6.14+** — Open accepts Studio Web `.uipx` solutions without a prior workspace |

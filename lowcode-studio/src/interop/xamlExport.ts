@@ -367,7 +367,10 @@ ${pad}</ui:ForEachRow>`;
   }
 
   if (activity.type === 'System.LogMessage') {
-    return `${pad}<ui:LogMessage DisplayName="${escapeAttr(activity.displayName)}" Level="TraceLevel.${escapeAttr(String(activity.properties.level || 'Info'))}" Message="[${escapeAttr(String(activity.properties.message ?? '""'))}]" />`;
+    // Studio Web expects Level="Info" (enum member name). Desktop sometimes wrote
+    // Level="TraceLevel.Info", which Studio Web rejects: Failed to create a 'Level'…
+    const level = normalizeLogLevel(activity.properties.level);
+    return `${pad}<ui:LogMessage DisplayName="${escapeAttr(activity.displayName)}" Level="${escapeAttr(level)}" Message="[${escapeAttr(String(activity.properties.message ?? '""'))}]" />`;
   }
 
   if (activity.type === 'System.Delay') {
@@ -707,6 +710,37 @@ function pad2(n: number): string {
 function sanitizeClass(name: string): string {
   const cleaned = name.replace(/[^A-Za-z0-9_]/g, '_');
   return /^[A-Za-z_]/.test(cleaned) ? cleaned : `Workflow_${cleaned}`;
+}
+
+/** UiPath LogMessage Level enum member names accepted by Studio Web. */
+const LOG_LEVELS = new Set(['Trace', 'Info', 'Warn', 'Error', 'Fatal']);
+
+export function normalizeLogLevel(value: unknown): string {
+  let raw = String(value ?? 'Info').trim();
+  raw = raw.replace(/^TraceLevel\./i, '').replace(/^LogLevel\./i, '');
+  if (!raw) {
+    return 'Info';
+  }
+  // Normalize common aliases
+  const lower = raw.toLowerCase();
+  const alias: Record<string, string> = {
+    information: 'Info',
+    info: 'Info',
+    warning: 'Warn',
+    warn: 'Warn',
+    trace: 'Trace',
+    error: 'Error',
+    fatal: 'Fatal',
+    critical: 'Fatal'
+  };
+  const mapped = alias[lower] || raw;
+  // Preserve canonical casing when already valid
+  for (const level of LOG_LEVELS) {
+    if (level.toLowerCase() === mapped.toLowerCase()) {
+      return level;
+    }
+  }
+  return 'Info';
 }
 
 function escapeAttr(value: string): string {
