@@ -1,12 +1,12 @@
 # LowCode Studio
 
-**Version 0.6.11** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.6.12** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.6.11-0ea5e9)
+![version](https://img.shields.io/badge/version-0.6.12-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
@@ -45,7 +45,12 @@ Design on Mac (REFramework)
 2. **Project Explorer** — title actions with tooltips (Open, Scenarios, Connect, Validate…)  
 3. **Extract Table Data** — smart page → DataTable extraction for Windows UI automation
 
-## What’s in 0.6.11
+## What’s in 0.6.12
+
+- **Local Workspace uses Portable** — fixes Studio Web error that Windows projects can only open on a Windows machine / Studio Desktop
+- Re-Connect or Save rewrites an already-linked project as Portable (`net8.0`)
+
+### Also in 0.6.11
 
 - **Studio Web Local Workspace** — create/open a `.uipx` solution folder; **Save** syncs `.xaml` (no routine `.uip` export)
 - Designer **Project** tab shows folders/files of the **current** RPA project only
@@ -133,7 +138,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.11.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.12.vsix` → reload.
 
 ## Easy path
 

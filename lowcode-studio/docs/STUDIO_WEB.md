@@ -1,6 +1,22 @@
 # Connect LowCode Studio ↔ UiPath Studio Web Local Workspace
 
-LowCode Studio is optimized for **Mac design + dry-run**. Link a project to a **Studio Web Local Workspace** solution folder; every **Save** syncs Windows `.xaml` into that folder so Studio Web stays up to date — **no `.uip` export required**.
+LowCode Studio is optimized for **Mac design + dry-run**. Link a project to a **Studio Web Local Workspace** solution folder; every **Save** syncs `.xaml` into that folder so Studio Web stays up to date — **no `.uip` export required**.
+
+## Important: Portable (not Windows)
+
+Studio Web Local Workspace shows this error for Windows-target projects:
+
+> This project targets Windows  
+> Windows projects can only be opened in Studio Web on a Windows machine or in Studio Desktop.
+
+LowCode Studio therefore always writes the linked Local Workspace project as **`targetFramework: Portable`** (`net8.0`) so it opens on Mac Studio Web.
+
+| Path | Target | Use |
+|---|---|---|
+| **Local Workspace** (Connect / Save sync) | **Portable** | Design/open in Studio Web on Mac |
+| Legacy `.uip` / Export Windows folder | **Windows** | Studio Desktop / Windows robots |
+
+If you already linked a project before this fix: run **Connect → Sync & open** (or Save once) to rewrite `project.json` as Portable.
 
 ## Recommended loop
 
@@ -9,8 +25,8 @@ Design on Mac (LowCode Studio)
    → Dry Run / Scenarios (F5 / Shift+F5)
    → Connect / Open Studio Web Local Workspace (once)
    → Open that folder in Studio Web → Local Workspace (Allow file access)
-   → Save in LowCode Studio → files sync on disk
-   → Publish from Studio Web → run on Windows robot
+   → Save in LowCode Studio → Portable .xaml syncs on disk
+   → Publish from Studio Web
 ```
 
 ## One-time connect
@@ -18,9 +34,9 @@ Design on Mac (LowCode Studio)
 1. Select your LowCode Studio project (Project Explorer or open a workflow)
 2. Run **Connect / Open Studio Web Local Workspace**
 3. Choose:
-   - **Create new** — pick a parent folder; LCS writes `{Name}/` with `.uipx` + project
+   - **Create new** — pick a parent folder; LCS writes `{Name}/` with `.uipx` + Portable project
    - **Open existing** — pick a folder that already has a `.uipx`
-   - **Sync & open** — if already linked
+   - **Sync & open** — if already linked (also rewrites Portable)
 4. **Reveal Solution**, then in Studio Web: **Local Workspace → Open solution → Allow**
 5. Keep designing in LowCode Studio — **Save** refreshes the linked `.xaml` / `project.json`
 
@@ -32,28 +48,18 @@ Link metadata is stored in LowCode Studio `project.json` → `studioWebLocal`.
 |---|---|
 | `lowcodeStudio.syncStudioWebOnSave` | **true** |
 
-When enabled and the project is linked, saving a `.lcs.json` or `project.json` rewrites the UiPath project under the solution’s project folder.
+When enabled and the project is linked, saving a `.lcs.json` or `project.json` rewrites the UiPath **Portable** project under the solution’s project folder.
 
-## Windows compatibility
+## Legacy Windows handoff
 
-| Setting | Value |
-|---|---|
-| `targetFramework` | **Windows** |
-| .NET TFM | `net8.0-windows` |
-| UI selectors | Classic `<html>/<webctrl>` (browser) or `<wnd>` (desktop) |
-| Activities | `UiPath.UIAutomation.Activities` modern (`uia:NClick`, …) |
-| Input method | Set in designer; exports as `InteractionMode` |
-
-## Legacy one-off `.uip`
-
-From the Connect picker choose **Legacy: export .uip package once** if you still need Automations → Import project. Prefer Local Workspace sync for day-to-day work.
+From the Connect picker choose **Legacy: export .uip package once** or **Export for Studio Web (Windows project folder)** when you need a Windows-target package for Studio Desktop / Windows robots.
 
 ## Tips
 
 - Prefer activities mapped to real UiPath packages (see [ACTIVITIES.md](ACTIVITIES.md))
 - Use the designer **Selector Builder** before publishing
-- Nest UI steps under **Use Application/Browser** when targeting a modern app/browser scope
-- Review `WINDOWS_TODO.md` for Mac → Windows handoff items
-- Capture / refine remaining selectors on Windows with UI Explorer
+- Nest UI steps under **Use Application/Browser** when targeting a browser scope
+- Desktop UI (`<wnd>`) still needs a Windows machine / Studio Desktop for reliable capture
+- Review `WINDOWS_TODO.md` for Mac → Windows robot handoff items
 
-> Not an official UiPath product — community tooling for Mac-first REFramework design targeting Windows execution.
+> Not an official UiPath product — community tooling for Mac-first REFramework design with Studio Web Local Workspace sync.

@@ -192,7 +192,12 @@ export function linkStudioWebLocalWorkspace(
   fs.writeFileSync(uipxPath, JSON.stringify(data, null, 2) + '\n', 'utf8');
 
   const projectDir = path.join(solutionDir, projectFolder);
-  const exported = writeUiPathProjectToDir(lcsProjectDir, projectDir, { writeReadme: true });
+  // Portable is required for Studio Web Local Workspace on Mac.
+  // Windows-target projects show an error icon and cannot be opened/edited there.
+  const exported = writeUiPathProjectToDir(lcsProjectDir, projectDir, {
+    writeReadme: true,
+    targetFramework: 'Portable'
+  });
 
   const link: StudioWebLocalLink = {
     solutionDir,
@@ -216,6 +221,8 @@ This folder is a **UiPath solution** linked from LowCode Studio.
 4. Allow the browser to edit files when prompted
 
 LowCode Studio syncs \`.xaml\` + \`project.json\` into \`${projectFolder}/\` every time you **Save** a workflow.
+The linked project uses \`targetFramework: Portable\` so Studio Web can open it on Mac (Windows-target projects are blocked in Studio Web on Mac).
+
 No \`.uip\` export is required for this loop.
 `,
     'utf8'
@@ -254,7 +261,10 @@ export function syncToStudioWebLocal(lcsProjectDir: string): StudioWebLocalSyncR
   fs.writeFileSync(uipxPath, JSON.stringify(data, null, 2) + '\n', 'utf8');
 
   const projectDir = path.join(link.solutionDir, link.projectFolder);
-  const exported = writeUiPathProjectToDir(lcsProjectDir, projectDir, { writeReadme: false });
+  const exported = writeUiPathProjectToDir(lcsProjectDir, projectDir, {
+    writeReadme: false,
+    targetFramework: 'Portable'
+  });
 
   return {
     ...exported,
@@ -314,8 +324,18 @@ export function validateStudioWebLocalOpenability(
   const workflows: string[] = [];
   if (fs.existsSync(projectJson)) {
     try {
-      const pj = JSON.parse(fs.readFileSync(projectJson, 'utf8')) as { main?: string };
+      const pj = JSON.parse(fs.readFileSync(projectJson, 'utf8')) as {
+        main?: string;
+        targetFramework?: string;
+      };
       mainXaml = pj.main || 'Main.xaml';
+      if (pj.targetFramework === 'Windows' || pj.targetFramework === 'WindowsLegacy') {
+        errors.push(
+          `Project targets ${pj.targetFramework} — Studio Web Local Workspace on Mac cannot open it. Re-Connect / Save to rewrite as Portable.`
+        );
+      } else if (pj.targetFramework && pj.targetFramework !== 'Portable') {
+        errors.push(`Unexpected targetFramework "${pj.targetFramework}" (expected Portable)`);
+      }
       const mainAbs = path.join(projectDir, mainXaml);
       if (!fs.existsSync(mainAbs)) {
         errors.push(`Main workflow missing: ${mainXaml}`);
@@ -403,8 +423,9 @@ LowCode Studio (design + dry-run)
 ## Notes
 
 - Link is stored in LowCode Studio \`project.json\` → \`studioWebLocal\`
+- Linked UiPath project is always **Portable** (required to open in Studio Web on Mac)
 - Sync runs automatically on Save (disable via setting \`lowcodeStudio.syncStudioWebOnSave\`)
-- Classic **Export Windows project folder** remains available for one-off handoff without linking
+- Classic **Export Windows project folder** / legacy \`.uip\` remains for Windows Desktop / robot handoff
 
 > Not an official UiPath product.
 `;
