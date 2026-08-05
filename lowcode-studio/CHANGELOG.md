@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.32] — 2026-08-05
+
+### Added
+- Properties panel shows **VB repair hints in red** under expression fields, with one-click Apply
+- Activity **right-click** menu: Move up/down, Open workflow, Apply VB repairs (card icon buttons removed)
+
+### Fixed
+- Variables panel not listing variables (`variablesPanel` typo broke render)
+- Add Argument / Add Variable persistence racing a stale document read
+
 ## [0.6.31] — 2026-08-05
 
 ### Added

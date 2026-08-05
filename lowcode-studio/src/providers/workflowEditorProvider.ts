@@ -454,8 +454,16 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
         }
         case 'variablesChanged': {
           try {
-            const workflow = parseWorkflow(document.getText());
-            workflow.variables = message.variables;
+            // Prefer full workflow from the designer (avoids racing a stale document read)
+            const workflow = message.workflow
+              ? (message.workflow as WorkflowDocument)
+              : parseWorkflow(document.getText());
+            if (Array.isArray(message.variables)) {
+              workflow.variables = message.variables;
+            }
+            workflow.variables = Array.isArray(workflow.variables) ? workflow.variables : [];
+            workflow.arguments = Array.isArray(workflow.arguments) ? workflow.arguments : [];
+            await this.updateTextDocument(document, workflow);
             this.onWorkflowChanged(workflow);
           } catch {
             // ignore
@@ -464,13 +472,17 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
         }
         case 'argumentsChanged': {
           try {
-            const workflow = parseWorkflow(document.getText());
+            const workflow = message.workflow
+              ? (message.workflow as WorkflowDocument)
+              : parseWorkflow(document.getText());
             const args = message.workflowArguments ?? message.arguments;
             if (Array.isArray(args)) {
               workflow.arguments = args;
-              await this.updateTextDocument(document, workflow);
-              this.onWorkflowChanged(workflow);
             }
+            workflow.variables = Array.isArray(workflow.variables) ? workflow.variables : [];
+            workflow.arguments = Array.isArray(workflow.arguments) ? workflow.arguments : [];
+            await this.updateTextDocument(document, workflow);
+            this.onWorkflowChanged(workflow);
           } catch {
             // ignore
           }

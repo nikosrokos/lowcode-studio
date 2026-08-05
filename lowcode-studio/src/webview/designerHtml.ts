@@ -647,7 +647,6 @@ export function getDesignerHtml(
     .flow-node .card-bp {
       position: absolute; right: 8px; top: 8px; z-index: 3;
     }
-    .card-actions .card-bp { display: inline-block; }
     .kind-badge {
       display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .04em;
       text-transform: uppercase; padding: 1px 5px; border-radius: 4px; margin-left: 6px;
@@ -674,13 +673,31 @@ export function getDesignerHtml(
       letter-spacing: .02em;
     }
     .card-warn.weak { color: #ca8a04; }
-    .card-actions {
-      position: absolute; right: 6px; top: 6px; display: flex; gap: 3px; align-items: center;
-      z-index: 3;
+    .card-bp-dot {
+      position: absolute; right: 8px; top: 8px; z-index: 3;
+      width: 9px; height: 9px; border-radius: 50%;
+      background: #ef4444; border: 1px solid color-mix(in srgb, #ef4444 40%, #fff);
+      box-shadow: 0 0 0 2px color-mix(in srgb, #ef4444 25%, transparent);
+      pointer-events: none;
     }
-    .card-actions .icon-btn { display: none; }
-    .card:hover .card-actions .icon-btn, .card.selected .card-actions .icon-btn { display: inline-flex; align-items: center; justify-content: center; }
-    .card-actions .card-bp { display: inline-block; }
+    .vb-repair-hint {
+      margin-top: 5px; font-size: 11px; line-height: 1.4; color: #ef4444;
+      font-weight: 600;
+    }
+    .vb-repair-hint .vb-proposed {
+      display: block; margin-top: 2px; font-family: var(--mono); font-weight: 500;
+      color: #ef4444; word-break: break-word; white-space: pre-wrap;
+    }
+    .vb-repair-hint .vb-apply {
+      margin-top: 4px; border: 1px solid color-mix(in srgb, #ef4444 55%, var(--border));
+      background: color-mix(in srgb, #ef4444 12%, transparent); color: #ef4444;
+      border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 600; cursor: pointer;
+    }
+    .vb-repair-hint .vb-apply:hover { background: color-mix(in srgb, #ef4444 22%, transparent); }
+    .ctx-menu .ctx-sep {
+      height: 1px; margin: 4px 8px; background: var(--border); pointer-events: none;
+    }
+    .ctx-menu button[hidden] { display: none !important; }
     .icon-btn {
       width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--border);
       background: var(--input-bg); color: var(--text); cursor: pointer; font-size: 12px;
@@ -1125,9 +1142,16 @@ export function getDesignerHtml(
       <div class="ctx-menu" id="ctxMenu" role="menu">
         <button type="button" data-ctx="insert-before">Insert activity above</button>
         <button type="button" data-ctx="insert-after">Insert activity below</button>
+        <div class="ctx-sep"></div>
+        <button type="button" data-ctx="up">Move up</button>
+        <button type="button" data-ctx="down">Move down</button>
+        <button type="button" data-ctx="dup">Duplicate</button>
+        <div class="ctx-sep"></div>
         <button type="button" data-ctx="bp">Toggle breakpoint</button>
         <button type="button" data-ctx="runto">Run to here</button>
-        <button type="button" data-ctx="dup">Duplicate</button>
+        <button type="button" data-ctx="open" hidden>Open workflow</button>
+        <button type="button" data-ctx="vb-repair" hidden>Apply VB expression repairs</button>
+        <div class="ctx-sep"></div>
         <button type="button" class="danger" data-ctx="delete">Delete</button>
       </div>
     </main>
@@ -1676,6 +1700,20 @@ export function getDesignerHtml(
       if (!menu) return;
       state.ctxTargetId = activityId;
       state.selectedId = activityId;
+      const hit = walkFind(state.workflow.activities, activityId);
+      const node = hit?.node;
+      const openBtn = menu.querySelector('[data-ctx="open"]');
+      const vbBtn = menu.querySelector('[data-ctx="vb-repair"]');
+      if (openBtn) {
+        openBtn.hidden = !(node && node.type === 'REFramework.InvokeWorkflow' && node.properties?.workflowPath);
+      }
+      if (vbBtn) {
+        const repairs = node ? vbRepairsForActivity(node) : [];
+        vbBtn.hidden = !repairs.length;
+        vbBtn.textContent = repairs.length
+          ? ('Apply VB repairs (' + repairs.length + ')')
+          : 'Apply VB expression repairs';
+      }
       menu.classList.add('show');
       const pad = 8;
       const mw = menu.offsetWidth || 160;
@@ -2404,23 +2442,12 @@ export function getDesignerHtml(
       const card = document.createElement('div');
       card.dataset.id = node.id;
       card.className = 'card' + (state.selectedId === node.id ? ' selected' : '') + dryRunClass(node.id);
-      const openBtn = node.type === 'REFramework.InvokeWorkflow'
-        ? '<button class="icon-btn" data-act="open" title="Open workflow in new tab">↗</button>'
-        : '';
       const bpOn = !!state.breakpoints[node.id];
       const selWarn = selectorCardWarn(node);
       if (bpOn) card.classList.add('has-bp');
       card.innerHTML =
         '<div class="card-accent" style="background:' + color + '"></div>' +
-        '<div class="card-actions">' +
-          '<button type="button" class="card-bp' + (bpOn ? ' on' : '') + '" data-act="bp" title="Toggle breakpoint"></button>' +
-          openBtn +
-          '<button class="icon-btn" data-act="runto" title="Run to here">⏭</button>' +
-          '<button class="icon-btn" data-act="up" title="Move up">↑</button>' +
-          '<button class="icon-btn" data-act="down" title="Move down">↓</button>' +
-          '<button class="icon-btn" data-act="dup" title="Duplicate">⧉</button>' +
-          '<button class="icon-btn" data-act="delete" title="Delete">✕</button>' +
-        '</div>' +
+        (bpOn ? '<span class="card-bp-dot" title="Breakpoint set — right-click to toggle"></span>' : '') +
         '<div class="card-head"><span class="step">#' + stepNo + '</span>' +
         '<div class="card-title">' + escapeHtml(node.displayName) + '</div></div>' +
         '<div class="card-summary">' + escapeHtml(summary(node)) + '</div>' +
@@ -2430,8 +2457,7 @@ export function getDesignerHtml(
       card.addEventListener('mouseenter', (e) => showTip(tipHtml(node), e.clientX, e.clientY));
       card.addEventListener('mousemove', (e) => showTip(tipHtml(node), e.clientX, e.clientY));
       card.addEventListener('mouseleave', hideTip);
-      card.addEventListener('click', (e) => {
-        if (e.target.closest('[data-act]')) return;
+      card.addEventListener('click', () => {
         state.selectedId = node.id;
         hideTip();
         hideCtxMenu();
@@ -2449,48 +2475,6 @@ export function getDesignerHtml(
           e.stopPropagation();
           vscode.postMessage({ type: 'openWorkflow', workflowPath: String(node.properties.workflowPath) });
         }
-      });
-      card.querySelectorAll('[data-act]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const act = btn.getAttribute('data-act');
-          if (act === 'bp') {
-            toggleBreakpoint(node.id);
-            return;
-          }
-          if (act === 'runto') {
-            state.selectedId = node.id;
-            postDryRun({ stepThrough: true, runToActivityId: node.id });
-            return;
-          }
-          if (act === 'delete') {
-            deleteActivityById(node.id);
-            return;
-          }
-          if (act === 'open') {
-            vscode.postMessage({
-              type: 'openWorkflow',
-              workflowPath: String(node.properties?.workflowPath || '')
-            });
-            return;
-          }
-          const hit = walkFind(state.workflow.activities, node.id);
-          if (!hit) return;
-          if (act === 'up' && hit.index > 0) {
-            const [item] = hit.list.splice(hit.index, 1);
-            hit.list.splice(hit.index - 1, 0, item);
-          } else if (act === 'down' && hit.index < hit.list.length - 1) {
-            const [item] = hit.list.splice(hit.index, 1);
-            hit.list.splice(hit.index + 1, 0, item);
-          } else if (act === 'dup') {
-            const clone = JSON.parse(JSON.stringify(node));
-            const reid = (n) => { n.id = newId(); (n.children || []).forEach(reid); (n.elseChildren || []).forEach(reid); };
-            reid(clone);
-            hit.list.splice(hit.index + 1, 0, clone);
-            state.selectedId = clone.id;
-          }
-          persist(true);
-        });
       });
       wrap.appendChild(card);
       if (def?.container) {
@@ -2600,26 +2584,16 @@ export function getDesignerHtml(
         el.style.top = (node.y || 40) + 'px';
         el.style.borderColor = node.color || def?.color || undefined;
         const bpOn = !!state.breakpoints[node.id];
-        const bpBtn = '<button type="button" class="card-bp' + (bpOn ? ' on' : '') + '" data-flow-bp="1" title="Toggle breakpoint"></button>';
+        const bpDot = bpOn ? '<span class="card-bp-dot" title="Breakpoint set — right-click to toggle"></span>' : '';
         if (bpOn) el.classList.add('has-bp');
         if (isDecision) {
-          el.innerHTML = bpBtn + '<div class="inner"><div class="title">' + escapeHtml(node.displayName) + '</div><div class="summary">' + escapeHtml(summary(node)) + '</div></div><div class="port" title="Drag to connect"></div>';
+          el.innerHTML = bpDot + '<div class="inner"><div class="title">' + escapeHtml(node.displayName) + '</div><div class="summary">' + escapeHtml(summary(node)) + '</div></div><div class="port" title="Drag to connect"></div>';
         } else {
-          el.innerHTML = bpBtn + '<div class="title">' + escapeHtml(node.displayName) + '</div>' +
+          el.innerHTML = bpDot + '<div class="title">' + escapeHtml(node.displayName) + '</div>' +
             (isStart || isEnd ? '' : '<div class="summary">' + escapeHtml(summary(node)) + '</div>') +
             warnHtml +
             (isEnd ? '' : '<div class="port" title="Drag to connect"></div>');
         }
-        el.querySelector('[data-flow-bp]')?.addEventListener('mousedown', (e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          toggleBreakpoint(node.id);
-        });
-        el.querySelector('[data-flow-bp]')?.addEventListener('dblclick', (e) => {
-          e.stopPropagation();
-          state.selectedId = node.id;
-          postDryRun({ stepThrough: true, runToActivityId: node.id });
-        });
         el.addEventListener('contextmenu', (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -2892,6 +2866,113 @@ export function getDesignerHtml(
         '</div>';
     }
 
+    /** Compact UiPath VB rewrite for live Properties hints (mirrors Assist F4). */
+    function rewriteVbExpression(input) {
+      const original = String(input ?? '');
+      if (!original.trim()) return { next: original, changed: false, labels: [] };
+      const labels = [];
+      const note = (label) => { if (!labels.includes(label)) labels.push(label); };
+      const parts = [];
+      let i = 0, code = '';
+      while (i < original.length) {
+        const ch = original[i];
+        if (ch === '"' || ch === "'") {
+          if (code) { parts.push({ kind: 'code', text: code }); code = ''; }
+          const q = ch; let s = q; i++;
+          while (i < original.length) {
+            s += original[i];
+            if (original[i] === q) {
+              if (original[i + 1] === q) { s += original[i + 1]; i += 2; continue; }
+              i++; break;
+            }
+            i++;
+          }
+          parts.push({ kind: 'string', text: s });
+          continue;
+        }
+        code += ch; i++;
+      }
+      if (code) parts.push({ kind: 'code', text: code });
+      const sub = (chunk, pattern, flags, repl, label) => {
+        const re = new RegExp(pattern, flags);
+        let hit = false;
+        const next = chunk.replace(re, (...args) => {
+          hit = true;
+          return typeof repl === 'function' ? repl(...args) : String(repl);
+        });
+        if (hit) note(label);
+        return next;
+      };
+      const unary = (chunk, name, wrap, label) =>
+        sub(chunk, '(?<![\\w.])' + name + '\\s*\\(\\s*([^()]+?)\\s*\\)', 'gi', (_m, arg) => wrap(String(arg).trim()), label);
+      for (let pi = 0; pi < parts.length; pi++) {
+        if (parts[pi].kind === 'string') continue;
+        let c = parts[pi].text;
+        c = sub(c, '\\.toUpperCase\\s*\\(', 'gi', '.ToUpper(', '.toUpperCase() → .ToUpper()');
+        c = sub(c, '\\.toLowerCase\\s*\\(', 'gi', '.ToLower(', '.toLowerCase() → .ToLower()');
+        c = sub(c, '\\.trim\\s*\\(', 'gi', '.Trim(', '.trim() → .Trim()');
+        c = sub(c, '\\.includes\\s*\\(', 'gi', '.Contains(', '.includes() → .Contains()');
+        c = sub(c, '\\.startsWith\\s*\\(', 'gi', '.StartsWith(', '.startsWith() → .StartsWith()');
+        c = sub(c, '\\.endsWith\\s*\\(', 'gi', '.EndsWith(', '.endsWith() → .EndsWith()');
+        c = sub(c, '\\.length\\b', 'g', '.Length', '.length → .Length');
+        c = unary(c, 'Trim', (a) => a + '.Trim()', 'Trim(x) → x.Trim()');
+        c = unary(c, 'LTrim', (a) => a + '.TrimStart()', 'LTrim(x) → x.TrimStart()');
+        c = unary(c, 'RTrim', (a) => a + '.TrimEnd()', 'RTrim(x) → x.TrimEnd()');
+        c = unary(c, 'UCase', (a) => a + '.ToUpper()', 'UCase(x) → x.ToUpper()');
+        c = unary(c, 'LCase', (a) => a + '.ToLower()', 'LCase(x) → x.ToLower()');
+        c = unary(c, 'Len', (a) => a + '.Length', 'Len(x) → x.Length');
+        const lhs = '([\\w.]+(?:\\([^)]*\\))?)';
+        c = sub(c, lhs + '\\s*(?:===|==)\\s*(?:null|undefined)\\b', 'gi', (_m, a) => a + ' Is Nothing', '== null → Is Nothing');
+        c = sub(c, lhs + '\\s*(?:!==|!=)\\s*(?:null|undefined)\\b', 'gi', (_m, a) => a + ' IsNot Nothing', '!= null → IsNot Nothing');
+        c = sub(c, '\\bundefined\\b', 'g', 'Nothing', 'undefined → Nothing');
+        c = sub(c, '\\bnull\\b', 'g', 'Nothing', 'null → Nothing');
+        c = sub(c, lhs + '\\s*(?:==|=)\\s*Nothing\\b', 'gi', (_m, a) => a + ' Is Nothing', '= Nothing → Is Nothing');
+        c = sub(c, '===', 'g', '=', '=== → =');
+        c = sub(c, '!==', 'g', '<>', '!== → <>');
+        c = sub(c, '!=', 'g', '<>', '!= → <>');
+        c = sub(c, '&&', 'g', ' AndAlso ', '&& → AndAlso');
+        c = sub(c, '\\|\\|', 'g', ' OrElse ', '|| → OrElse');
+        c = sub(c, '\\btrue\\b', 'g', 'True', 'true → True');
+        c = sub(c, '\\bfalse\\b', 'g', 'False', 'false → False');
+        c = c.replace(/[ \t]{2,}/g, ' ');
+        parts[pi] = { kind: 'code', text: c };
+      }
+      const next = parts.map((p) => p.text).join('');
+      return { next, changed: next !== original, labels };
+    }
+    function vbRepairsForActivity(node) {
+      const def = findDef(node.type);
+      const out = [];
+      const props = node.properties || {};
+      for (const [name, raw] of Object.entries(props)) {
+        if (typeof raw !== 'string') continue;
+        if (name === 'selector' || name === 'selectorModern' || name === 'selectorXml') continue;
+        const pdef = (def?.properties || []).find((p) => p.name === name);
+        const expressionish = pdef
+          ? (pdef.type === 'expression' || pdef.type === 'multiline' || name === 'condition' || name === 'expression' || name === 'assignments')
+          : /^(condition|message|value|text|expression|url|jsonString|json|arrayRow|subject|body|assignments|argumentMappings)$/.test(name);
+        if (!expressionish) continue;
+        const r = rewriteVbExpression(raw);
+        if (r.changed) out.push({ name, label: pdef?.label || name, original: raw, proposed: r.next, labels: r.labels });
+      }
+      return out;
+    }
+    function applyVbRepairsToActivity(node) {
+      const repairs = vbRepairsForActivity(node);
+      if (!repairs.length) return 0;
+      for (const r of repairs) node.properties[r.name] = r.proposed;
+      return repairs.length;
+    }
+    function vbRepairHintHtml(propName, currentValue) {
+      const r = rewriteVbExpression(String(currentValue ?? ''));
+      if (!r.changed) return '';
+      return '<div class="vb-repair-hint" data-vb-for="' + escapeAttr(propName) + '">' +
+        'UiPath VB repair: ' + escapeHtml(r.labels.join('; ') || 'expression fix') +
+        '<span class="vb-proposed">' + escapeHtml(r.next) + '</span>' +
+        '<button type="button" class="vb-apply" data-vb-apply="' + escapeAttr(propName) + '" data-vb-value="' + escapeAttr(r.next) + '">Apply repair</button>' +
+        '</div>';
+    }
+
     function renderProps() {
       syncSuggestionVariables();
       const hit = state.selectedId ? walkFind(state.workflow.activities, state.selectedId) : null;
@@ -2941,6 +3022,10 @@ export function getDesignerHtml(
           continue;
         }
         activity += fieldHtml(label, renderPropInput(p, val, node), p.required);
+        const isExprProp = p.type === 'expression' || p.type === 'multiline' || p.name === 'condition' || p.name === 'expression' || p.name === 'assignments' || p.name === 'argumentMappings';
+        if (isExprProp && p.name !== 'selector') {
+          activity += vbRepairHintHtml(p.name, val);
+        }
         if (p.name === 'selector') {
           activity += selectorBuilderHtml(p.name, val);
           selectorProps.push(p.name);
@@ -3029,6 +3114,18 @@ export function getDesignerHtml(
         vscode.postMessage({
           type: 'openWorkflow',
           workflowPath: String(node.properties?.workflowPath || '')
+        });
+      });
+      els.props.querySelectorAll('[data-vb-apply]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const key = btn.getAttribute('data-vb-apply');
+          const value = btn.getAttribute('data-vb-value');
+          if (!key || value == null) return;
+          node.properties[key] = value;
+          persist(true);
+          toast('Applied VB repair → ' + key);
         });
       });
       selectorProps.forEach(propName => wireSelectorBuilder(els.props, node, propName));
@@ -3131,13 +3228,15 @@ export function getDesignerHtml(
     }
 
     function renderVariables() {
-      const vars = state.workflow.variables || [];
+      if (!els.variablesView) return;
+      state.workflow.variables = Array.isArray(state.workflow.variables) ? state.workflow.variables : [];
+      const vars = state.workflow.variables;
       if (els.variablesCount) els.variablesCount.textContent = String(vars.length);
       if (!vars.length) {
-        els.variablesPanel.innerHTML = '<div class="empty">No variables yet.</div>';
+        els.variablesView.innerHTML = '<div class="empty">No variables yet. Use Add Variable below.</div>';
         return;
       }
-      els.variablesPanel.innerHTML = vars.map((v, i) => (
+      els.variablesView.innerHTML = vars.map((v, i) => (
         '<div class="field" style="display:grid;grid-template-columns:1fr 90px 28px;gap:6px;align-items:end;">' +
           '<div><label>Name</label><input data-var="' + i + '" data-field="name" value="' + escapeAttr(v.name) + '" /></div>' +
           '<div><label>Type</label><select data-var="' + i + '" data-field="type">' +
@@ -3147,7 +3246,7 @@ export function getDesignerHtml(
         '</div>' +
         '<div class="field"><label>Default</label><input data-var="' + i + '" data-field="defaultValue" value="' + escapeAttr(v.defaultValue === undefined || v.defaultValue === null ? '' : String(v.defaultValue)) + '" /></div>'
       )).join('');
-      els.variablesPanel.querySelectorAll('[data-var]').forEach(input => {
+      els.variablesView.querySelectorAll('[data-var]').forEach(input => {
         input.addEventListener('change', () => {
           const i = Number(input.getAttribute('data-var'));
           const field = input.getAttribute('data-field');
@@ -3161,25 +3260,25 @@ export function getDesignerHtml(
             state.workflow.variables[i][field] = input.value;
           }
           persist(false);
-          vscode.postMessage({ type: 'variablesChanged', variables: state.workflow.variables });
+          vscode.postMessage({ type: 'variablesChanged', variables: state.workflow.variables, workflow: state.workflow });
         });
       });
-      els.variablesPanel.querySelectorAll('[data-del-var]').forEach(btn => {
+      els.variablesView.querySelectorAll('[data-del-var]').forEach(btn => {
         btn.addEventListener('click', () => {
           state.workflow.variables.splice(Number(btn.getAttribute('data-del-var')), 1);
           persist(true);
-          vscode.postMessage({ type: 'variablesChanged', variables: state.workflow.variables });
+          vscode.postMessage({ type: 'variablesChanged', variables: state.workflow.variables, workflow: state.workflow });
         });
       });
     }
 
     function renderArguments() {
       if (!els.argumentsView) return;
-      state.workflow.arguments ||= [];
+      state.workflow.arguments = Array.isArray(state.workflow.arguments) ? state.workflow.arguments : [];
       const args = state.workflow.arguments;
       if (els.argumentsCount) els.argumentsCount.textContent = String(args.length);
       if (!args.length) {
-        els.argumentsView.innerHTML = '<div class="empty">No arguments yet. Add In / Out / InOut for this workflow.</div>';
+        els.argumentsView.innerHTML = '<div class="empty">No arguments yet. Use Add Argument below for In / Out / InOut.</div>';
         return;
       }
       const types = ['String','Int32','Boolean','Double','Object','DataTable','Array'];
@@ -3215,7 +3314,11 @@ export function getDesignerHtml(
           state.workflow.arguments[i][field] = input.value;
         }
         vscode.postMessage({ type: 'edit', workflow: state.workflow });
-        vscode.postMessage({ type: 'argumentsChanged', workflowArguments: state.workflow.arguments });
+        vscode.postMessage({
+          type: 'argumentsChanged',
+          workflowArguments: state.workflow.arguments,
+          workflow: state.workflow
+        });
       };
       els.argumentsView.querySelectorAll('[data-arg]').forEach(input => {
         input.addEventListener('change', () => applyArgField(input));
@@ -3229,7 +3332,11 @@ export function getDesignerHtml(
           if (!Array.isArray(state.workflow.arguments)) return;
           state.workflow.arguments.splice(idx, 1);
           persist(true);
-          vscode.postMessage({ type: 'argumentsChanged', workflowArguments: state.workflow.arguments });
+          vscode.postMessage({
+            type: 'argumentsChanged',
+            workflowArguments: state.workflow.arguments,
+            workflow: state.workflow
+          });
           toast('Argument removed');
         });
       });
@@ -3692,14 +3799,22 @@ export function getDesignerHtml(
     document.getElementById('btnPbStep')?.addEventListener('click', () => stepPlayback());
     document.getElementById('btnPbContinue')?.addEventListener('click', () => continuePlayback());
     document.getElementById('btnPbStop')?.addEventListener('click', () => stopPlayback());
-    document.getElementById('btnAddVar').addEventListener('click', () => {
+    document.getElementById('btnAddVar')?.addEventListener('click', () => {
       try {
-        if (!Array.isArray(state.workflow.variables)) state.workflow.variables = [];
+        state.workflow.variables = Array.isArray(state.workflow.variables) ? state.workflow.variables : [];
         const n = state.workflow.variables.length + 1;
         state.workflow.variables.push({ name: 'var' + n, type: 'String', defaultValue: '' });
         openLeftSectionExclusive('variables');
-        persist(true);
-        vscode.postMessage({ type: 'variablesChanged', variables: state.workflow.variables });
+        renderVariables();
+        vscode.postMessage({
+          type: 'edit',
+          workflow: state.workflow
+        });
+        vscode.postMessage({
+          type: 'variablesChanged',
+          variables: state.workflow.variables,
+          workflow: state.workflow
+        });
         toast('Variable added');
       } catch (err) {
         toast('Add variable failed: ' + (err && err.message ? err.message : String(err)));
@@ -3707,7 +3822,7 @@ export function getDesignerHtml(
     });
     document.getElementById('btnAddArg')?.addEventListener('click', () => {
       try {
-        if (!Array.isArray(state.workflow.arguments)) state.workflow.arguments = [];
+        state.workflow.arguments = Array.isArray(state.workflow.arguments) ? state.workflow.arguments : [];
         const n = state.workflow.arguments.length + 1;
         state.workflow.arguments.push({
           name: 'in_Arg' + n,
@@ -3716,8 +3831,16 @@ export function getDesignerHtml(
           defaultValue: ''
         });
         openLeftSectionExclusive('arguments');
-        persist(true);
-        vscode.postMessage({ type: 'argumentsChanged', workflowArguments: state.workflow.arguments });
+        renderArguments();
+        vscode.postMessage({
+          type: 'edit',
+          workflow: state.workflow
+        });
+        vscode.postMessage({
+          type: 'argumentsChanged',
+          workflowArguments: state.workflow.arguments,
+          workflow: state.workflow
+        });
         toast('Argument added');
       } catch (err) {
         toast('Add argument failed: ' + (err && err.message ? err.message : String(err)));
@@ -3983,11 +4106,42 @@ export function getDesignerHtml(
             postDryRun({ stepThrough: true, runToActivityId: id });
             return;
           }
+          if (act === 'open') {
+            const hit = walkFind(state.workflow.activities, id);
+            const path = hit?.node?.properties?.workflowPath;
+            if (path) vscode.postMessage({ type: 'openWorkflow', workflowPath: String(path) });
+            return;
+          }
+          if (act === 'vb-repair') {
+            const hit = walkFind(state.workflow.activities, id);
+            if (!hit) return;
+            const n = applyVbRepairsToActivity(hit.node);
+            if (!n) { toast('No VB repairs for this activity'); return; }
+            state.selectedId = id;
+            persist(true);
+            toast('Applied ' + n + ' VB expression repair(s)');
+            return;
+          }
+          if (act === 'up' || act === 'down') {
+            const hit = walkFind(state.workflow.activities, id);
+            if (!hit) return;
+            if (act === 'up' && hit.index > 0) {
+              const [item] = hit.list.splice(hit.index, 1);
+              hit.list.splice(hit.index - 1, 0, item);
+              persist(true);
+            } else if (act === 'down' && hit.index < hit.list.length - 1) {
+              const [item] = hit.list.splice(hit.index, 1);
+              hit.list.splice(hit.index + 1, 0, item);
+              persist(true);
+            }
+            return;
+          }
           if (act === 'dup') {
             const hit = walkFind(state.workflow.activities, id);
             if (!hit) return;
             const clone = JSON.parse(JSON.stringify(hit.node));
-            clone.id = 'act_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+            const reid = (n) => { n.id = newId(); (n.children || []).forEach(reid); (n.elseChildren || []).forEach(reid); };
+            reid(clone);
             hit.list.splice(hit.index + 1, 0, clone);
             state.selectedId = clone.id;
             persist(true);
