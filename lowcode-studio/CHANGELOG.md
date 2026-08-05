@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.33] — 2026-08-05
+
+### Fixed
+- **Use Application/Browser** Studio Web “activity missing / could not be loaded”: export now uses real `NApplicationCard` shape (`TargetApp` for Url/BrowserType, `AttachMode=ByInstance|SingleWindow`, `ActivityAction` body) — no more hallucinated card-level `Url` / `AttachMode="Browser"`
+- **Build Data Table** on Studio Web Local (Portable): UiPath marks it Windows-only; Save now rewrites to `New DataTable` + **Add Data Column** so Studio Web can open the workflow
+
+### Added
+- Studio Web checklist / package validation notes for Windows-only activities
+
 ## [0.6.32] — 2026-08-05
 
 ### Added

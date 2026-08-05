@@ -53,10 +53,9 @@ Full history: [CHANGELOG.md](CHANGELOG.md)
 
 ### Also recent
 
+- **0.6.33** — Studio Web load fix for Use Browser (TargetApp) + Build Data Table (Portable rewrite)
+- **0.6.32** — Inline VB repair hints; Variables/Args panel fix
 - **0.6.27** — A3 selectors + CHANGELOG / What's New
-- **0.6.26** — Settings popup; 6 activity color presets
-- **0.6.25** — Accordion left rail, BP, context menu, args/vars fix
-- **0.6.24** — Dry-run 2.0 + Output channel
 
 
 ## Install
@@ -69,7 +68,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.28.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.33.vsix` → reload.
 
 ## Easy path
 

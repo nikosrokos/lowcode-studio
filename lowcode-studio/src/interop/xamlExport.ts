@@ -20,24 +20,45 @@ import {
   UiPathTargetFramework
 } from './windowsTarget';
 
+export interface XamlExportOptions {
+  /** When Portable (Studio Web Local), rewrite Windows-only activities. */
+  targetFramework?: UiPathTargetFramework;
+}
+
+/** Active export target — set for the duration of exportWorkflowToXaml. */
+let exportTarget: UiPathTargetFramework = 'Windows';
+
+function isPortableExport(): boolean {
+  return exportTarget === 'Portable';
+}
+
 /**
  * Best-effort XAML export for UiPath Studio Desktop (Windows) / Studio Web import.
  * Default project compatibility is **Windows** so robots run on Windows machines
- * with classic UI Automation selectors.
+ * with classic UI Automation selectors. Studio Web Local sync should pass Portable.
  */
-export function exportWorkflowToXaml(doc: WorkflowDocument): string {
-  const varsXml = renderVariables(doc.variables);
-  const membersXml = renderXamlMembers(doc.arguments || []);
-  const body =
-    doc.type === 'Flowchart'
-      ? renderFlowchart(doc)
-      : renderSequence(doc.activities, doc.name, varsXml);
+export function exportWorkflowToXaml(
+  doc: WorkflowDocument,
+  options: XamlExportOptions = {}
+): string {
+  const prev = exportTarget;
+  exportTarget = resolveUiPathTarget(options.targetFramework);
+  try {
+    const varsXml = renderVariables(doc.variables);
+    const membersXml = renderXamlMembers(doc.arguments || []);
+    const body =
+      doc.type === 'Flowchart'
+        ? renderFlowchart(doc)
+        : renderSequence(doc.activities, doc.name, varsXml);
 
-  return `<?xml version="1.0" encoding="utf-8"?>
+    return `<?xml version="1.0" encoding="utf-8"?>
 <Activity mc:Ignorable="sap sap2010" x:Class="${escapeAttr(sanitizeClass(doc.name))}" sap:VirtualizedContainerService.HintSize="1200,800" sap2010:WorkflowViewState.IdRef="Activity1" xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation" xmlns:sap2010="http://schemas.microsoft.com/netfx/2010/xaml/activities/presentation" xmlns:scg="clr-namespace:System.Collections.Generic;assembly=System.Collections" xmlns:sd="clr-namespace:System.Data;assembly=System.Data.Common" xmlns:ui="http://schemas.uipath.com/workflow/activities" xmlns:uia="http://schemas.uipath.com/workflow/activities/uipath.uiautomation.next" xmlns:excel="http://schemas.uipath.com/workflow/activities/excel" xmlns:mail="http://schemas.uipath.com/workflow/activities/mail" xmlns:python="http://schemas.uipath.com/workflow/activities/python" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 ${membersXml}${body}
 </Activity>
 `;
+  } finally {
+    exportTarget = prev;
+  }
 }
 
 const GUID_RE =
@@ -529,22 +550,11 @@ ${pad}</ui:TimeoutScope>`;
   }
 
   if (activity.type === 'UI.UseApplicationBrowser') {
-    const kids = (activity.children || []).map((c) => renderActivity(c, indent + 1)).join('\n');
-    const props = applyWindowsSelectorsToActivityProps(activity.properties || {});
-    const url = escapeAttr(String(props.urlOrPath || 'https://example.com'));
-    const mode = String(props.mode || 'Browser');
-    const browser = escapeAttr(String(props.browserType || 'Chrome'));
-    const open = escapeAttr(String(props.open || 'IfNotOpen'));
-    const close = escapeAttr(String(props.close || 'Never'));
-    const selAttr = selectorAttribute(props);
-    const inputAttr = interactionModeAttribute(props, 'Simulate');
-    return `${pad}<uia:NApplicationCard DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Url="${url}" OpenMode="${open}" CloseMode="${close}" BrowserType="${browser}" AttachMode="${mode === 'Application' ? 'Application' : 'Browser'}"${inputAttr}${selAttr}>
-${pad}  <uia:NApplicationCard.Body>
-${pad}    <Sequence>
-${kids}
-${pad}    </Sequence>
-${pad}  </uia:NApplicationCard.Body>
-${pad}</uia:NApplicationCard>`;
+    return renderUseApplicationBrowser(activity, pad, indent);
+  }
+
+  if (activity.type === 'Data.BuildDataTable') {
+    return renderBuildDataTable(activity, pad, indent);
   }
 
   if (isUiActivity(activity.type)) {
@@ -648,6 +658,126 @@ ${pad}</uia:NApplicationCard>`;
   }
 
   return `${pad}<ui:Comment DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Text="${escapeAttr('Exported placeholder for ' + activity.type)}" />`;
+}
+
+/**
+ * Modern Use Application/Browser (NApplicationCard).
+ * Studio rejects hallucinated card-level Url / BrowserType / AttachMode="Browser".
+ * URL + BrowserType belong on TargetApp; AttachMode is SingleWindow | ByInstance.
+ */
+function renderUseApplicationBrowser(
+  activity: ActivityNode,
+  pad: string,
+  indent: number
+): string {
+  const kids = (activity.children || [])
+    .map((c) => renderActivity(c, indent + 3))
+    .join('\n');
+  const props = applyWindowsSelectorsToActivityProps(activity.properties || {});
+  const mode = String(props.mode || 'Browser');
+  const isApp = /application/i.test(mode);
+  const pathOrUrl = String(props.urlOrPath || (isApp ? '' : 'https://example.com'));
+  const browser = escapeAttr(String(props.browserType || 'Chrome'));
+  const open = escapeAttr(normalizeOpenMode(props.open));
+  const close = escapeAttr(normalizeCloseMode(props.close));
+  // AttachMode is window scope — NOT Browser/Application (those go on TargetApp)
+  const attach = escapeAttr(
+    normalizeAttachMode(props.attachMode) || (isApp ? 'ByInstance' : 'ByInstance')
+  );
+  let inputAttr = interactionModeAttribute(props, 'Simulate');
+  // Portable / Studio Web only supports Simulate + Chromium API (DebuggerApi)
+  if (isPortableExport() && /InteractionMode="(WindowMessages|HardwareEvents|Background)"/.test(inputAttr)) {
+    inputAttr = ' InteractionMode="Simulate"';
+  }
+  const selector = String(props.selector || '').trim();
+  const selAttr = selector ? ` Selector="${escapeAttr(selector)}"` : '';
+  const scopeGuid = crypto.randomUUID();
+
+  const targetInner = isApp
+    ? ` FilePath="${escapeAttr(pathOrUrl)}"`
+    : ` BrowserType="${browser}" Url="${escapeAttr(pathOrUrl)}"${selAttr}`;
+
+  return `${pad}<uia:NApplicationCard DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" OpenMode="${open}" CloseMode="${close}" AttachMode="${attach}"${inputAttr} Version="V2" ScopeGuid="${scopeGuid}">
+${pad}  <uia:NApplicationCard.Body>
+${pad}    <ActivityAction x:TypeArguments="x:Object">
+${pad}      <ActivityAction.Argument>
+${pad}        <DelegateInArgument x:TypeArguments="x:Object" Name="WSSessionData" />
+${pad}      </ActivityAction.Argument>
+${pad}      <Sequence DisplayName="Do">
+${kids}
+${pad}      </Sequence>
+${pad}    </ActivityAction>
+${pad}  </uia:NApplicationCard.Body>
+${pad}  <uia:NApplicationCard.TargetApp>
+${pad}    <uia:TargetApp Area="0, 0, 0, 0"${targetInner} Version="V2" />
+${pad}  </uia:NApplicationCard.TargetApp>
+${pad}</uia:NApplicationCard>`;
+}
+
+function normalizeOpenMode(raw: unknown): string {
+  const v = String(raw || 'IfNotOpen').trim();
+  if (/^always$/i.test(v)) return 'Always';
+  if (/^never$/i.test(v)) return 'Never';
+  return 'IfNotOpen';
+}
+
+function normalizeCloseMode(raw: unknown): string {
+  const v = String(raw || 'Never').trim();
+  if (/^always$/i.test(v)) return 'Always';
+  if (/if\s*opened/i.test(v) || /IfOpenedBy/i.test(v)) return 'IfOpenedByAppBrowser';
+  return 'Never';
+}
+
+function normalizeAttachMode(raw: unknown): string | undefined {
+  const v = String(raw || '').trim();
+  if (!v) return undefined;
+  if (/single/i.test(v)) return 'SingleWindow';
+  if (/instance|process/i.test(v)) return 'ByInstance';
+  // Legacy LCS mistakenly stored Browser/Application here — ignore
+  if (/^(browser|application)$/i.test(v)) return undefined;
+  return undefined;
+}
+
+/**
+ * Build Data Table is Windows-only. Portable (Studio Web) rewrite:
+ * Assign New DataTable + Add Data Column per column (cross-platform).
+ */
+function renderBuildDataTable(
+  activity: ActivityNode,
+  pad: string,
+  indent: number
+): string {
+  const result = String(activity.properties.result || 'dt').replace(/^\[|\]$/g, '');
+  const columns = String(activity.properties.columns || 'Column1')
+    .split(',')
+    .map((c) => c.trim())
+    .filter(Boolean);
+  const display = escapeAttr(exportDisplayName(activity.displayName));
+
+  if (!isPortableExport()) {
+    return `${pad}<ui:BuildDataTable DisplayName="${display}" DataTable="[${escapeAttr(result)}]" />`;
+  }
+
+  const initPad = pad + '  ';
+  const colPad = pad + '  ';
+  const colXml = columns
+    .map(
+      (col) =>
+        `${colPad}<ui:AddDataColumn DisplayName="Add column ${escapeAttr(col)}" DataTable="[${escapeAttr(result)}]" ColumnName="${escapeAttr(col)}" />`
+    )
+    .join('\n');
+
+  return `${pad}<Sequence DisplayName="${display} (Portable)">
+${initPad}<Assign DisplayName="New DataTable → ${escapeAttr(result)}">
+${initPad}  <Assign.To>
+${initPad}    <OutArgument x:TypeArguments="sd:DataTable">[${escapeAttr(result)}]</OutArgument>
+${initPad}  </Assign.To>
+${initPad}  <Assign.Value>
+${initPad}    <InArgument x:TypeArguments="sd:DataTable">[New System.Data.DataTable]</InArgument>
+${initPad}  </Assign.Value>
+${initPad}</Assign>
+${colXml}
+${pad}</Sequence>`;
 }
 
 function renderPythonActivity(activity: ActivityNode, pad: string, indent: number): string {

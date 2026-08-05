@@ -1042,10 +1042,23 @@ function mapActivity(
         raw,
       warnings
     );
-    const attachMode = String(
-      raw['@_AttachMode'] || raw['@_Mode'] || extractArgument(raw, 'AttachMode') || 'Browser'
+    const targetApp = extractTargetApp(raw);
+    const filePath = cleanExpr(
+      targetApp.filePath ||
+        raw['@_FilePath'] ||
+        extractArgument(raw, 'FilePath') ||
+        ''
     );
-    const mode = /application/i.test(attachMode) ? 'Application' : 'Browser';
+    const url = cleanExpr(
+      targetApp.url ||
+        raw['@_Url'] ||
+        extractArgument(raw, 'Url') ||
+        ''
+    );
+    const mode = filePath && !url ? 'Application' : 'Browser';
+    const windowAttach = String(
+      raw['@_AttachMode'] || extractArgument(raw, 'AttachMode') || ''
+    );
     return {
       id: newId(),
       type: 'UI.UseApplicationBrowser',
@@ -1053,21 +1066,28 @@ function mapActivity(
       properties: applySelectorProps(
         {
           mode,
-          urlOrPath: cleanExpr(
-            raw['@_Url'] ||
-              raw['@_FilePath'] ||
-              extractArgument(raw, 'Url') ||
-              extractArgument(raw, 'FilePath') ||
-              (mode === 'Browser' ? 'https://example.com' : '')
+          urlOrPath: url || filePath || (mode === 'Browser' ? 'https://example.com' : ''),
+          browserType: String(
+            targetApp.browserType ||
+              raw['@_BrowserType'] ||
+              extractArgument(raw, 'BrowserType') ||
+              'Chrome'
           ),
-          browserType: String(raw['@_BrowserType'] || extractArgument(raw, 'BrowserType') || 'Chrome'),
           open: String(raw['@_OpenMode'] || raw['@_Open'] || 'IfNotOpen'),
           close: String(raw['@_CloseMode'] || raw['@_Close'] || 'Never'),
+          attachMode: /single/i.test(windowAttach)
+            ? 'SingleWindow'
+            : /instance|process/i.test(windowAttach)
+              ? 'ByInstance'
+              : undefined,
           inputMethod: fromXamlInteractionMode(
             String(raw['@_InteractionMode'] || extractArgument(raw, 'InteractionMode') || '')
           )
         },
-        extractSelectorProps(raw)
+        {
+          ...extractSelectorProps(raw),
+          ...(targetApp.selector ? { selector: targetApp.selector } : {})
+        }
       ),
       children: kids.length ? kids : undefined
     };
@@ -1552,6 +1572,46 @@ function mapType(typeArg: string): VariableType {
     return 'String';
   }
   return 'Object';
+}
+
+/** Read Url / FilePath / BrowserType / Selector from NApplicationCard.TargetApp. */
+function extractTargetApp(raw: Record<string, unknown>): {
+  url?: string;
+  filePath?: string;
+  browserType?: string;
+  selector?: string;
+} {
+  const block =
+    (raw['TargetApp'] as Record<string, unknown> | undefined) ||
+    (raw['NApplicationCard.TargetApp'] as Record<string, unknown> | undefined) ||
+    (raw['UseApplicationBrowser.TargetApp'] as Record<string, unknown> | undefined);
+  if (!block || typeof block !== 'object') {
+    return {};
+  }
+  // TargetApp may be wrapped: { TargetApp: { '@_Url': ... } } or direct attrs
+  const inner =
+    (block['TargetApp'] as Record<string, unknown> | undefined) &&
+    typeof block['TargetApp'] === 'object'
+      ? (block['TargetApp'] as Record<string, unknown>)
+      : block;
+  const url = cleanExpr(
+    inner['@_Url'] || extractArgument(inner, 'Url') || ''
+  );
+  const filePath = cleanExpr(
+    inner['@_FilePath'] || extractArgument(inner, 'FilePath') || ''
+  );
+  const browserType = String(
+    inner['@_BrowserType'] || extractArgument(inner, 'BrowserType') || ''
+  ).trim();
+  const selector = cleanExpr(
+    inner['@_Selector'] || extractArgument(inner, 'Selector') || ''
+  );
+  return {
+    url: url || undefined,
+    filePath: filePath || undefined,
+    browserType: browserType || undefined,
+    selector: selector || undefined
+  };
 }
 
 function cleanExpr(value: unknown): string {
