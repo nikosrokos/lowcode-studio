@@ -149,8 +149,12 @@ function renderSequence(
   displayName: string,
   varsXml: string
 ): string {
-  const kids = activities.map((a) => renderActivity(a, 2)).join('\n');
-  return `  <Sequence DisplayName="${escapeAttr(displayName)}" sap:VirtualizedContainerService.HintSize="800,600" sap2010:WorkflowViewState.IdRef="Sequence_1">
+  const kids = activities
+    .filter((a) => !shouldSkipActivityOnExport(a))
+    .map((a) => renderActivity(a, 2))
+    .filter(Boolean)
+    .join('\n');
+  return `  <Sequence DisplayName="${escapeAttr(exportDisplayName(displayName))}" sap:VirtualizedContainerService.HintSize="800,600" sap2010:WorkflowViewState.IdRef="Sequence_1">
 ${varsXml}${kids}
   </Sequence>`;
 }
@@ -188,12 +192,15 @@ ${lines.join('\n')}
 }
 
 function renderActivity(activity: ActivityNode, indent: number): string {
+  if (shouldSkipActivityOnExport(activity)) {
+    return '';
+  }
   const pad = '  '.repeat(indent);
   const info = xamlInfoForLcsType(activity.type);
 
   if (activity.type === 'ControlFlow.Sequence') {
     const kids = (activity.children || []).map((c) => renderActivity(c, indent + 1)).join('\n');
-    return `${pad}<Sequence DisplayName="${escapeAttr(activity.displayName)}">\n${kids}\n${pad}</Sequence>`;
+    return `${pad}<Sequence DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">\n${kids}\n${pad}</Sequence>`;
   }
 
   if (activity.type === 'ControlFlow.If') {
@@ -201,7 +208,7 @@ function renderActivity(activity: ActivityNode, indent: number): string {
     const elseKids = (activity.elseChildren || [])
       .map((c) => renderActivity(c, indent + 2))
       .join('\n');
-    return `${pad}<If Condition="[${escapeAttr(String(activity.properties.condition ?? 'True'))}]" DisplayName="${escapeAttr(activity.displayName)}">
+    return `${pad}<If Condition="[${escapeAttr(String(activity.properties.condition ?? 'True'))}]" DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
 ${pad}  <If.Then>
 ${pad}    <Sequence DisplayName="Then">
 ${thenKids}
@@ -217,7 +224,7 @@ ${pad}</If>`;
 
   if (activity.type === 'ControlFlow.While') {
     const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
-    return `${pad}<While Condition="[${escapeAttr(String(activity.properties.condition ?? 'True'))}]" DisplayName="${escapeAttr(activity.displayName)}">
+    return `${pad}<While Condition="[${escapeAttr(String(activity.properties.condition ?? 'True'))}]" DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
 ${pad}  <Sequence>
 ${kids}
 ${pad}  </Sequence>
@@ -226,7 +233,7 @@ ${pad}</While>`;
 
   if (activity.type === 'ControlFlow.ForEach') {
     const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
-    return `${pad}<ForEach x:TypeArguments="x:Object" Values="[${escapeAttr(String(activity.properties.values ?? 'collection'))}]" DisplayName="${escapeAttr(activity.displayName)}">
+    return `${pad}<ForEach x:TypeArguments="x:Object" Values="[${escapeAttr(String(activity.properties.values ?? 'collection'))}]" DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
 ${pad}  <ActivityAction x:TypeArguments="x:Object">
 ${pad}    <ActivityAction.Argument>
 ${pad}      <DelegateInArgument x:TypeArguments="x:Object" Name="${escapeAttr(String(activity.properties.item ?? 'item'))}" />
@@ -243,7 +250,7 @@ ${pad}</ForEach>`;
     const catchKids = (activity.elseChildren || [])
       .map((c) => renderActivity(c, indent + 3))
       .join('\n');
-    return `${pad}<TryCatch DisplayName="${escapeAttr(activity.displayName)}">
+    return `${pad}<TryCatch DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
 ${pad}  <TryCatch.Try>
 ${pad}    <Sequence>
 ${tryKids}
@@ -265,7 +272,7 @@ ${pad}</TryCatch>`;
   }
 
   if (activity.type === 'Programming.Assign') {
-    return `${pad}<Assign DisplayName="${escapeAttr(activity.displayName)}">
+    return `${pad}<Assign DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
 ${pad}  <Assign.To>
 ${pad}    <OutArgument x:TypeArguments="x:Object">[${escapeAttr(String(activity.properties.to ?? 'variable'))}]</OutArgument>
 ${pad}  </Assign.To>
@@ -291,7 +298,7 @@ ${pad}    <Assign.Value><InArgument x:TypeArguments="x:Object">[${escapeAttr(val
 ${pad}  </Assign>`;
       })
       .join('\n');
-    return `${pad}<ui:MultipleAssign DisplayName="${escapeAttr(activity.displayName)}">
+    return `${pad}<ui:MultipleAssign DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
 ${pad}  <ui:MultipleAssign.Assignments>
 ${assigns || `${pad}  <Assign />`}
 ${pad}  </ui:MultipleAssign.Assignments>
@@ -300,20 +307,20 @@ ${pad}</ui:MultipleAssign>`;
 
   if (activity.type === 'Programming.InvokeCode') {
     const lang = String(activity.properties.language || 'CSharp');
-    return `${pad}<ui:InvokeCode DisplayName="${escapeAttr(activity.displayName)}" Language="${escapeAttr(lang)}" Code="${escapeAttr(String(activity.properties.code || ''))}" />`;
+    return `${pad}<ui:InvokeCode DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Language="${escapeAttr(lang)}" Code="${escapeAttr(String(activity.properties.code || ''))}" />`;
   }
 
   if (activity.type === 'System.Throw') {
-    return `${pad}<Throw DisplayName="${escapeAttr(activity.displayName)}" Exception="[${escapeAttr(String(activity.properties.message ?? '\"Error\"'))}]" />`;
+    return `${pad}<Throw DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Exception="[${escapeAttr(String(activity.properties.message ?? '\"Error\"'))}]" />`;
   }
 
   if (activity.type === 'System.TerminateWorkflow') {
-    return `${pad}<ui:TerminateWorkflow DisplayName="${escapeAttr(activity.displayName)}" Reason="[${escapeAttr(String(activity.properties.reason ?? '\"Terminated\"'))}]" />`;
+    return `${pad}<ui:TerminateWorkflow DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Reason="[${escapeAttr(String(activity.properties.reason ?? '\"Terminated\"'))}]" />`;
   }
 
   if (activity.type === 'ControlFlow.Switch') {
     const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
-    return `${pad}<Switch x:TypeArguments="x:String" Expression="[${escapeAttr(String(activity.properties.expression ?? 'status'))}]" DisplayName="${escapeAttr(activity.displayName)}">
+    return `${pad}<Switch x:TypeArguments="x:String" Expression="[${escapeAttr(String(activity.properties.expression ?? 'status'))}]" DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
 ${pad}  <Switch.Default>
 ${pad}    <Sequence>
 ${kids}
@@ -324,7 +331,7 @@ ${pad}</Switch>`;
 
   if (activity.type === 'Data.ForEachRow') {
     const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
-    return `${pad}<ui:ForEachRow DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" DisplayName="${escapeAttr(activity.displayName)}">
+    return `${pad}<ui:ForEachRow DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
 ${pad}  <ui:ForEachRow.Body>
 ${pad}    <ActivityAction x:TypeArguments="s:DataRow" xmlns:s="clr-namespace:System.Data;assembly=System.Data.Common">
 ${pad}      <ActivityAction.Argument>
@@ -339,44 +346,45 @@ ${pad}</ui:ForEachRow>`;
   }
 
   if (activity.type === 'Data.AddDataRow') {
-    return `${pad}<ui:AddDataRow DisplayName="${escapeAttr(activity.displayName)}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" ArrayRow="[${escapeAttr(String(activity.properties.arrayRow || '[]'))}]" />`;
+    return `${pad}<ui:AddDataRow DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" ArrayRow="[${escapeAttr(String(activity.properties.arrayRow || '[]'))}]" />`;
   }
 
   if (activity.type === 'Data.AddDataColumn') {
-    return `${pad}<ui:AddDataColumn DisplayName="${escapeAttr(activity.displayName)}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" ColumnName="${escapeAttr(String(activity.properties.columnName || 'NewColumn'))}" />`;
+    return `${pad}<ui:AddDataColumn DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" ColumnName="${escapeAttr(String(activity.properties.columnName || 'NewColumn'))}" />`;
   }
 
   if (activity.type === 'Data.FilterDataTable') {
-    return `${pad}<ui:FilterDataTable DisplayName="${escapeAttr(activity.displayName)}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" FilterRowsDataTable="[${escapeAttr(String(activity.properties.result || 'filteredDt'))}]" />`;
+    return `${pad}<ui:FilterDataTable DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" FilterRowsDataTable="[${escapeAttr(String(activity.properties.result || 'filteredDt'))}]" />`;
   }
 
   if (activity.type === 'Data.ClearDataTable') {
-    return `${pad}<ui:ClearDataTable DisplayName="${escapeAttr(activity.displayName)}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" />`;
+    return `${pad}<ui:ClearDataTable DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" />`;
   }
 
   if (activity.type === 'Data.OutputDataTable') {
-    return `${pad}<ui:OutputDataTable DisplayName="${escapeAttr(activity.displayName)}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" Text="[${escapeAttr(String(activity.properties.result || 'tableText'))}]" />`;
+    return `${pad}<ui:OutputDataTable DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" Text="[${escapeAttr(String(activity.properties.result || 'tableText'))}]" />`;
   }
 
   if (activity.type === 'Messaging.DeserializeJson') {
-    return `${pad}<ui:DeserializeJson DisplayName="${escapeAttr(activity.displayName)}" JsonString="[${escapeAttr(String(activity.properties.jsonString ?? '\"{}\"'))}]" />`;
+    return `${pad}<ui:DeserializeJson DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" JsonString="[${escapeAttr(String(activity.properties.jsonString ?? '\"{}\"'))}]" />`;
   }
 
   if (activity.type === 'Messaging.SerializeJson') {
-    return `${pad}<ui:SerializeJson DisplayName="${escapeAttr(activity.displayName)}" JsonObject="[${escapeAttr(String(activity.properties.value || 'jsonObj'))}]" />`;
+    return `${pad}<ui:SerializeJson DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" JsonObject="[${escapeAttr(String(activity.properties.value || 'jsonObj'))}]" />`;
   }
 
   if (activity.type === 'System.LogMessage') {
     // Studio Web expects Level="Info" (enum member name). Desktop sometimes wrote
     // Level="TraceLevel.Info", which Studio Web rejects: Failed to create a 'Level'…
     const level = normalizeLogLevel(activity.properties.level);
-    return `${pad}<ui:LogMessage DisplayName="${escapeAttr(activity.displayName)}" Level="${escapeAttr(level)}" Message="[${escapeAttr(String(activity.properties.message ?? '""'))}]" />`;
+    const messageExpr = toVbStringArgument(activity.properties.message);
+    return `${pad}<ui:LogMessage DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Level="${escapeAttr(level)}" Message="[${escapeAttr(messageExpr)}]" />`;
   }
 
   if (activity.type === 'System.Delay') {
     const ms = Number(activity.properties.durationMs ?? 1000);
     const ts = msToTimeSpan(ms);
-    return `${pad}<Delay DisplayName="${escapeAttr(activity.displayName)}" Duration="${ts}" />`;
+    return `${pad}<Delay DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Duration="${ts}" />`;
   }
 
   if (activity.type === 'REFramework.InvokeWorkflow') {
@@ -384,20 +392,20 @@ ${pad}</ui:ForEachRow>`;
       /\.lcs\.json$/i,
       '.xaml'
     );
-    return `${pad}<ui:InvokeWorkflowFile DisplayName="${escapeAttr(activity.displayName)}" WorkflowFileName="${escapeAttr(path)}" />`;
+    return `${pad}<ui:InvokeWorkflowFile DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkflowFileName="${escapeAttr(path)}" />`;
   }
 
   if (activity.type === 'System.MessageBox') {
-    return `${pad}<ui:MessageBox DisplayName="${escapeAttr(activity.displayName)}" Text="[${escapeAttr(String(activity.properties.text ?? '""'))}]" Caption="${escapeAttr(String(activity.properties.title || 'LowCode Studio'))}" />`;
+    return `${pad}<ui:MessageBox DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Text="[${escapeAttr(toVbStringArgument(activity.properties.text))}]" Caption="${escapeAttr(String(activity.properties.title || 'LowCode Studio'))}" />`;
   }
 
   if (activity.type === 'System.WriteLine') {
-    return `${pad}<WriteLine DisplayName="${escapeAttr(activity.displayName)}" Text="[${escapeAttr(String(activity.properties.text ?? '""'))}]" />`;
+    return `${pad}<WriteLine DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Text="[${escapeAttr(toVbStringArgument(activity.properties.text))}]" />`;
   }
 
   if (activity.type === 'ControlFlow.DoWhile') {
     const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
-    return `${pad}<DoWhile Condition="[${escapeAttr(String(activity.properties.condition ?? 'True'))}]" DisplayName="${escapeAttr(activity.displayName)}">
+    return `${pad}<DoWhile Condition="[${escapeAttr(String(activity.properties.condition ?? 'True'))}]" DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
 ${pad}  <Sequence>
 ${kids}
 ${pad}  </Sequence>
@@ -406,7 +414,7 @@ ${pad}</DoWhile>`;
 
   if (activity.type === 'ControlFlow.RetryScope') {
     const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
-    return `${pad}<ui:RetryScope DisplayName="${escapeAttr(activity.displayName)}" NumberOfRetries="${Number(activity.properties.numberOfRetries ?? 3)}">
+    return `${pad}<ui:RetryScope DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" NumberOfRetries="${Number(activity.properties.numberOfRetries ?? 3)}">
 ${pad}  <ui:RetryScope.Activity>
 ${pad}    <ActivityAction>
 ${pad}      <Sequence>
@@ -418,7 +426,7 @@ ${pad}</ui:RetryScope>`;
   }
 
   if (activity.type === 'ControlFlow.Break') {
-    return `${pad}<Break DisplayName="${escapeAttr(activity.displayName)}" />`;
+    return `${pad}<Break DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" />`;
   }
 
   if (activity.type === 'UI.UseApplicationBrowser') {
@@ -431,7 +439,7 @@ ${pad}</ui:RetryScope>`;
     const close = escapeAttr(String(props.close || 'Never'));
     const selAttr = selectorAttribute(props);
     const inputAttr = interactionModeAttribute(props, 'Simulate');
-    return `${pad}<uia:NApplicationCard DisplayName="${escapeAttr(activity.displayName)}" Url="${url}" OpenMode="${open}" CloseMode="${close}" BrowserType="${browser}" AttachMode="${mode === 'Application' ? 'Application' : 'Browser'}"${inputAttr}${selAttr}>
+    return `${pad}<uia:NApplicationCard DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Url="${url}" OpenMode="${open}" CloseMode="${close}" BrowserType="${browser}" AttachMode="${mode === 'Application' ? 'Application' : 'Browser'}"${inputAttr}${selAttr}>
 ${pad}  <uia:NApplicationCard.Body>
 ${pad}    <Sequence>
 ${kids}
@@ -452,11 +460,11 @@ ${pad}</uia:NApplicationCard>`;
   }
 
   if (activity.type === 'Messaging.SendEmail') {
-    return `${pad}<mail:SendMail DisplayName="${escapeAttr(activity.displayName)}" To="${escapeAttr(String(activity.properties.to || ''))}" Subject="[${escapeAttr(String(activity.properties.subject ?? '""'))}]" Body="${escapeAttr(String(activity.properties.body || ''))}" />`;
+    return `${pad}<mail:SendMail DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" To="${escapeAttr(String(activity.properties.to || ''))}" Subject="[${escapeAttr(String(activity.properties.subject ?? '""'))}]" Body="${escapeAttr(String(activity.properties.body || ''))}" />`;
   }
 
   if (activity.type === 'Messaging.HttpRequest') {
-    return `${pad}<ui:HttpClient DisplayName="${escapeAttr(activity.displayName)}" Method="${escapeAttr(String(activity.properties.method || 'GET'))}" EndPoint="[${escapeAttr(String(activity.properties.url || '""'))}]" />`;
+    return `${pad}<ui:HttpClient DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Method="${escapeAttr(String(activity.properties.method || 'GET'))}" EndPoint="[${escapeAttr(String(activity.properties.url || '""'))}]" />`;
   }
 
   if (activity.type.startsWith('Python.')) {
@@ -466,7 +474,7 @@ ${pad}</uia:NApplicationCard>`;
   if (activity.type === 'System.Comment' || activity.type.startsWith('Imported.') || activity.type.startsWith('Flowchart.')) {
     // Preserve selector on imported placeholders when present
     const sel = selectorAttribute(activity.properties);
-    return `${pad}<ui:Comment DisplayName="${escapeAttr(activity.displayName)}" Text="${escapeAttr(String(activity.properties.text || activity.properties.hint || activity.type))}"${sel} />`;
+    return `${pad}<ui:Comment DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Text="${escapeAttr(String(activity.properties.text || activity.properties.hint || activity.type))}"${sel} />`;
   }
 
   if (info) {
@@ -482,30 +490,30 @@ ${pad}</uia:NApplicationCard>`;
               : info.ns === 'python'
                 ? `python:${info.localName}`
                 : info.localName;
-    return `${pad}<${tag} DisplayName="${escapeAttr(activity.displayName)}" />`;
+    return `${pad}<${tag} DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" />`;
   }
 
-  return `${pad}<ui:Comment DisplayName="${escapeAttr(activity.displayName)}" Text="${escapeAttr('Exported placeholder for ' + activity.type)}" />`;
+  return `${pad}<ui:Comment DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Text="${escapeAttr('Exported placeholder for ' + activity.type)}" />`;
 }
 
 function renderPythonActivity(activity: ActivityNode, pad: string, indent: number): string {
   switch (activity.type) {
     case 'Python.PythonScope': {
       const kids = (activity.children || []).map((c) => renderActivity(c, indent + 1)).join('\n');
-      return `${pad}<python:PythonScope DisplayName="${escapeAttr(activity.displayName)}" Path="${escapeAttr(String(activity.properties.path || ''))}" Target="${escapeAttr(String(activity.properties.target || 'x64'))}" WorkingFolder="${escapeAttr(String(activity.properties.workingFolder || ''))}" Version="${escapeAttr(String(activity.properties.version || ''))}">
+      return `${pad}<python:PythonScope DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Path="${escapeAttr(String(activity.properties.path || ''))}" Target="${escapeAttr(String(activity.properties.target || 'x64'))}" WorkingFolder="${escapeAttr(String(activity.properties.workingFolder || ''))}" Version="${escapeAttr(String(activity.properties.version || ''))}">
 ${kids}
 ${pad}</python:PythonScope>`;
     }
     case 'Python.LoadScript':
-      return `${pad}<python:LoadScript DisplayName="${escapeAttr(activity.displayName)}" File="${escapeAttr(String(activity.properties.file || ''))}" Code="${escapeAttr(String(activity.properties.code || ''))}" />`;
+      return `${pad}<python:LoadScript DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" File="${escapeAttr(String(activity.properties.file || ''))}" Code="${escapeAttr(String(activity.properties.code || ''))}" />`;
     case 'Python.RunScript':
-      return `${pad}<python:RunScript DisplayName="${escapeAttr(activity.displayName)}" File="${escapeAttr(String(activity.properties.file || ''))}" Code="${escapeAttr(String(activity.properties.code || ''))}" />`;
+      return `${pad}<python:RunScript DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" File="${escapeAttr(String(activity.properties.file || ''))}" Code="${escapeAttr(String(activity.properties.code || ''))}" />`;
     case 'Python.InvokeMethod':
-      return `${pad}<python:InvokeMethod DisplayName="${escapeAttr(activity.displayName)}" Name="${escapeAttr(String(activity.properties.name || 'main'))}" Instance="[${escapeAttr(String(activity.properties.instance || 'pythonScript'))}]" />`;
+      return `${pad}<python:InvokeMethod DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Name="${escapeAttr(String(activity.properties.name || 'main'))}" Instance="[${escapeAttr(String(activity.properties.instance || 'pythonScript'))}]" />`;
     case 'Python.GetObject':
-      return `${pad}<python:GetObject DisplayName="${escapeAttr(activity.displayName)}" Type="{x:Type ${escapeAttr(String(activity.properties.type || 'String'))}}" />`;
+      return `${pad}<python:GetObject DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Type="{x:Type ${escapeAttr(String(activity.properties.type || 'String'))}}" />`;
     default:
-      return `${pad}<ui:Comment DisplayName="${escapeAttr(activity.displayName)}" Text="Python placeholder" />`;
+      return `${pad}<ui:Comment DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Text="Python placeholder" />`;
   }
 }
 
@@ -520,7 +528,7 @@ function renderExtractTableData(activity: ActivityNode, pad: string): string {
     props.smartExtraction === false || props.smartExtraction === 'false' ? 'False' : 'True';
   const meta = escapeAttr(String(props.extractionMetadata || ''));
   const attrs = [
-    `DisplayName="${escapeAttr(activity.displayName)}"`,
+    `DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}"`,
     selAttr.trim(),
     `ExtractMetadata="${meta}"`,
     `IncludeHeaders="${includeHeaders}"`,
@@ -575,7 +583,7 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
     }
   }
   if (activity.type === 'UI.TypeInto') {
-    extra.push(`Text="[${escapeAttr(String(props.text ?? '""'))}]"`);
+    extra.push(`Text="[${escapeAttr(toVbStringArgument(props.text))}]"`);
     if (props.emptyField !== false && props.emptyField !== 'false') {
       extra.push(`EmptyField="True"`);
     } else {
@@ -628,7 +636,7 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
         : open;
 
   const attrs = [
-    `DisplayName="${escapeAttr(activity.displayName)}"`,
+    `DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}"`,
     selAttr.trim(),
     ...extra
   ]
@@ -658,15 +666,15 @@ function renderExcelActivity(activity: ActivityNode, pad: string): string {
   const cell = escapeAttr(String(activity.properties.cell || 'A1'));
   switch (activity.type) {
     case 'Excel.ReadRange':
-      return `${pad}<excel:ReadRange DisplayName="${escapeAttr(activity.displayName)}" WorkbookPath="${path}" SheetName="${sheet}" Range="${range}" />`;
+      return `${pad}<excel:ReadRange DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" SheetName="${sheet}" Range="${range}" />`;
     case 'Excel.WriteRange':
-      return `${pad}<excel:WriteRange DisplayName="${escapeAttr(activity.displayName)}" WorkbookPath="${path}" SheetName="${sheet}" DataTable="[${escapeAttr(String(activity.properties.data || 'dt'))}]" />`;
+      return `${pad}<excel:WriteRange DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" SheetName="${sheet}" DataTable="[${escapeAttr(String(activity.properties.data || 'dt'))}]" />`;
     case 'Excel.ReadCell':
-      return `${pad}<excel:ReadCell DisplayName="${escapeAttr(activity.displayName)}" WorkbookPath="${path}" SheetName="${sheet}" Cell="${cell}" />`;
+      return `${pad}<excel:ReadCell DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" SheetName="${sheet}" Cell="${cell}" />`;
     case 'Excel.WriteCell':
-      return `${pad}<excel:WriteCell DisplayName="${escapeAttr(activity.displayName)}" WorkbookPath="${path}" SheetName="${sheet}" Cell="${cell}" Value="[${escapeAttr(String(activity.properties.value ?? '""'))}]" />`;
+      return `${pad}<excel:WriteCell DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" SheetName="${sheet}" Cell="${cell}" Value="[${escapeAttr(String(activity.properties.value ?? '""'))}]" />`;
     default:
-      return `${pad}<ui:Comment DisplayName="${escapeAttr(activity.displayName)}" Text="Excel placeholder" />`;
+      return `${pad}<ui:Comment DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Text="Excel placeholder" />`;
   }
 }
 
@@ -741,6 +749,94 @@ export function normalizeLogLevel(value: unknown): string {
     }
   }
   return 'Info';
+}
+
+/** Strip LCS import suffix before writing DisplayName to Studio Web XAML. */
+export function exportDisplayName(name: string | undefined): string {
+  const raw = String(name || '').trim();
+  return raw.replace(/\s*\(imported\)\s*$/i, '').trim() || raw || 'Activity';
+}
+
+/**
+ * Studio Web triggers (Manual Trigger, etc.) must not be re-emitted as Comment
+ * placeholders — they break / clutter Main.xaml. Skip on export.
+ */
+export function shouldSkipActivityOnExport(activity: ActivityNode): boolean {
+  const type = activity.type || '';
+  const bareType = type.replace(/^Imported\./i, '');
+  const label = exportDisplayName(activity.displayName);
+  if (/Trigger$/i.test(bareType)) {
+    return true;
+  }
+  if (/trigger/i.test(label) && (type.startsWith('Imported.') || type === 'System.Comment')) {
+    return true;
+  }
+  if (/^Manual\s*Trigger$/i.test(label)) {
+    return true;
+  }
+  // Flowchart chrome nodes are handled separately; never emit as comments
+  if (type === 'Flowchart.Start' || type === 'Flowchart.End') {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Build the VB expression fragment for a string InArgument (content inside [...]).
+ * Designer stores plain text like `12` or `"12"`; XAML needs `"12"` so Studio Web
+ * shows the string 12 — not `[12]` (number) or `[["12"]]` (double-wrapped).
+ */
+export function toVbStringArgument(value: unknown): string {
+  let text = value == null ? '' : String(value).trim();
+  if (!text) {
+    return '""';
+  }
+
+  // Explicit expression from designer: [message] or ["12"] or [["12"]]
+  if (text.startsWith('[') && text.endsWith(']') && text.length >= 2) {
+    let inner = text.slice(1, -1).trim();
+    while (inner.startsWith('[') && inner.endsWith(']') && inner.length >= 2) {
+      inner = inner.slice(1, -1).trim();
+    }
+    if (inner.length >= 2 && inner.startsWith('"') && inner.endsWith('"')) {
+      return inner;
+    }
+    if (inner.length >= 2 && inner.startsWith("'") && inner.endsWith("'")) {
+      return `"${inner.slice(1, -1).replace(/"/g, '""')}"`;
+    }
+    return inner || '""';
+  }
+
+  // Already a string literal
+  if (text.length >= 2 && text.startsWith('"') && text.endsWith('"')) {
+    return text;
+  }
+  if (text.length >= 2 && text.startsWith("'") && text.endsWith("'")) {
+    return `"${text.slice(1, -1).replace(/"/g, '""')}"`;
+  }
+
+  // Plain designer text (including numbers and words like Starting) → VB string literal
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+/** Inverse for import: store plain designer text, not VB wrappers. */
+export function fromVbStringArgument(value: unknown): string {
+  let text = value == null ? '' : String(value).trim();
+  text = text
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+  while (text.startsWith('[') && text.endsWith(']') && text.length >= 2) {
+    text = text.slice(1, -1).trim();
+  }
+  if (text.length >= 2 && text.startsWith('"') && text.endsWith('"')) {
+    return text.slice(1, -1).replace(/""/g, '"');
+  }
+  if (text.length >= 2 && text.startsWith("'") && text.endsWith("'")) {
+    return text.slice(1, -1);
+  }
+  return text;
 }
 
 function escapeAttr(value: string): string {

@@ -78,6 +78,8 @@ From the Connect picker choose **Legacy: export .uip package once** or **Export 
 | `Failed to parse JSON` / `uniqueId` Guid error | Update to **0.6.13+** and **Save** or Connect → Sync (rewrites a valid Guid) |
 | "targets Windows" on Mac | Update to **0.6.12+** and Sync (rewrites Portable) |
 | Solution not in Project Explorer | Connect → Sync/Open again, or **Open** and pick the `.uipx` solution folder (works with no workspace open) |
+| Manual Trigger (imported) appears in Main.xaml | Update to **0.6.18+** and **Save** — triggers are skipped; `(imported)` stripped from names |
+| Log Message shows `["12"]` / weird wrappers instead of `12` | Update to **0.6.18+** and **Save** — Message exports a proper VB string literal |
 | `Failed to create a 'Level' from 'TraceLevel.Info'` | Update to **0.6.17+** and **Save** (rewrites LogMessage `Level="Info"`) |
 | `'sapc' prefix is not defined` when opening .xaml | Update to **0.6.16+** and **Save** (rewrites Ignorable to `sap sap2010`) |
 | Duplicate / stuck projects in Project Explorer | Update to **0.6.16+**; Remove hides + unlinks; Connect no longer adds a second workspace root for the solution |
