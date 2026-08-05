@@ -1,7 +1,9 @@
 import { XMLParser } from 'fast-xml-parser';
 import {
   ActivityNode,
+  ArgumentDirection,
   VariableType,
+  WorkflowArgument,
   WorkflowDocument,
   WorkflowVariable,
   newId
@@ -10,6 +12,7 @@ import { lcsTypeFromXamlName, unknownActivityType } from './activityMap';
 import { applySelectorProps, extractSelectorProps } from './selectorRoundTrip';
 import { fromXamlInteractionMode } from './inputMethod';
 import { fromVbStringArgument } from './xamlExport';
+import { formatArgumentMappings } from './workflowArguments';
 
 export interface ImportWarning {
   message: string;
@@ -59,6 +62,7 @@ export function importXaml(xamlText: string, workflowName = 'Imported'): XamlImp
   }
 
   const variables = extractVariables(activityRoot, warnings);
+  const argumentsList = extractWorkflowArguments(activityRoot);
   const body = unwrapBody(activityRoot);
   const flowchart = findFirstByName(body, 'Flowchart');
 
@@ -74,7 +78,7 @@ export function importXaml(xamlText: string, workflowName = 'Imported'): XamlImp
         description: 'Imported from UiPath XAML (Flowchart)',
         type: 'Flowchart',
         variables,
-        arguments: [],
+        arguments: argumentsList,
         activities,
         connections,
         startActivityId,
@@ -96,7 +100,7 @@ export function importXaml(xamlText: string, workflowName = 'Imported'): XamlImp
       description: 'Imported from UiPath XAML',
       type: 'Sequence',
       variables,
-      arguments: [],
+      arguments: argumentsList,
       activities:
         activities.length > 0
           ? activities
@@ -196,6 +200,77 @@ function extractVariables(
     warnings.push({ message: 'No variables found in XAML (or they use an unsupported shape).' });
   }
   return vars;
+}
+
+function extractWorkflowArguments(root: Record<string, unknown>): WorkflowArgument[] {
+  const args: WorkflowArgument[] = [];
+  const members = root['Members'] || root['x:Members'];
+  if (!members || typeof members !== 'object') {
+    return args;
+  }
+  const bag = members as Record<string, unknown>;
+  const list = asArray(bag.Property || bag['x:Property']) as Array<Record<string, unknown>>;
+  for (const p of list) {
+    const name = String(p['@_Name'] || '').trim();
+    if (!name) {
+      continue;
+    }
+    const typeRaw = String(p['@_Type'] || 'InArgument(x:String)');
+    let direction: ArgumentDirection = 'In';
+    if (/^OutArgument/i.test(typeRaw)) {
+      direction = 'Out';
+    } else if (/^InOutArgument/i.test(typeRaw)) {
+      direction = 'InOut';
+    }
+    const inner = typeRaw.replace(/^(In|Out|InOut)Argument\((.+)\)$/i, '$2');
+    args.push({
+      name,
+      type: mapType(inner),
+      direction
+    });
+  }
+  return args;
+}
+
+/** Pull InvokeWorkflowFile.Arguments dictionary into multiline mappings. */
+function extractInvokeArgumentMappings(raw: Record<string, unknown>): string {
+  const bag =
+    raw['InvokeWorkflowFile.Arguments'] ||
+    raw['Arguments'] ||
+    (raw as { Arguments?: unknown }).Arguments;
+  if (!bag || typeof bag !== 'object') {
+    return '';
+  }
+  const mappings: Array<{ name: string; expression: string }> = [];
+  const visit = (node: unknown) => {
+    if (!node || typeof node !== 'object') {
+      return;
+    }
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+    const obj = node as Record<string, unknown>;
+    for (const [key, value] of Object.entries(obj)) {
+      if (key === 'InArgument' || key === 'OutArgument' || key === 'InOutArgument') {
+        for (const arg of asArray(value) as Array<Record<string, unknown> | string>) {
+          if (typeof arg === 'string') {
+            continue;
+          }
+          const name = String(arg['@_Key'] || arg['@_x:Key'] || '').trim();
+          if (!name) {
+            continue;
+          }
+          const expr = cleanExpr(argumentValue(arg) ?? arg['#text'] ?? '');
+          mappings.push({ name, expression: String(expr || '""') });
+        }
+      } else if (!key.startsWith('@_')) {
+        visit(value);
+      }
+    }
+  };
+  visit(bag);
+  return formatArgumentMappings(mappings);
 }
 
 function collectActivities(
@@ -409,12 +484,14 @@ function mapActivity(
   }
 
   if (localName === 'InvokeWorkflowFile') {
+    const mappings = extractInvokeArgumentMappings(raw);
     return {
       id: newId(),
       type: 'REFramework.InvokeWorkflow',
       displayName,
       properties: {
         workflowPath: String(raw['@_WorkflowFileName'] || raw['@_FilePath'] || 'Workflow.xaml'),
+        argumentMappings: mappings,
         description: displayName
       }
     };

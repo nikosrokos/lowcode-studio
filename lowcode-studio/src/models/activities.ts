@@ -1643,6 +1643,14 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         required: true
       },
       {
+        name: 'argumentMappings',
+        label: 'Arguments (name = expression)',
+        type: 'multiline',
+        defaultValue: '',
+        description:
+          'One mapping per line, e.g. in_Config = Config. Exported as InvokeWorkflowFile.Arguments.'
+      },
+      {
         name: 'description',
         label: 'Description',
         type: 'string',

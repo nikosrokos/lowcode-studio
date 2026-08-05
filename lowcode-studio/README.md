@@ -1,12 +1,12 @@
 # LowCode Studio
 
-**Version 0.6.21** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.6.22** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.6.21-0ea5e9)
+![version](https://img.shields.io/badge/version-0.6.22-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
@@ -42,7 +42,17 @@ Design on Mac (REFramework)
 1. **Designer** — framed toolbox + properties, sequence board, macOS-style bottom dock  
 2. **Floating frames** — traffic-light controls to float / dock / collapse either side panel  
 
-## What’s in 0.6.21
+## What’s in 0.6.22
+
+- **Workflow Arguments** panel (In / Out / InOut) with XAML `x:Members` export/import
+- **Invoke Workflow** argument mappings (`name = expression` → `InvokeWorkflowFile.Arguments`)
+- Left rail: separate stacked **Explorer · Activities · Variables · Arguments** sections
+- **Expression expand** editor for expression/multiline properties
+- **Find in workflow** search + nested **breadcrumbs**
+- Flowchart **Tidy** layout (layered spacing + orphan handling)
+- Selector “needs real selector” hint on flowchart nodes
+
+### Also in 0.6.21
 
 - Dock chrome polish: **Save** top-right only; clearer bottom-dock tooltips
 - Side panels: no red close — show/hide via bottom dock; float/dock traffic lights kept
@@ -193,7 +203,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.21.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.22.vsix` → reload.
 
 ## Easy path
 
