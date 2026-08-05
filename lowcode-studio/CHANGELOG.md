@@ -12,6 +12,7 @@ Use **LowCode Studio: What's New** in the command palette (or the Output channel
 - **C2** Opt-in real HTTP + local Python in dry-run (`lowcodeStudio.dryRun.realHttp` / `realPython`, host allow list; fixtures always win)
 - **F0** Assist — **Explain / critique workflow** (deterministic report in Output)
 - **F1** Assist — **Generate scenarios from description** (Manage Scenarios + command palette)
+- Designer toolbar **✦ Assist** button — open/close popup with how-to for Assist commands and where to run them
 
 ### Changed
 - Dry-run uses project directory for real File IO stubs; File IO steps classify as `real`
