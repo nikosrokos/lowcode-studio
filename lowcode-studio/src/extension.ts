@@ -18,6 +18,7 @@ import {
   toPseudocode,
   validateWorkflow
 } from './commands/simulator';
+import { getLowCodeOutput } from './util/outputChannel';
 import {
   createQuickScenario,
   duplicateScenario,
@@ -96,7 +97,6 @@ let variablesProvider: VariablesTreeProvider;
 let projectProvider: ProjectTreeProvider;
 let activityProvider: ActivityTreeProvider;
 let projectsTreeView: vscode.TreeView<ProjectTreeItem>;
-let outputChannel: vscode.OutputChannel;
 let extensionContext: vscode.ExtensionContext;
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -2292,10 +2292,7 @@ async function pickWorkflowUri(): Promise<vscode.Uri | undefined> {
 }
 
 function getOutput(): vscode.OutputChannel {
-  if (!outputChannel) {
-    outputChannel = vscode.window.createOutputChannel('LowCode Studio');
-  }
-  return outputChannel;
+  return getLowCodeOutput();
 }
 
 function showGettingStarted(): void {

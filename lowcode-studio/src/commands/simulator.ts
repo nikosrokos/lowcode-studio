@@ -12,6 +12,8 @@ export interface ValidationIssue {
   message: string;
 }
 
+export type DryRunExecutionKind = 'simulated' | 'real' | 'unsupported';
+
 export interface DryRunStep {
   index: number;
   activityId: string;
@@ -19,6 +21,8 @@ export interface DryRunStep {
   type: string;
   action: string;
   status: 'ok' | 'skipped' | 'error' | 'warn';
+  /** How this step was executed in the Mac dry-run engine */
+  executionKind?: DryRunExecutionKind;
   /** Full variable snapshot after this step */
   variablesSnapshot?: Record<string, unknown>;
   /** Keys that changed vs the previous step */
@@ -175,7 +179,8 @@ export function dryRunWorkflow(
   const pushStep = (
     activity: ActivityNode,
     action: string,
-    status: DryRunStep['status'] = 'ok'
+    status: DryRunStep['status'] = 'ok',
+    executionKind?: DryRunExecutionKind
   ) => {
     const step: DryRunStep = {
       index: index++,
@@ -183,7 +188,8 @@ export function dryRunWorkflow(
       displayName: activity.displayName,
       type: activity.type,
       action,
-      status
+      status,
+      executionKind: executionKind || classifyExecutionKind(activity.type)
     };
     if (captureSnapshots) {
       const snap = cloneVars(variables);
@@ -236,7 +242,8 @@ export function formatDryRunReport(result: DryRunResult, title = 'Dry Run'): str
   for (const step of result.steps) {
     const mark =
       step.status === 'error' ? '✗' : step.status === 'warn' ? '!' : step.status === 'skipped' ? '·' : '✓';
-    lines.push(`[${step.index}] ${mark} ${step.displayName} — ${step.action}`);
+    const kind = step.executionKind ? ` [${step.executionKind}]` : '';
+    lines.push(`[${step.index}] ${mark} ${step.displayName} — ${step.action}${kind}`);
     if (step.changedKeys?.length && step.variablesSnapshot) {
       for (const key of step.changedKeys) {
         lines.push(`     Δ ${key} = ${JSON.stringify(step.variablesSnapshot[key])}`);
@@ -1340,6 +1347,34 @@ function asArray(value: unknown): unknown[] {
 }
 
 type DataTableLike = { columns?: string[]; rows?: unknown[][] };
+
+export function classifyExecutionKind(activityType: string): DryRunExecutionKind {
+  if (
+    activityType.startsWith('Imported.') ||
+    activityType === 'System.Comment' ||
+    activityType.startsWith('Flowchart.')
+  ) {
+    return activityType.startsWith('Imported.') ? 'unsupported' : 'simulated';
+  }
+  // In-memory / expression evaluation — honest local execution
+  if (
+    activityType.startsWith('Programming.') ||
+    activityType === 'System.LogMessage' ||
+    activityType === 'System.WriteLine' ||
+    activityType === 'System.Delay' ||
+    activityType === 'System.Throw' ||
+    activityType === 'System.TerminateWorkflow' ||
+    activityType.startsWith('ControlFlow.') ||
+    activityType.startsWith('Data.') ||
+    activityType === 'Messaging.DeserializeJson' ||
+    activityType === 'Messaging.SerializeJson' ||
+    activityType === 'Messaging.SelectToken'
+  ) {
+    return 'real';
+  }
+  // External / robot / UI — stubbed or fixture-driven on Mac
+  return 'simulated';
+}
 
 function hasFixtures(fixtures: DryRunFixtures): boolean {
   return Boolean(
