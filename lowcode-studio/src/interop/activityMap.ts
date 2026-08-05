@@ -115,13 +115,7 @@ const MAP: Array<{
   },
   {
     lcsType: 'UI.OpenApplication',
-    xamlLocalNames: [
-      'OpenApplication',
-      'OpenBrowser',
-      'NOpenApplication',
-      'UseApplicationBrowser',
-      'NApplicationCard'
-    ],
+    xamlLocalNames: ['OpenApplication', 'OpenBrowser', 'NOpenApplication'],
     xamlNamespace: 'uia'
   },
   {

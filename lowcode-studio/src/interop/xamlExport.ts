@@ -591,7 +591,7 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
     }
   }
   if (activity.type === 'UI.SelectItem') {
-    extra.push(`Item="[${escapeAttr(String(props.item ?? '""'))}]"`);
+    extra.push(`Item="[${escapeAttr(toVbStringArgument(props.item))}]"`);
   }
   if (activity.type === 'UI.OpenApplication') {
     extra.push(`Url="${escapeAttr(String(props.pathOrUrl || ''))}"`);
@@ -605,8 +605,39 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
   if (activity.type === 'UI.GetAttribute') {
     extra.push(`Attribute="${escapeAttr(String(props.attribute || 'aaname'))}"`);
   }
-  if (activity.type === 'UI.WaitElement') {
-    extra.push(`TimeoutMS="${Number(props.timeoutMs ?? 30000)}"`);
+  if (
+    activity.type === 'UI.GetText' ||
+    activity.type === 'UI.ElementExists' ||
+    activity.type === 'UI.GetAttribute'
+  ) {
+    const resultVar = String(
+      props.result ||
+        (activity.type === 'UI.ElementExists'
+          ? 'exists'
+          : activity.type === 'UI.GetAttribute'
+            ? 'attributeValue'
+            : 'extractedText')
+    ).replace(/^\[|\]$/g, '');
+    if (resultVar) {
+      extra.push(`Result="[${escapeAttr(resultVar)}]"`);
+    }
+  }
+  if (
+    activity.type === 'UI.WaitElement' ||
+    activity.type === 'UI.Click' ||
+    activity.type === 'UI.TypeInto' ||
+    activity.type === 'UI.GetText' ||
+    activity.type === 'UI.ElementExists' ||
+    activity.type === 'UI.Hover' ||
+    activity.type === 'UI.Check' ||
+    activity.type === 'UI.SelectItem'
+  ) {
+    const timeout = Number(props.timeoutMs);
+    if (Number.isFinite(timeout) && timeout > 0) {
+      extra.push(`TimeoutMS="${timeout}"`);
+    } else if (activity.type === 'UI.WaitElement') {
+      extra.push(`TimeoutMS="${Number(props.timeoutMs ?? 30000)}"`);
+    }
   }
 
   const supportsInputMethod =
@@ -614,10 +645,13 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
     activity.type === 'UI.TypeInto' ||
     activity.type === 'UI.Hover' ||
     activity.type === 'UI.Check' ||
-    activity.type === 'UI.SelectItem';
+    activity.type === 'UI.SelectItem' ||
+    activity.type === 'UI.GetText';
   if (supportsInputMethod) {
     const fallback =
-      activity.type === 'UI.Click' || activity.type === 'UI.TypeInto'
+      activity.type === 'UI.Click' ||
+      activity.type === 'UI.TypeInto' ||
+      activity.type === 'UI.GetText'
         ? 'Simulate'
         : 'Same as App/Browser';
     const inputAttr = interactionModeAttribute(props, fallback).trim();

@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Mac-first low-code RPA for VS Code/Cursor: REFramework design, scenario dry-runs (Shift+F5), and the easiest Connect to Studio Web handoff for Orchestrator publish.",
-  "version": "0.6.18",
+  "version": "0.6.19",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -534,7 +534,7 @@
     "package": "npm run bundle && vsce package --no-dependencies",
     "lint": "tsc --noEmit",
     "docs:activities": "npm run compile && node scripts/generate-activities-md.js",
-    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && node out/test/windowsTarget.test.js && node out/test/extractTableData.test.js && node out/test/selectorBuilder.test.js && node out/test/windowsTodo.test.js && node out/test/strongDryRun.test.js && node out/test/blueprints.test.js && node out/test/activityPaletteSmartProps.test.js && node out/test/inputMethod.test.js && node out/test/projectResolve.test.js && node out/test/studioWebLocal.test.js && npm run docs:activities"
+    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && node out/test/windowsTarget.test.js && node out/test/extractTableData.test.js && node out/test/selectorBuilder.test.js && node out/test/windowsTodo.test.js && node out/test/strongDryRun.test.js && node out/test/blueprints.test.js && node out/test/activityPaletteSmartProps.test.js && node out/test/inputMethod.test.js && node out/test/projectResolve.test.js && node out/test/studioWebLocal.test.js && node out/test/useAppBrowserUx.test.js && npm run docs:activities"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",

@@ -25,7 +25,17 @@ function run(): void {
   assert.ok(normalized.includes("id='btnSubmit'"));
   assert.ok(isWindowsClassicSelector(normalized));
   assert.ok(isPlaceholderSelector('<target id="x" />'));
-  assert.ok(!isPlaceholderSelector(normalized));
+  assert.ok(isPlaceholderSelector(normalized), 'stock btnSubmit id stays a placeholder');
+  assert.ok(
+    !isPlaceholderSelector(normalized.replace(/btnSubmit/g, 'checkoutBtn')),
+    'real ids are not placeholders'
+  );
+  assert.ok(
+    isPlaceholderSelector(
+      "<html app='chrome.exe' title='*' />\n<webctrl tag='BUTTON' />"
+    ),
+    'tag-only webctrl is placeholder'
+  );
 
   const projectJson = JSON.parse(
     exportUiPathProjectJson({

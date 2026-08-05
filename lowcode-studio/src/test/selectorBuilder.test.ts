@@ -47,10 +47,19 @@ function run(): void {
 
   const edge = applyTemplate('edge-link');
   assert.ok(edge.includes('msedge.exe'));
-  assert.ok(edge.includes("aaname='Next'"));
+  assert.ok(edge.includes("tag='A'"));
 
   const roundTrip = buildWindowsSelector(parseWindowsSelector(fromTpl));
   assert.ok(roundTrip.includes('webctrl'));
+
+  const specific = buildWindowsSelector({
+    kind: 'browser',
+    app: 'chrome.exe',
+    title: '*',
+    tag: 'BUTTON',
+    id: 'checkout'
+  });
+  assert.ok(specific.includes("id='checkout'"));
 
   console.log('selectorBuilder.test.ts: all assertions passed');
 }

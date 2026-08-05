@@ -1,12 +1,12 @@
 # LowCode Studio
 
-**Version 0.6.18** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.6.19** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.6.18-0ea5e9)
+![version](https://img.shields.io/badge/version-0.6.19-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
@@ -45,7 +45,18 @@ Design on Mac (REFramework)
 2. **Project Explorer** — title actions with tooltips (Open, Scenarios, Connect, Validate…)  
 3. **Extract Table Data** — smart page → DataTable extraction for Windows UI automation
 
-## What’s in 0.6.18
+## What’s in 0.6.19
+
+- **Selectors & UI automation**
+  - Use Application/Browser imports as a real container (`NApplicationCard`) with nested Click/Type/Get Text children
+  - Get Text / Element Exists / Get Attribute export `Result=` + timeouts; Get Text supports Input Method
+  - Empty defaults (no fake “done” selectors); stronger placeholder detection; Selector Builder applies live
+  - Mode-aware Use Application/Browser props (Browser vs Application); Modern Selector collapsed when empty
+- **Canvas UX**
+  - Sequence board surface, spine drop-zones, stronger selection, scroll fade, empty-state prompt
+  - Cards warn when a required selector is still a starter
+
+### Also in 0.6.18
 
 - Skip **Manual Trigger** (and other Studio Web triggers) on import/export — no more Comment placeholders in Main.xaml
 - Strip **`(imported)`** from DisplayName when writing XAML
@@ -169,7 +180,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.18.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.19.vsix` → reload.
 
 ## Easy path
 

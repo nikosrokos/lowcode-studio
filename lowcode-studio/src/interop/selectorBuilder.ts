@@ -29,7 +29,7 @@ export const DEFAULT_BROWSER_PARTS: SelectorParts = {
   kind: 'browser',
   app: 'chrome.exe',
   title: '*',
-  tag: 'BUTTON',
+  tag: '',
   id: '',
   aaname: '',
   cls: '',
@@ -39,12 +39,12 @@ export const DEFAULT_BROWSER_PARTS: SelectorParts = {
 
 export const DEFAULT_DESKTOP_PARTS: SelectorParts = {
   kind: 'desktop',
-  app: 'notepad.exe',
-  title: '*',
+  app: '',
+  title: '',
   tag: '',
   id: '',
   aaname: '',
-  cls: 'Notepad',
+  cls: '',
   name: '',
   idx: ''
 };
@@ -53,23 +53,23 @@ export const SELECTOR_TEMPLATES: SelectorTemplate[] = [
   {
     id: 'chrome-button',
     label: 'Chrome — Button',
-    description: 'HTML button in Google Chrome',
+    description: 'HTML button in Google Chrome — fill Id or aaname',
     kind: 'browser',
-    parts: { app: 'chrome.exe', tag: 'BUTTON', id: 'btnSubmit' }
+    parts: { app: 'chrome.exe', tag: 'BUTTON', aaname: '' }
   },
   {
     id: 'chrome-input',
     label: 'Chrome — Input',
-    description: 'Text input in Google Chrome',
+    description: 'Text input in Google Chrome — fill Id or name',
     kind: 'browser',
-    parts: { app: 'chrome.exe', tag: 'INPUT', id: 'username' }
+    parts: { app: 'chrome.exe', tag: 'INPUT', id: '' }
   },
   {
     id: 'edge-link',
     label: 'Edge — Link',
-    description: 'Anchor / link in Microsoft Edge',
+    description: 'Anchor / link in Microsoft Edge — set aaname',
     kind: 'browser',
-    parts: { app: 'msedge.exe', tag: 'A', aaname: 'Next' }
+    parts: { app: 'msedge.exe', tag: 'A', aaname: '' }
   },
   {
     id: 'chrome-table',
@@ -81,9 +81,9 @@ export const SELECTOR_TEMPLATES: SelectorTemplate[] = [
   {
     id: 'chrome-select',
     label: 'Chrome — Dropdown',
-    description: 'SELECT element in Chrome',
+    description: 'SELECT element in Chrome — fill Id',
     kind: 'browser',
-    parts: { app: 'chrome.exe', tag: 'SELECT', id: 'country' }
+    parts: { app: 'chrome.exe', tag: 'SELECT', id: '' }
   },
   {
     id: 'wnd-notepad',
@@ -102,9 +102,9 @@ export const SELECTOR_TEMPLATES: SelectorTemplate[] = [
   {
     id: 'wnd-generic',
     label: 'Desktop — Generic Window',
-    description: 'Generic Win32 window by app + title',
+    description: 'Generic Win32 window — set app + title',
     kind: 'desktop',
-    parts: { app: 'app.exe', title: '*', cls: '' }
+    parts: { app: '', title: '', cls: '' }
   }
 ];
 
@@ -152,8 +152,8 @@ export function buildWindowsSelector(parts: Partial<SelectorParts>): string {
   if (parts.idx) {
     web.push(`idx='${esc(parts.idx)}'`);
   }
-  if (!parts.id && !parts.aaname && !parts.name && tag === '*') {
-    web.push(`id='element'`);
+  if (!parts.id && !parts.aaname && !parts.name && !parts.idx && tag === '*') {
+    // Leave under-specified — do not invent id='element'
   }
   return `<html app='${esc(app)}' title='${esc(title)}' />\n<webctrl ${web.join(' ')} />`;
 }
@@ -188,7 +188,7 @@ export function parseWindowsSelector(raw: string): SelectorParts {
     kind: 'browser',
     app: htmlAttrs.app || 'chrome.exe',
     title: htmlAttrs.title || '*',
-    tag: (webAttrs.tag || 'BUTTON').toUpperCase(),
+    tag: (webAttrs.tag || '').toUpperCase(),
     id: webAttrs.id || '',
     aaname: webAttrs.aaname || '',
     cls: webAttrs.class || webAttrs.cls || '',

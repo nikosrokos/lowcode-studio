@@ -490,22 +490,23 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         type: 'string',
         defaultValue: 'https://example.com',
         required: true,
-        description: 'Browser URL or application executable path.'
+        description: 'Browser: page URL. Application: .exe path.'
       },
       {
         name: 'browserType',
         label: 'Browser',
         type: 'enum',
         options: ['Chrome', 'Edge', 'Firefox', 'IE'],
-        defaultValue: 'Chrome'
+        defaultValue: 'Chrome',
+        description: 'Used when Mode = Browser.'
       },
       { ...SCOPE_INPUT_METHOD_PROP },
       {
         name: 'selector',
-        label: 'Window Selector (Windows)',
+        label: 'Window Selector (optional)',
         type: 'multiline',
-        defaultValue: "<html app='chrome.exe' title='*' />",
-        description: 'Optional attach selector for an already-open window.'
+        defaultValue: '',
+        description: 'Attach to an already-open window. Leave empty to open URL/path. Capture on Windows.'
       },
       {
         name: 'open',
@@ -535,16 +536,16 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         name: 'selector',
         label: 'Selector (Windows)',
         type: 'multiline',
-        defaultValue: "<html app='chrome.exe' title='*' />\n<webctrl tag='BUTTON' id='btnSubmit' />",
+        defaultValue: '',
         required: true,
-        description: 'Classic Windows UiPath selector (<html>/<webctrl> or <wnd>). Capture on a Windows machine.'
+        description: 'Classic UiPath selector (<html>/<webctrl> or <wnd>). Use Selector Builder or capture on Windows.'
       },
       {
         name: 'selectorModern',
-        label: 'Modern Selector',
+        label: 'Modern Selector (advanced)',
         type: 'multiline',
         defaultValue: '',
-        description: 'Preserved FullSelectorEncoding from Studio (round-trip).'
+        description: 'Optional FullSelectorEncoding from Studio — leave blank if using classic selector.'
       },
       {
         name: 'clickType',
@@ -552,6 +553,13 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         type: 'enum',
         options: ['Single', 'Double', 'Right'],
         defaultValue: 'Single'
+      },
+      {
+        name: 'timeoutMs',
+        label: 'Timeout (ms)',
+        type: 'number',
+        defaultValue: 30000,
+        description: 'How long to wait for the target before failing.'
       },
       { ...UI_INPUT_METHOD_PROP, defaultValue: 'Simulate' }
     ]
@@ -568,15 +576,16 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         name: 'selector',
         label: 'Selector (Windows)',
         type: 'multiline',
-        defaultValue: "<html app='chrome.exe' title='*' />\n<webctrl tag='INPUT' id='input' />",
-        required: true
+        defaultValue: '',
+        required: true,
+        description: 'Classic UiPath selector. Use Selector Builder or capture on Windows.'
       },
       {
         name: 'selectorModern',
-        label: 'Modern Selector',
+        label: 'Modern Selector (advanced)',
         type: 'multiline',
         defaultValue: '',
-        description: 'Preserved FullSelectorEncoding from Studio (round-trip).'
+        description: 'Optional FullSelectorEncoding from Studio — leave blank if using classic selector.'
       },
       {
         name: 'text',
@@ -590,6 +599,12 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         label: 'Empty Field',
         type: 'boolean',
         defaultValue: true
+      },
+      {
+        name: 'timeoutMs',
+        label: 'Timeout (ms)',
+        type: 'number',
+        defaultValue: 30000
       },
       { ...UI_INPUT_METHOD_PROP, defaultValue: 'Simulate' }
     ]
@@ -606,15 +621,14 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         name: 'selector',
         label: 'Selector (Windows)',
         type: 'multiline',
-        defaultValue: "<html app='chrome.exe' title='*' />\n<webctrl tag='*' id='label' />",
+        defaultValue: '',
         required: true
       },
       {
         name: 'selectorModern',
-        label: 'Modern Selector',
+        label: 'Modern Selector (advanced)',
         type: 'multiline',
-        defaultValue: '',
-        description: 'Preserved FullSelectorEncoding from Studio (round-trip).'
+        defaultValue: ''
       },
       {
         name: 'result',
@@ -622,7 +636,14 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         type: 'expression',
         defaultValue: 'extractedText',
         required: true
-      }
+      },
+      {
+        name: 'timeoutMs',
+        label: 'Timeout (ms)',
+        type: 'number',
+        defaultValue: 30000
+      },
+      { ...UI_INPUT_METHOD_PROP, defaultValue: 'Simulate' }
     ]
   },
   {
@@ -637,12 +658,12 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         name: 'selector',
         label: 'Selector (Windows)',
         type: 'multiline',
-        defaultValue: "<html app='chrome.exe' title='*' />\n<webctrl tag='*' id='popup' />",
+        defaultValue: '',
         required: true
       },
       {
         name: 'selectorModern',
-        label: 'Modern Selector',
+        label: 'Modern Selector (advanced)',
         type: 'multiline',
         defaultValue: ''
       },
@@ -673,7 +694,7 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         name: 'selector',
         label: 'Selector (Windows)',
         type: 'multiline',
-        defaultValue: "<html app='chrome.exe' title='*' />\n<webctrl tag='INPUT' id='chkAgree' />",
+        defaultValue: '',
         required: true
       },
       {
@@ -688,6 +709,12 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         type: 'enum',
         options: ['Check', 'Uncheck', 'Toggle'],
         defaultValue: 'Check'
+      },
+      {
+        name: 'timeoutMs',
+        label: 'Timeout (ms)',
+        type: 'number',
+        defaultValue: 30000
       },
       { ...UI_INPUT_METHOD_PROP }
     ]
@@ -704,7 +731,7 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         name: 'selector',
         label: 'Selector (Windows)',
         type: 'multiline',
-        defaultValue: "<html app='chrome.exe' title='*' />\n<webctrl tag='*' id='menu' />",
+        defaultValue: '',
         required: true
       },
       {
@@ -712,6 +739,12 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         label: 'Modern Selector',
         type: 'multiline',
         defaultValue: ''
+      },
+      {
+        name: 'timeoutMs',
+        label: 'Timeout (ms)',
+        type: 'number',
+        defaultValue: 30000
       },
       { ...UI_INPUT_METHOD_PROP }
     ]
@@ -728,7 +761,7 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         name: 'selector',
         label: 'Selector (Windows)',
         type: 'multiline',
-        defaultValue: "<html app='chrome.exe' title='*' />\n<webctrl tag='SELECT' id='cmbCountry' />",
+        defaultValue: '',
         required: true
       },
       {
@@ -781,7 +814,7 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         name: 'selector',
         label: 'Selector (Windows)',
         type: 'multiline',
-        defaultValue: "<html app='chrome.exe' title='*' />\n<webctrl tag='*' id='element' />",
+        defaultValue: '',
         required: true
       },
       {
@@ -818,7 +851,7 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         name: 'selector',
         label: 'Selector (Windows)',
         type: 'multiline',
-        defaultValue: "<html app='chrome.exe' title='*' />\n<webctrl tag='*' id='element' />",
+        defaultValue: '',
         required: true
       },
       {
@@ -855,14 +888,13 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         name: 'selector',
         label: 'Table Selector (Windows)',
         type: 'multiline',
-        defaultValue:
-          "<html app='chrome.exe' title='*' />\n<webctrl tag='TABLE' />",
+        defaultValue: '',
         required: true,
-        description: 'Classic Windows selector for the HTML table or grid root.'
+        description: 'Classic UiPath selector for the table/grid root. Capture on Windows.'
       },
       {
         name: 'selectorModern',
-        label: 'Modern Selector',
+        label: 'Modern Selector (advanced)',
         type: 'multiline',
         defaultValue: ''
       },
@@ -870,10 +902,9 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         name: 'extractionMetadata',
         label: 'Extraction Metadata (JSON)',
         type: 'multiline',
-        defaultValue:
-          '{\n  "Columns": [\n    { "Name": "Column1", "Attr": "text" },\n    { "Name": "Column2", "Attr": "text" }\n  ],\n  "SmartExtraction": true\n}',
+        defaultValue: '',
         description:
-          'UiPath-style extraction metadata / column map. SmartExtraction infers columns when empty.'
+          'Optional UiPath column map JSON. Leave empty when Smart Extraction is on — Studio will infer columns.'
       },
       {
         name: 'includeHeaders',
