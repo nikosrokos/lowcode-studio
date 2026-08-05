@@ -151,17 +151,18 @@ export function getDesignerHtml(
       display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden;
     }
     .left-section {
-      display: flex; flex-direction: column; min-height: 72px;
+      display: flex; flex-direction: column; min-height: 0;
+      flex: 0 0 auto;
       border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
     }
-    .left-section[data-section="project"] { flex: 0 1 24%; }
-    .left-section[data-section="activities"] { flex: 1 1 40%; min-height: 140px; }
-    .left-section[data-section="variables"] { flex: 0 1 18%; }
-    .left-section[data-section="arguments"] { flex: 0 1 14%; }
-    .left-section[data-section="watch"] { flex: 0 1 16%; }
-    .left-section[data-section="fixtures"] { flex: 0 1 16%; border-bottom: none; }
     .left-section.collapsed { flex: 0 0 auto; min-height: 0; }
     .left-section.collapsed .left-section-body { display: none; }
+    /* Accordion: only the open section grows to fill the rail */
+    .left-section:not(.collapsed) {
+      flex: 1 1 auto;
+      min-height: 120px;
+    }
+    .left-section[data-section="fixtures"] { border-bottom: none; }
     .left-section-head {
       display: flex; align-items: center; gap: 6px; width: 100%;
       padding: 8px 10px; border: none; background: transparent; color: var(--text);
@@ -464,30 +465,49 @@ export function getDesignerHtml(
     .canvas-empty h3 { margin: 0 0 8px; color: var(--text); font-size: 15px; font-weight: 650; }
     .canvas-empty p { margin: 0; font-size: 12px; line-height: 1.5; }
     .drop-zone {
-      min-height: 28px; border-radius: 8px;
-      border: 1px dashed color-mix(in srgb, var(--muted) 28%, transparent);
-      margin: 0 auto; width: 100%; max-width: 100%;
-      transition: min-height .14s ease, border-color .14s ease, background .14s ease, opacity .14s ease;
-      position: relative; opacity: .85;
+      position: relative; height: 18px; margin: 2px 0;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
     }
     .drop-zone::before {
       content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px;
       background: var(--spine); transform: translateX(-50%); pointer-events: none;
+      opacity: .35;
     }
     .drop-zone::after {
-      content: ''; position: absolute; left: 50%; top: 50%; width: 5px; height: 5px;
-      border-radius: 50%; background: color-mix(in srgb, var(--muted) 55%, transparent);
-      transform: translate(-50%, -50%); pointer-events: none; opacity: .7;
+      content: '+'; position: relative; z-index: 1;
+      width: 22px; height: 22px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; line-height: 1;
+      color: transparent; background: transparent;
+      border: 1px solid transparent;
+      transition: .12s ease;
+    }
+    .drop-zone:hover::after, .drop-zone.active::after {
+      color: var(--accent-fg, #fff);
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 35%, transparent);
     }
     .drop-zone.active {
-      min-height: 48px; opacity: 1;
-      border-color: color-mix(in srgb, var(--focus) 70%, var(--border));
-      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      height: 28px;
     }
-    .drop-zone.active::after {
-      width: 9px; height: 9px; opacity: 1; background: var(--focus);
-      box-shadow: 0 0 0 4px color-mix(in srgb, var(--focus) 22%, transparent);
+    .ctx-menu {
+      position: fixed; z-index: 80; min-width: 160px;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 10px; box-shadow: var(--shadow-frame);
+      padding: 4px; display: none;
     }
+    .ctx-menu.show { display: block; }
+    .ctx-menu button {
+      display: block; width: 100%; text-align: left;
+      border: none; background: transparent; color: var(--text);
+      padding: 8px 10px; border-radius: 6px; font: inherit; cursor: pointer;
+    }
+    .ctx-menu button:hover { background: var(--hover); }
+    .ctx-menu button.danger { color: #ef4444; }
+    .card.has-bp { outline: none; }
+    .card.has-bp .card-bp.on { /* already styled */ }
     .card {
       position: relative; background: var(--card);
       border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
@@ -516,15 +536,19 @@ export function getDesignerHtml(
     }
     .card-summary.mono { font-family: var(--mono); }
     .card-bp {
-      position: absolute; left: -2px; top: 50%; transform: translateY(-50%);
-      width: 10px; height: 10px; border-radius: 50%;
-      border: 1px solid color-mix(in srgb, #ef4444 60%, var(--border));
-      background: transparent; cursor: pointer; padding: 0; z-index: 2;
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 1.5px solid color-mix(in srgb, #ef4444 55%, var(--border));
+      background: transparent; cursor: pointer; padding: 0; flex: 0 0 auto;
     }
+    .card-bp:hover { border-color: #ef4444; }
     .card-bp.on, .flow-node .card-bp.on {
       background: #ef4444; border-color: #ef4444;
       box-shadow: 0 0 0 2px color-mix(in srgb, #ef4444 25%, transparent);
     }
+    .flow-node .card-bp {
+      position: absolute; right: 8px; top: 8px; z-index: 3;
+    }
+    .card-actions .card-bp { display: inline-block; }
     .kind-badge {
       display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .04em;
       text-transform: uppercase; padding: 1px 5px; border-radius: 4px; margin-left: 6px;
@@ -550,8 +574,13 @@ export function getDesignerHtml(
       margin-top: 6px; font-size: 10px; font-weight: 600; color: #d97706;
       letter-spacing: .02em;
     }
-    .card-actions { position: absolute; right: 8px; top: 8px; display: none; gap: 4px; }
-    .card:hover .card-actions, .card.selected .card-actions { display: flex; }
+    .card-actions {
+      position: absolute; right: 6px; top: 6px; display: flex; gap: 3px; align-items: center;
+      z-index: 3;
+    }
+    .card-actions .icon-btn { display: none; }
+    .card:hover .card-actions .icon-btn, .card.selected .card-actions .icon-btn { display: inline-flex; align-items: center; justify-content: center; }
+    .card-actions .card-bp { display: inline-block; }
     .icon-btn {
       width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--border);
       background: var(--input-bg); color: var(--text); cursor: pointer; font-size: 12px;
@@ -937,6 +966,14 @@ export function getDesignerHtml(
       </div>
       <div class="toast" id="toast"></div>
       <div class="hover-tip" id="hoverTip"></div>
+      <div class="ctx-menu" id="ctxMenu" role="menu">
+        <button type="button" data-ctx="insert-before">Insert activity above</button>
+        <button type="button" data-ctx="insert-after">Insert activity below</button>
+        <button type="button" data-ctx="bp">Toggle breakpoint</button>
+        <button type="button" data-ctx="runto">Run to here</button>
+        <button type="button" data-ctx="dup">Duplicate</button>
+        <button type="button" class="danger" data-ctx="delete">Delete</button>
+      </div>
     </main>
 
     <div class="expr-overlay" id="exprOverlay">
@@ -1027,7 +1064,7 @@ export function getDesignerHtml(
       suggestions: ${suggestionsJson},
       palette: ${paletteJson},
       projects: ${projectsJson},
-      collapsedLeftSections: { watch: true, fixtures: true },
+      collapsedLeftSections: { project: true, activities: false, variables: true, arguments: true, watch: true, fixtures: true },
       selectedId: null,
       dragType: null,
       linkFrom: null,
@@ -1050,7 +1087,9 @@ export function getDesignerHtml(
       paletteOpen: false,
       paletteQuery: '',
       paletteActive: 0,
-      exprEdit: null
+      exprEdit: null,
+      insertPath: null,
+      ctxTargetId: null
     };
 
     const els = {
@@ -1102,13 +1141,35 @@ export function getDesignerHtml(
         if (chev) chev.textContent = collapsed ? '▸' : '▾';
       });
     }
+    /** Accordion: opening one section collapses the others so Watch/Fixtures get full height. */
+    function openLeftSectionExclusive(id) {
+      document.querySelectorAll('.left-section').forEach((sec) => {
+        const sid = sec.getAttribute('data-section');
+        state.collapsedLeftSections[sid] = sid !== id;
+      });
+      applyLeftSections();
+    }
     document.querySelectorAll('[data-toggle-section]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-toggle-section');
-        state.collapsedLeftSections[id] = !state.collapsedLeftSections[id];
-        applyLeftSections();
+        const currentlyOpen = !state.collapsedLeftSections[id];
+        if (currentlyOpen) {
+          // Collapse this one only (others stay as-is); keep activities open as fallback
+          state.collapsedLeftSections[id] = true;
+          if (Object.keys(state.collapsedLeftSections).every((k) => state.collapsedLeftSections[k])) {
+            state.collapsedLeftSections.activities = false;
+          }
+          applyLeftSections();
+        } else {
+          openLeftSectionExclusive(id);
+        }
       });
     });
+    // Default: Activities open, others collapsed (room for tall panels when opened)
+    state.collapsedLeftSections = Object.assign(
+      { project: true, activities: false, variables: true, arguments: true, watch: true, fixtures: true },
+      state.collapsedLeftSections || {}
+    );
     applyLeftSections();
 
         function renderProjectTree() {
@@ -1174,11 +1235,14 @@ export function getDesignerHtml(
       }
     }
     function setLeftSection(id, open) {
-      if (open === false) state.collapsedLeftSections[id] = true;
-      else state.collapsedLeftSections[id] = false;
-      applyLeftSections();
+      if (open === false) {
+        state.collapsedLeftSections[id] = true;
+        applyLeftSections();
+      } else {
+        openLeftSectionExclusive(id);
+      }
     }
-    function setLeftTab(id) { setLeftSection(id, true); }
+    function setLeftTab(id) { openLeftSectionExclusive(id); }
     function parseFixturesEditor() {
       const raw = (els.fixturesEditor && els.fixturesEditor.value || '').trim();
       if (!raw) return {};
@@ -1206,6 +1270,42 @@ export function getDesignerHtml(
       if (!state.breakpoints[id]) delete state.breakpoints[id];
       toast(state.breakpoints[id] ? 'Breakpoint on' : 'Breakpoint off');
       renderAll();
+    }
+    function deleteActivityById(id) {
+      if (!id) return;
+      const hit = walkFind(state.workflow.activities, id);
+      if (!hit) return;
+      hit.list.splice(hit.index, 1);
+      if (isFlow()) {
+        state.workflow.connections = (state.workflow.connections || []).filter(c => c.from !== id && c.to !== id);
+        if (state.workflow.startActivityId === id) state.workflow.startActivityId = undefined;
+      }
+      if (state.breakpoints[id]) delete state.breakpoints[id];
+      if (state.selectedId === id) state.selectedId = null;
+      hideCtxMenu();
+      persist(true);
+      toast('Deleted activity');
+    }
+    function hideCtxMenu() {
+      const menu = document.getElementById('ctxMenu');
+      if (menu) menu.classList.remove('show');
+      state.ctxTargetId = null;
+    }
+    function showCtxMenu(x, y, activityId) {
+      const menu = document.getElementById('ctxMenu');
+      if (!menu) return;
+      state.ctxTargetId = activityId;
+      state.selectedId = activityId;
+      menu.classList.add('show');
+      const pad = 8;
+      const mw = menu.offsetWidth || 160;
+      const mh = menu.offsetHeight || 200;
+      let left = x;
+      let top = y;
+      if (left + mw > window.innerWidth - pad) left = window.innerWidth - mw - pad;
+      if (top + mh > window.innerHeight - pad) top = window.innerHeight - mh - pad;
+      menu.style.left = Math.max(pad, left) + 'px';
+      menu.style.top = Math.max(pad, top) + 'px';
     }
     function renderWatch(snapshot) {
       if (!els.watchView) return;
@@ -1729,6 +1829,7 @@ export function getDesignerHtml(
       const z = document.createElement('div');
       z.className = 'drop-zone';
       z.dataset.path = pathKey;
+      z.title = 'Drop activity here, or click + to insert';
       z.addEventListener('dragover', (e) => { e.preventDefault(); z.classList.add('active'); });
       z.addEventListener('dragleave', () => z.classList.remove('active'));
       z.addEventListener('drop', (e) => {
@@ -1740,6 +1841,13 @@ export function getDesignerHtml(
         insertAtPath(pathKey, node);
         state.selectedId = node.id;
         persist(true);
+      });
+      z.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        state.insertPath = pathKey;
+        openPalette();
+        toast('Pick an activity to insert');
       });
       return z;
     }
@@ -1759,14 +1867,15 @@ export function getDesignerHtml(
       const selMissing = needsSelector && isPlaceholderSel(node.properties?.selector);
       if (bpOn) card.classList.add('has-bp');
       card.innerHTML =
-        '<button type="button" class="card-bp' + (bpOn ? ' on' : '') + '" data-act="bp" title="Toggle breakpoint"></button>' +
         '<div class="card-accent" style="background:' + color + '"></div>' +
         '<div class="card-actions">' +
+          '<button type="button" class="card-bp' + (bpOn ? ' on' : '') + '" data-act="bp" title="Toggle breakpoint"></button>' +
           openBtn +
           '<button class="icon-btn" data-act="runto" title="Run to here">⏭</button>' +
           '<button class="icon-btn" data-act="up" title="Move up">↑</button>' +
           '<button class="icon-btn" data-act="down" title="Move down">↓</button>' +
           '<button class="icon-btn" data-act="dup" title="Duplicate">⧉</button>' +
+          '<button class="icon-btn" data-act="delete" title="Delete">✕</button>' +
         '</div>' +
         '<div class="card-head"><span class="step">#' + stepNo + '</span>' +
         '<div class="card-title">' + escapeHtml(node.displayName) + '</div></div>' +
@@ -1781,7 +1890,15 @@ export function getDesignerHtml(
         if (e.target.closest('[data-act]')) return;
         state.selectedId = node.id;
         hideTip();
+        hideCtxMenu();
         renderAll();
+      });
+      card.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        state.selectedId = node.id;
+        hideTip();
+        showCtxMenu(e.clientX, e.clientY, node.id);
       });
       card.addEventListener('dblclick', (e) => {
         if (node.type === 'REFramework.InvokeWorkflow' && node.properties?.workflowPath) {
@@ -1800,6 +1917,10 @@ export function getDesignerHtml(
           if (act === 'runto') {
             state.selectedId = node.id;
             postDryRun({ stepThrough: true, runToActivityId: node.id });
+            return;
+          }
+          if (act === 'delete') {
+            deleteActivityById(node.id);
             return;
           }
           if (act === 'open') {
@@ -1865,7 +1986,7 @@ export function getDesignerHtml(
         empty.className = 'canvas-empty';
         empty.innerHTML =
           '<h3>Start your sequence</h3>' +
-          '<p>Drag an activity from the left palette onto this board — or double-click one to append.</p>';
+          '<p>Drag from Activities, click the + between steps, or press ⌘/Ctrl+K to insert.</p>';
         els.sequence.appendChild(empty);
         els.sequence.appendChild(dropZone('root'));
         return;
@@ -1919,12 +2040,16 @@ export function getDesignerHtml(
         const isDecision = node.type === 'Flowchart.FlowDecision';
         const isStart = node.type === 'Flowchart.Start';
         const isEnd = node.type === 'Flowchart.End';
+        const needsSelector = !!(def?.properties || []).some(p => p.name === 'selector' && p.required);
+        const selMissing = needsSelector && isPlaceholderSel(node.properties?.selector);
+        const warnHtml = selMissing ? '<div class="card-warn" style="margin-top:4px;">Needs a real selector</div>' : '';
         el.dataset.id = node.id;
         el.className = 'flow-node' +
           (state.selectedId === node.id ? ' selected' : '') +
           (isDecision ? ' decision' : '') +
           (isStart ? ' start' : '') +
           (isEnd ? ' end' : '') +
+          (selMissing ? ' selector-missing' : '') +
           dryRunClass(node.id);
         el.style.left = (node.x || 40) + 'px';
         el.style.top = (node.y || 40) + 'px';
@@ -1937,7 +2062,7 @@ export function getDesignerHtml(
         } else {
           el.innerHTML = bpBtn + '<div class="title">' + escapeHtml(node.displayName) + '</div>' +
             (isStart || isEnd ? '' : '<div class="summary">' + escapeHtml(summary(node)) + '</div>') +
-            '' +
+            warnHtml +
             (isEnd ? '' : '<div class="port" title="Drag to connect"></div>');
         }
         el.querySelector('[data-flow-bp]')?.addEventListener('mousedown', (e) => {
@@ -1949,6 +2074,12 @@ export function getDesignerHtml(
           e.stopPropagation();
           state.selectedId = node.id;
           postDryRun({ stepThrough: true, runToActivityId: node.id });
+        });
+        el.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          state.selectedId = node.id;
+          showCtxMenu(e.clientX, e.clientY, node.id);
         });
 
         el.addEventListener('mousedown', (e) => {
@@ -2442,41 +2573,52 @@ export function getDesignerHtml(
       const types = ['String','Int32','Boolean','Double','Object','DataTable','Array'];
       const dirs = ['In','Out','InOut'];
       els.argumentsView.innerHTML = args.map((a, i) => (
-        '<div class="field" style="display:grid;grid-template-columns:1fr 72px 72px 28px;gap:6px;align-items:end;">' +
-          '<div><label>Name</label><input data-arg="' + i + '" data-field="name" value="' + escapeAttr(a.name) + '" /></div>' +
-          '<div><label>Dir</label><select data-arg="' + i + '" data-field="direction">' +
-            dirs.map(d => '<option' + ((a.direction || 'In') === d ? ' selected' : '') + '>' + d + '</option>').join('') +
-          '</select></div>' +
-          '<div><label>Type</label><select data-arg="' + i + '" data-field="type">' +
-            types.map(t => '<option' + (a.type === t ? ' selected' : '') + '>' + t + '</option>').join('') +
-          '</select></div>' +
-          '<button class="icon-btn" data-del-arg="' + i + '" title="Remove">✕</button>' +
-        '</div>' +
-        '<div class="field"><label>Default</label><input data-arg="' + i + '" data-field="defaultValue" value="' + escapeAttr(a.defaultValue === undefined || a.defaultValue === null ? '' : String(a.defaultValue)) + '" /></div>'
-      )).join('');
+        '<div class="field arg-card" data-arg-card="' + i + '">' +
+          '<div style="display:grid;grid-template-columns:1fr 28px;gap:6px;align-items:end;">' +
+            '<div><label>Name</label><input data-arg="' + i + '" data-field="name" value="' + escapeAttr(a.name || '') + '" /></div>' +
+            '<button class="icon-btn" data-del-arg="' + i + '" title="Remove">✕</button>' +
+          '</div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">' +
+            '<div><label>Direction</label><select data-arg="' + i + '" data-field="direction">' +
+              dirs.map(d => '<option' + ((a.direction || 'In') === d ? ' selected' : '') + '>' + d + '</option>').join('') +
+            '</select></div>' +
+            '<div><label>Type</label><select data-arg="' + i + '" data-field="type">' +
+              types.map(t => '<option' + (a.type === t ? ' selected' : '') + '>' + t + '</option>').join('') +
+            '</select></div>' +
+          '</div>' +
+          '<div class="field" style="margin-top:6px;margin-bottom:0"><label>Default</label><input data-arg="' + i + '" data-field="defaultValue" value="' + escapeAttr(a.defaultValue === undefined || a.defaultValue === null ? '' : String(a.defaultValue)) + '" /></div>' +
+        '</div>'
+      )).join('<div style="height:10px"></div>');
+      const applyArgField = (input) => {
+        const i = Number(input.getAttribute('data-arg'));
+        const field = input.getAttribute('data-field');
+        if (!state.workflow.arguments || !state.workflow.arguments[i] || !field) return;
+        if (field === 'defaultValue') {
+          const t = state.workflow.arguments[i].type;
+          let val = input.value;
+          if (t === 'Int32' || t === 'Double') val = Number(val || 0);
+          if (t === 'Boolean') val = val === 'true';
+          state.workflow.arguments[i].defaultValue = val;
+        } else {
+          state.workflow.arguments[i][field] = input.value;
+        }
+        vscode.postMessage({ type: 'edit', workflow: state.workflow });
+        vscode.postMessage({ type: 'argumentsChanged', workflowArguments: state.workflow.arguments });
+      };
       els.argumentsView.querySelectorAll('[data-arg]').forEach(input => {
-        input.addEventListener('change', () => {
-          const i = Number(input.getAttribute('data-arg'));
-          const field = input.getAttribute('data-field');
-          if (!state.workflow.arguments[i]) return;
-          if (field === 'defaultValue') {
-            const t = state.workflow.arguments[i].type;
-            let val = input.value;
-            if (t === 'Int32' || t === 'Double') val = Number(val || 0);
-            if (t === 'Boolean') val = val === 'true';
-            state.workflow.arguments[i].defaultValue = val;
-          } else {
-            state.workflow.arguments[i][field] = input.value;
-          }
-          persist(false);
-          vscode.postMessage({ type: 'argumentsChanged', arguments: state.workflow.arguments });
-        });
+        input.addEventListener('change', () => applyArgField(input));
+        input.addEventListener('blur', () => applyArgField(input));
       });
       els.argumentsView.querySelectorAll('[data-del-arg]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          state.workflow.arguments.splice(Number(btn.getAttribute('data-del-arg')), 1);
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const idx = Number(btn.getAttribute('data-del-arg'));
+          if (!Array.isArray(state.workflow.arguments)) return;
+          state.workflow.arguments.splice(idx, 1);
           persist(true);
-          vscode.postMessage({ type: 'argumentsChanged', arguments: state.workflow.arguments });
+          vscode.postMessage({ type: 'argumentsChanged', workflowArguments: state.workflow.arguments });
+          toast('Argument removed');
         });
       });
     }
@@ -2614,10 +2756,25 @@ export function getDesignerHtml(
     }
 
     function persist(rerender) {
-      vscode.postMessage({ type: 'edit', workflow: state.workflow });
-      if (rerender) renderAll();
-      else if (isFlow()) { /* positions already live */ }
-      else { renderSequence(); renderProps(); }
+      try {
+        if (!Array.isArray(state.workflow.variables)) state.workflow.variables = [];
+        if (!Array.isArray(state.workflow.arguments)) state.workflow.arguments = [];
+        vscode.postMessage({ type: 'edit', workflow: state.workflow });
+        if (rerender) renderAll();
+        else if (isFlow()) {
+          renderVariables();
+          renderArguments();
+          renderBreadcrumbs();
+        } else {
+          renderSequence();
+          renderProps();
+          renderVariables();
+          renderArguments();
+          renderBreadcrumbs();
+        }
+      } catch (err) {
+        toast('Edit failed: ' + (err && err.message ? err.message : String(err)));
+      }
     }
 
     els.workflowName.addEventListener('change', () => {
@@ -2924,21 +3081,35 @@ export function getDesignerHtml(
     document.getElementById('btnPbContinue')?.addEventListener('click', () => continuePlayback());
     document.getElementById('btnPbStop')?.addEventListener('click', () => stopPlayback());
     document.getElementById('btnAddVar').addEventListener('click', () => {
-      state.workflow.variables ||= [];
-      state.workflow.variables.push({ name: 'var' + (state.workflow.variables.length + 1), type: 'String', defaultValue: '' });
-      persist(true);
-      vscode.postMessage({ type: 'variablesChanged', variables: state.workflow.variables });
+      try {
+        if (!Array.isArray(state.workflow.variables)) state.workflow.variables = [];
+        const n = state.workflow.variables.length + 1;
+        state.workflow.variables.push({ name: 'var' + n, type: 'String', defaultValue: '' });
+        openLeftSectionExclusive('variables');
+        persist(true);
+        vscode.postMessage({ type: 'variablesChanged', variables: state.workflow.variables });
+        toast('Variable added');
+      } catch (err) {
+        toast('Add variable failed: ' + (err && err.message ? err.message : String(err)));
+      }
     });
     document.getElementById('btnAddArg')?.addEventListener('click', () => {
-      state.workflow.arguments ||= [];
-      state.workflow.arguments.push({
-        name: 'in_Arg' + (state.workflow.arguments.length + 1),
-        type: 'String',
-        direction: 'In',
-        defaultValue: ''
-      });
-      persist(true);
-      vscode.postMessage({ type: 'argumentsChanged', arguments: state.workflow.arguments });
+      try {
+        if (!Array.isArray(state.workflow.arguments)) state.workflow.arguments = [];
+        const n = state.workflow.arguments.length + 1;
+        state.workflow.arguments.push({
+          name: 'in_Arg' + n,
+          type: 'String',
+          direction: 'In',
+          defaultValue: ''
+        });
+        openLeftSectionExclusive('arguments');
+        persist(true);
+        vscode.postMessage({ type: 'argumentsChanged', workflowArguments: state.workflow.arguments });
+        toast('Argument added');
+      } catch (err) {
+        toast('Add argument failed: ' + (err && err.message ? err.message : String(err)));
+      }
     });
     document.getElementById('exprDialogApply')?.addEventListener('click', () => applyExprEditor());
     document.getElementById('exprDialogCancel')?.addEventListener('click', () => closeExprEditor());
@@ -2982,16 +3153,7 @@ export function getDesignerHtml(
     });
     els.btnDelete.addEventListener('click', () => {
       if (!state.selectedId) return;
-      const hit = walkFind(state.workflow.activities, state.selectedId);
-      if (!hit) return;
-      const id = state.selectedId;
-      hit.list.splice(hit.index, 1);
-      if (isFlow()) {
-        state.workflow.connections = (state.workflow.connections || []).filter(c => c.from !== id && c.to !== id);
-        if (state.workflow.startActivityId === id) state.workflow.startActivityId = undefined;
-      }
-      state.selectedId = null;
-      persist(true);
+      deleteActivityById(state.selectedId);
     });
     els.btnLink.addEventListener('click', () => {
       if (!state.selectedId) { toast('Select a source node first'); return; }
@@ -3134,11 +3296,17 @@ export function getDesignerHtml(
         node.x = 220;
         node.y = 120 + state.workflow.activities.length * 24;
         state.workflow.activities.push(node);
+      } else if (state.insertPath) {
+        insertAtPath(state.insertPath, node);
+        state.insertPath = null;
       } else if (state.selectedId) {
         const hit = walkFind(state.workflow.activities, state.selectedId);
         if (hit) {
           const def = findDef(hit.node.type);
-          if (def?.container && Array.isArray(hit.node.children)) {
+          if (state._insertBefore) {
+            hit.list.splice(hit.index, 0, node);
+            state._insertBefore = false;
+          } else if (def?.container && Array.isArray(hit.node.children) && !state.insertPath) {
             hit.node.children.push(node);
           } else {
             hit.list.splice(hit.index + 1, 0, node);
@@ -3155,6 +3323,64 @@ export function getDesignerHtml(
       toast('Added ' + node.displayName);
       vscode.postMessage({ type: 'activityUsed', activityType: type });
     }
+
+    
+    (function wireCtxMenu() {
+      const menu = document.getElementById('ctxMenu');
+      if (!menu) return;
+      menu.querySelectorAll('[data-ctx]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const act = btn.getAttribute('data-ctx');
+          const id = state.ctxTargetId || state.selectedId;
+          hideCtxMenu();
+          if (!id && act !== 'insert-before' && act !== 'insert-after') return;
+          if (act === 'delete') { deleteActivityById(id); return; }
+          if (act === 'bp') { toggleBreakpoint(id); return; }
+          if (act === 'runto') {
+            state.selectedId = id;
+            postDryRun({ stepThrough: true, runToActivityId: id });
+            return;
+          }
+          if (act === 'dup') {
+            const hit = walkFind(state.workflow.activities, id);
+            if (!hit) return;
+            const clone = JSON.parse(JSON.stringify(hit.node));
+            clone.id = 'act_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+            hit.list.splice(hit.index + 1, 0, clone);
+            state.selectedId = clone.id;
+            persist(true);
+            toast('Duplicated');
+            return;
+          }
+          if (act === 'insert-before' || act === 'insert-after') {
+            const hit = walkFind(state.workflow.activities, id);
+            if (!hit) {
+              state.insertPath = 'root';
+            } else {
+              // find path key for list - use root@index style when possible
+              const idx = hit.index + (act === 'insert-after' ? 1 : 0);
+              // Prefer parent path: if list is root activities
+              if (hit.list === state.workflow.activities) {
+                state.insertPath = 'root@' + idx;
+              } else {
+                // Nested: insert relative via selected + splice after open palette
+                state.insertPath = null;
+                state.selectedId = id;
+                state._insertBefore = act === 'insert-before';
+              }
+            }
+            openPalette();
+            toast('Pick an activity to insert');
+          }
+        });
+      });
+      document.addEventListener('click', () => hideCtxMenu());
+      document.addEventListener('contextmenu', (e) => {
+        if (!e.target.closest('.card') && !e.target.closest('.flow-node')) hideCtxMenu();
+      });
+    })();
 
     document.getElementById('btnInsert')?.addEventListener('click', () => openPalette());
     document.getElementById('paletteOverlay')?.addEventListener('click', (e) => {

@@ -442,6 +442,20 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           }
           break;
         }
+        case 'argumentsChanged': {
+          try {
+            const workflow = parseWorkflow(document.getText());
+            const args = message.workflowArguments ?? message.arguments;
+            if (Array.isArray(args)) {
+              workflow.arguments = args;
+              await this.updateTextDocument(document, workflow);
+              this.onWorkflowChanged(workflow);
+            }
+          } catch {
+            // ignore
+          }
+          break;
+        }
         case 'openWorkflow': {
           await this.openInvokedWorkflow(document, String(message.workflowPath || ''));
           break;
