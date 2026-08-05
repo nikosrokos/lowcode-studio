@@ -1197,6 +1197,19 @@ export function getDesignerHtml(
           </ul>
           <span class="cmd">&lt;button id="loginBtn" aria-label="Sign in"&gt;Sign in&lt;/button&gt;</span>
 
+          <h3>Repair VB expressions (F4)</h3>
+          <span class="cmd">LowCode Studio: Repair VB expressions (Assist)</span>
+          <p>
+            Scans expression fields for UiPath Visual Basic typos / JS-style calls and proposes fixes
+            (confirm before apply). Examples:
+          </p>
+          <ul>
+            <li><code>TRim(name)</code> → <code>name.Trim()</code></li>
+            <li><code>name.toUpperCase()</code> → <code>name.ToUpper()</code></li>
+            <li><code>x == null</code> → <code>x Is Nothing</code> · <code>&amp;&amp;</code> → <code>AndAlso</code></li>
+            <li><code>Len(s)</code> → <code>s.Length</code> · <code>Left(s, 3)</code> → <code>s.Substring(0, 3)</code></li>
+          </ul>
+
           <h3>Related dry-run settings (not Assist)</h3>
           <p>
             Optional real HTTP / Python live under Settings → VS Code

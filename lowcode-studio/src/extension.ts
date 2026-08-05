@@ -33,6 +33,11 @@ import {
   suggestSelectorsFromHtml
 } from './commands/assistSelectors';
 import {
+  applyExpressionRepairs,
+  formatExpressionAssistReport,
+  proposeExpressionRepairs
+} from './commands/assistExpressions';
+import {
   createQuickScenario,
   duplicateScenario,
   ensureScenariosFile,
@@ -299,6 +304,9 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand('lowcodeStudio.suggestSelectors', () =>
       suggestSelectorsCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.repairExpressions', () =>
+      repairExpressionsCommand()
     ),
     vscode.commands.registerCommand('lowcodeStudio.registerCustomActivity', () =>
       registerCustomActivityCommand()
@@ -2513,6 +2521,92 @@ async function explainWorkflowCommand(): Promise<void> {
       ? `Explain: ${report.critiqueCount} critique item(s) — see Output`
       : 'Explain: no local critique items — see Output'
   );
+}
+
+async function repairExpressionsCommand(): Promise<void> {
+  const doc = await getActiveWorkflowDocument();
+  if (!doc) {
+    return;
+  }
+  const proposals = proposeExpressionRepairs(doc);
+  const channel = getOutput();
+  channel.clear();
+  channel.appendLine(formatExpressionAssistReport(proposals));
+  channel.show(true);
+
+  if (!proposals.length) {
+    vscode.window.showInformationMessage(
+      'Assist F4: no VB expression typos / function wrappers found.'
+    );
+    return;
+  }
+
+  const pick = await vscode.window.showQuickPick(
+    [
+      {
+        label: `$(check) Apply all ${proposals.length} repair(s)`,
+        value: 'all' as const
+      },
+      {
+        label: '$(list-selection) Pick which to apply…',
+        value: 'pick' as const
+      },
+      {
+        label: '$(book) Report only (no changes)',
+        value: 'none' as const
+      }
+    ],
+    {
+      placeHolder: `Assist F4 — ${proposals.length} UiPath VB expression repair(s)`
+    }
+  );
+  if (!pick || pick.value === 'none') {
+    return;
+  }
+
+  let toApply = proposals;
+  if (pick.value === 'pick') {
+    const chosen = await vscode.window.showQuickPick(
+      proposals.map((p) => ({
+        label: `${p.displayName} · ${p.propertyLabel}`,
+        description: p.fixes.map((f) => f.label).join('; '),
+        detail: `${oneLineExpr(p.original)} → ${oneLineExpr(p.proposed)}`,
+        proposal: p
+      })),
+      { canPickMany: true, placeHolder: 'Select expression repairs to apply' }
+    );
+    if (!chosen?.length) {
+      return;
+    }
+    toApply = chosen.map((c) => c.proposal);
+  }
+
+  const next = applyExpressionRepairs(doc, toApply);
+  const applied = await editorProvider.applyWorkflowDocument(next);
+  if (!applied) {
+    const active = vscode.window.activeTextEditor?.document;
+    if (active?.fileName.endsWith('.lcs.json')) {
+      const edit = new vscode.WorkspaceEdit();
+      const full = new vscode.Range(
+        active.positionAt(0),
+        active.positionAt(active.getText().length)
+      );
+      edit.replace(active.uri, full, stringifyWorkflow(next));
+      await vscode.workspace.applyEdit(edit);
+    } else {
+      vscode.window.showWarningMessage(
+        'Open the workflow in the LowCode Studio designer to apply repairs.'
+      );
+      return;
+    }
+  }
+  vscode.window.showInformationMessage(
+    `Assist F4: applied ${toApply.length} VB expression repair(s). Spot-check in Studio Web.`
+  );
+}
+
+function oneLineExpr(s: string): string {
+  return String(s || '').replace(/\s+/g, ' ').trim().slice(0, 80);
 }
 
 async function suggestSelectorsCommand(): Promise<void> {

@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Mac-first low-code RPA for VS Code/Cursor: REFramework design, scenario dry-runs (Shift+F5), and the easiest Connect to Studio Web handoff for Orchestrator publish.",
-  "version": "0.6.30",
+  "version": "0.6.31",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -296,6 +296,13 @@
         "icon": "$(inspect)",
         "shortTitle": "Selectors",
         "category": "LowCode Studio"
+      },
+      {
+        "command": "lowcodeStudio.repairExpressions",
+        "title": "Repair VB expressions (Assist)",
+        "icon": "$(symbol-operator)",
+        "shortTitle": "VB repair",
+        "category": "LowCode Studio"
       }
     ],
     "menus": {
@@ -474,6 +481,11 @@
         },
         {
           "command": "lowcodeStudio.suggestSelectors",
+          "when": "resourceFilename =~ /\\.lcs\\.json$/",
+          "group": "navigation"
+        },
+        {
+          "command": "lowcodeStudio.repairExpressions",
           "when": "resourceFilename =~ /\\.lcs\\.json$/",
           "group": "navigation"
         },

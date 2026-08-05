@@ -9,6 +9,11 @@ import {
   proposeSelectorRepairs,
   suggestSelectorsFromHtml
 } from '../commands/assistSelectors';
+import {
+  applyExpressionRepairs,
+  proposeExpressionRepairs,
+  rewriteVbExpression
+} from '../commands/assistExpressions';
 import { ScenariosFile } from '../commands/refDryRun';
 import { WorkflowDocument } from '../models/workflow';
 
@@ -92,6 +97,51 @@ function run(): void {
   assert.ok(String(applied.activities.find((a) => a.id === 'a3')?.properties.selector || ''));
   // Unselected starter TypeInto unchanged
   assert.ok(/id='input'/.test(String(applied.activities.find((a) => a.id === 'a4')?.properties.selector)));
+
+  // F4 — VB expression repairs
+  const trimFix = rewriteVbExpression('TRim(customerName)');
+  assert.strictEqual(trimFix.next, 'customerName.Trim()');
+  assert.ok(trimFix.fixes.some((f) => f.ruleId === 'vb-trim'));
+
+  // Do not rewrite already-correct instance calls
+  const already = rewriteVbExpression('customerName.Trim()');
+  assert.strictEqual(already.changed, false);
+
+  const jsFix = rewriteVbExpression('name.toUpperCase() == null && active');
+  assert.ok(jsFix.next.includes('name.ToUpper()'));
+  assert.ok(jsFix.next.includes('Is Nothing'));
+  assert.ok(jsFix.next.includes('AndAlso'));
+
+  // Strings are left alone
+  const quoted = rewriteVbExpression('"use Trim(x) literally"');
+  assert.strictEqual(quoted.changed, false);
+
+  const exprDoc: WorkflowDocument = {
+    schemaVersion: '1.0',
+    name: 'Expr',
+    type: 'Sequence',
+    variables: [],
+    arguments: [],
+    activities: [
+      {
+        id: 'e1',
+        type: 'Programming.Assign',
+        displayName: 'Assign',
+        properties: { to: 'clean', value: 'TRim(raw)' }
+      },
+      {
+        id: 'e2',
+        type: 'ControlFlow.If',
+        displayName: 'If',
+        properties: { condition: 'status == null || flag' }
+      }
+    ]
+  };
+  const exprRepairs = proposeExpressionRepairs(exprDoc);
+  assert.ok(exprRepairs.some((p) => p.activityId === 'e1' && p.proposed === 'raw.Trim()'));
+  assert.ok(exprRepairs.some((p) => p.activityId === 'e2' && /Is Nothing/.test(p.proposed)));
+  const exprApplied = applyExpressionRepairs(exprDoc, exprRepairs);
+  assert.strictEqual(exprApplied.activities[0].properties.value, 'raw.Trim()');
 
   console.log('assist.test.ts OK');
 }

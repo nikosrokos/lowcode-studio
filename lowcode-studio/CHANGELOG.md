@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.31] — 2026-08-05
+
+### Added
+- **F4** Assist — **Repair VB expressions** for UiPath Visual Basic (e.g. `TRim(x)` → `x.Trim()`, JS-style `.toUpperCase()` / `== null` / `&&`, confirm before apply)
+- Assist help popup documents F4
+
 ## [0.6.30] — 2026-08-05
 
 ### Added
