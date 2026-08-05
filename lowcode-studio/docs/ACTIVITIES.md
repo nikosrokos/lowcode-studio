@@ -1,12 +1,12 @@
 # LowCode Studio — Activity coverage
 
-Generated for **v0.6.22** from the extension activity catalog.
+Generated for **v0.6.23** from the extension activity catalog.
 
 This list is what you can design in VS Code / Cursor, dry-run locally, and best-effort import/export with UiPath Studio / Studio Web.
 
 > Not every property of every UiPath activity is modeled. Selectors for UI activities round-trip via `selector` / `selectorModern` / `selectorXml`.
 
-**Total activities:** 59
+**Total activities:** 73
 
 ## By category
 
@@ -20,9 +20,12 @@ UiPath package (typical): `UiPath.System.Activities (WF)`
 | Do While | `ControlFlow.DoWhile` | Yes | condition |
 | For Each | `ControlFlow.ForEach` | Yes | item, values |
 | If | `ControlFlow.If` | Yes | condition |
+| Parallel | `ControlFlow.Parallel` | Yes | — |
+| Parallel For Each | `ControlFlow.ParallelForEach` | Yes | item, values |
 | Retry Scope | `ControlFlow.RetryScope` | Yes | numberOfRetries, retryIntervalMs |
 | Sequence | `ControlFlow.Sequence` | Yes | — |
 | Switch | `ControlFlow.Switch` | Yes | expression, cases |
+| Timeout Scope | `ControlFlow.TimeoutScope` | Yes | timeoutMs |
 | Try Catch | `ControlFlow.TryCatch` | Yes | exceptionType |
 | While | `ControlFlow.While` | Yes | condition |
 
@@ -36,10 +39,13 @@ UiPath package (typical): `UiPath.System.Activities`
 | Add Data Row | `Data.AddDataRow` | No | dataTable, arrayRow |
 | Build Data Table | `Data.BuildDataTable` | No | columns, result |
 | Clear Data Table | `Data.ClearDataTable` | No | dataTable |
-| Filter Data Table | `Data.FilterDataTable` | No | dataTable, columnName, value, result |
+| Filter Data Table | `Data.FilterDataTable` | No | dataTable, columnName, operator, value, result |
 | For Each Row | `Data.ForEachRow` | Yes | dataTable, row |
+| Join Data Tables | `Data.JoinDataTable` | No | dataTable1, dataTable2, joinType, column1, column2, result |
+| Lookup Data Table | `Data.LookupDataTable` | No | dataTable, lookupColumn, lookupValue, targetColumn, result |
 | Output Data Table | `Data.OutputDataTable` | No | dataTable, result |
 | Read CSV | `Data.ReadCsv` | No | path, result, hasHeaders |
+| Sort Data Table | `Data.SortDataTable` | No | dataTable, columnName, order, result |
 | Write CSV | `Data.WriteCsv` | No | path, data |
 
 ### Excel
@@ -48,6 +54,8 @@ UiPath package (typical): `UiPath.Excel.Activities`
 
 | Activity | Type id | Container | Key properties |
 |---|---|---|---|
+| Excel Append Range | `Excel.AppendRange` | No | workbookPath, sheetName, data |
+| Excel Application Scope | `Excel.ExcelApplicationScope` | Yes | workbookPath, createIfNotExists |
 | Excel Read Cell | `Excel.ReadCell` | No | workbookPath, sheetName, cell, result |
 | Excel Read Range | `Excel.ReadRange` | No | workbookPath, sheetName, range, result |
 | Excel Write Cell | `Excel.WriteCell` | No | workbookPath, sheetName, cell, value |
@@ -70,9 +78,22 @@ UiPath package (typical): `UiPath.Mail.Activities / UiPath.WebAPI.Activities`
 | Activity | Type id | Container | Key properties |
 |---|---|---|---|
 | Deserialize JSON | `Messaging.DeserializeJson` | No | jsonString, result |
-| HTTP Request | `Messaging.HttpRequest` | No | method, url, body, result |
+| Get Email | `Messaging.GetEmail` | No | mailFolder, top, filter, result |
+| HTTP Request | `Messaging.HttpRequest` | No | method, url, headers, authType, token, username… |
+| Select Token (JSON Path) | `Messaging.SelectToken` | No | json, path, result |
 | Send Email | `Messaging.SendEmail` | No | to, subject, body |
 | Serialize JSON | `Messaging.SerializeJson` | No | value, result |
+
+### Orchestrator
+
+UiPath package (typical): `—`
+
+| Activity | Type id | Container | Key properties |
+|---|---|---|---|
+| Add Queue Item | `Orchestrator.AddQueueItem` | No | queueName, folderPath, reference, itemInformation, priority |
+| Get Asset | `Orchestrator.GetAsset` | No | assetName, folderPath, result |
+| Get Transaction Item | `Orchestrator.GetTransactionItem` | No | queueName, folderPath, reference, result |
+| Set Asset | `Orchestrator.SetAsset` | No | assetName, value, folderPath |
 
 ### Programming
 
@@ -103,7 +124,7 @@ UiPath package (typical): `UiPath.System.Activities`
 | Activity | Type id | Container | Key properties |
 |---|---|---|---|
 | Invoke Workflow | `REFramework.InvokeWorkflow` | No | workflowPath, argumentMappings, description |
-| Set Transaction Status | `REFramework.SetTransactionStatus` | No | status, reason |
+| Set Transaction Status | `REFramework.SetTransactionStatus` | No | transactionItem, status, reason |
 
 ### System
 

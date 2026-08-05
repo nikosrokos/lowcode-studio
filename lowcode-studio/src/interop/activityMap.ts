@@ -268,6 +268,87 @@ const MAP: Array<{
     xamlNamespace: 'python'
   },
   {
+    lcsType: 'Data.JoinDataTable',
+    xamlLocalNames: ['JoinDataTables', 'JoinDataTable'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Data.LookupDataTable',
+    xamlLocalNames: ['LookupDataTable'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Data.SortDataTable',
+    xamlLocalNames: ['SortDataTable'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Excel.AppendRange',
+    xamlLocalNames: ['AppendRange', 'AppendRangeX', 'ExcelAppendRange'],
+    xamlNamespace: 'excel'
+  },
+  {
+    lcsType: 'Excel.ExcelApplicationScope',
+    xamlLocalNames: ['ExcelApplicationScope', 'ExcelProcessScope', 'UseExcelFile'],
+    xamlNamespace: 'excel'
+  },
+  {
+    lcsType: 'ControlFlow.Parallel',
+    xamlLocalNames: ['Parallel'],
+    xamlNamespace: 'default'
+  },
+  {
+    lcsType: 'ControlFlow.ParallelForEach',
+    xamlLocalNames: ['ParallelForEach'],
+    xamlNamespace: 'default'
+  },
+  {
+    lcsType: 'ControlFlow.TimeoutScope',
+    xamlLocalNames: ['TimeoutScope'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Messaging.GetEmail',
+    xamlLocalNames: [
+      'GetIMAPMailMessages',
+      'GetOutlookMailMessages',
+      'GetPOP3MailMessages',
+      'GetEmail',
+      'GetMail'
+    ],
+    xamlNamespace: 'mail'
+  },
+  {
+    lcsType: 'Messaging.SelectToken',
+    xamlLocalNames: ['SelectToken', 'DeserializeAndSelectToken'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Orchestrator.GetTransactionItem',
+    xamlLocalNames: ['GetQueueItem', 'GetTransactionItem'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Orchestrator.AddQueueItem',
+    xamlLocalNames: ['AddQueueItem'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Orchestrator.GetAsset',
+    xamlLocalNames: ['GetRobotAsset', 'GetAsset'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Orchestrator.SetAsset',
+    xamlLocalNames: ['SetAsset'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'REFramework.SetTransactionStatus',
+    xamlLocalNames: ['SetTransactionStatus'],
+    xamlNamespace: 'ui'
+  },
+  {
     lcsType: 'Flowchart.FlowDecision',
     xamlLocalNames: ['FlowDecision'],
     xamlNamespace: 'default'

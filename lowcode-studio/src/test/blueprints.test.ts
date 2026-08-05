@@ -28,10 +28,11 @@ function writeProject(
 }
 
 function run(): void {
-  assert.strictEqual(ROBOT_BLUEPRINTS.length, 3);
+  assert.strictEqual(ROBOT_BLUEPRINTS.length, 4);
   assert.ok(getBlueprint('web-scrape-excel'));
   assert.ok(getBlueprint('login-extract-email'));
   assert.ok(getBlueprint('api-datatable-process'));
+  assert.ok(getBlueprint('queue-orchestrator'));
 
   for (const bp of ROBOT_BLUEPRINTS) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), `lcs-bp-${bp.id}-`));

@@ -7,6 +7,7 @@ export type ActivityCategory =
   | 'Python'
   | 'Programming'
   | 'Messaging'
+  | 'Orchestrator'
   | 'Flowchart'
   | 'REFramework'
   | 'Custom';
@@ -441,6 +442,59 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         type: 'string',
         defaultValue: 'Success,Failed,Default',
         description: 'Comma-separated case labels (Default is the fallback)'
+      }
+    ]
+  },
+  {
+    type: 'ControlFlow.Parallel',
+    displayName: 'Parallel',
+    category: 'Control Flow',
+    description: 'Runs child branches conceptually in parallel (dry-run runs them sequentially with a warning).',
+    icon: '$(split-horizontal)',
+    color: '#F59E0B',
+    container: true,
+    properties: []
+  },
+  {
+    type: 'ControlFlow.ParallelForEach',
+    displayName: 'Parallel For Each',
+    category: 'Control Flow',
+    description: 'Iterates a collection in parallel conceptually (dry-run is sequential with a warning).',
+    icon: '$(list-tree)',
+    color: '#F59E0B',
+    container: true,
+    properties: [
+      {
+        name: 'item',
+        label: 'Item',
+        type: 'expression',
+        defaultValue: 'item',
+        required: true
+      },
+      {
+        name: 'values',
+        label: 'Values',
+        type: 'expression',
+        defaultValue: 'collection',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'ControlFlow.TimeoutScope',
+    displayName: 'Timeout Scope',
+    category: 'Control Flow',
+    description: 'Runs children with a timeout budget (dry-run logs timeout; does not cancel mid-activity).',
+    icon: '$(watch)',
+    color: '#EF4444',
+    container: true,
+    properties: [
+      {
+        name: 'timeoutMs',
+        label: 'Timeout (ms)',
+        type: 'number',
+        defaultValue: 30000,
+        required: true
       }
     ]
   },
@@ -1091,8 +1145,15 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         required: true
       },
       {
+        name: 'operator',
+        label: 'Operator',
+        type: 'enum',
+        options: ['=', '!=', 'Contains', 'StartsWith', '>', '<'],
+        defaultValue: '='
+      },
+      {
         name: 'value',
-        label: 'Equals Value',
+        label: 'Value',
         type: 'expression',
         defaultValue: '"Success"',
         required: true
@@ -1173,6 +1234,141 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     ]
   },
   {
+    type: 'Data.JoinDataTable',
+    displayName: 'Join Data Tables',
+    category: 'Data',
+    description: 'Joins two DataTables on a key column (inner join in dry-run).',
+    icon: '$(git-merge)',
+    color: '#06B6D4',
+    properties: [
+      {
+        name: 'dataTable1',
+        label: 'DataTable 1',
+        type: 'expression',
+        defaultValue: 'dtLeft',
+        required: true
+      },
+      {
+        name: 'dataTable2',
+        label: 'DataTable 2',
+        type: 'expression',
+        defaultValue: 'dtRight',
+        required: true
+      },
+      {
+        name: 'joinType',
+        label: 'Join Type',
+        type: 'enum',
+        options: ['Inner', 'Left', 'Full'],
+        defaultValue: 'Inner'
+      },
+      {
+        name: 'column1',
+        label: 'Column (Table 1)',
+        type: 'string',
+        defaultValue: 'Id',
+        required: true
+      },
+      {
+        name: 'column2',
+        label: 'Column (Table 2)',
+        type: 'string',
+        defaultValue: 'Id',
+        required: true
+      },
+      {
+        name: 'result',
+        label: 'Result',
+        type: 'expression',
+        defaultValue: 'joinedDt',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Data.LookupDataTable',
+    displayName: 'Lookup Data Table',
+    category: 'Data',
+    description: 'Looks up a value in a DataTable column and returns a cell from another column.',
+    icon: '$(search)',
+    color: '#06B6D4',
+    properties: [
+      {
+        name: 'dataTable',
+        label: 'DataTable',
+        type: 'expression',
+        defaultValue: 'dt',
+        required: true
+      },
+      {
+        name: 'lookupColumn',
+        label: 'Lookup Column',
+        type: 'string',
+        defaultValue: 'Id',
+        required: true
+      },
+      {
+        name: 'lookupValue',
+        label: 'Lookup Value',
+        type: 'expression',
+        defaultValue: '""',
+        required: true
+      },
+      {
+        name: 'targetColumn',
+        label: 'Target Column',
+        type: 'string',
+        defaultValue: 'Name',
+        required: true
+      },
+      {
+        name: 'result',
+        label: 'Result',
+        type: 'expression',
+        defaultValue: 'lookupResult',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Data.SortDataTable',
+    displayName: 'Sort Data Table',
+    category: 'Data',
+    description: 'Sorts a DataTable by a column.',
+    icon: '$(arrow-both)',
+    color: '#06B6D4',
+    properties: [
+      {
+        name: 'dataTable',
+        label: 'DataTable',
+        type: 'expression',
+        defaultValue: 'dt',
+        required: true
+      },
+      {
+        name: 'columnName',
+        label: 'Column',
+        type: 'string',
+        defaultValue: 'Id',
+        required: true
+      },
+      {
+        name: 'order',
+        label: 'Order',
+        type: 'enum',
+        options: ['Ascending', 'Descending'],
+        defaultValue: 'Ascending'
+      },
+      {
+        name: 'result',
+        label: 'Result',
+        type: 'expression',
+        defaultValue: 'sortedDt',
+        required: true
+      }
+    ]
+  },
+  {
     type: 'Excel.ReadRange',
     displayName: 'Excel Read Range',
     category: 'Excel',
@@ -1235,6 +1431,60 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         type: 'expression',
         defaultValue: 'dt',
         required: true
+      }
+    ]
+  },
+  {
+    type: 'Excel.AppendRange',
+    displayName: 'Excel Append Range',
+    category: 'Excel',
+    description: 'Appends a DataTable to the end of an Excel sheet.',
+    icon: '$(add)',
+    color: '#16A34A',
+    properties: [
+      {
+        name: 'workbookPath',
+        label: 'Workbook Path',
+        type: 'string',
+        defaultValue: 'Data/Output/out.xlsx',
+        required: true
+      },
+      {
+        name: 'sheetName',
+        label: 'Sheet Name',
+        type: 'string',
+        defaultValue: 'Sheet1'
+      },
+      {
+        name: 'data',
+        label: 'Data',
+        type: 'expression',
+        defaultValue: 'dt',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Excel.ExcelApplicationScope',
+    displayName: 'Excel Application Scope',
+    category: 'Excel',
+    description: 'Opens a workbook once and runs nested Excel activities (classic scope for Studio Web).',
+    icon: '$(file)',
+    color: '#16A34A',
+    container: true,
+    properties: [
+      {
+        name: 'workbookPath',
+        label: 'Workbook Path',
+        type: 'string',
+        defaultValue: 'Data/Input/data.xlsx',
+        required: true
+      },
+      {
+        name: 'createIfNotExists',
+        label: 'Create If Not Exists',
+        type: 'boolean',
+        defaultValue: true
       }
     ]
   },
@@ -1346,7 +1596,7 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     type: 'Messaging.HttpRequest',
     displayName: 'HTTP Request',
     category: 'Messaging',
-    description: 'Calls an HTTP endpoint and stores the response.',
+    description: 'Calls an HTTP endpoint with optional auth/headers; stores body and status.',
     icon: '$(globe)',
     color: '#EC4899',
     properties: [
@@ -1365,6 +1615,33 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         required: true
       },
       {
+        name: 'headers',
+        label: 'Headers',
+        type: 'multiline',
+        defaultValue: '',
+        description: 'One header per line: Name: Value'
+      },
+      {
+        name: 'authType',
+        label: 'Auth',
+        type: 'enum',
+        options: ['None', 'Bearer', 'Basic'],
+        defaultValue: 'None'
+      },
+      {
+        name: 'token',
+        label: 'Bearer Token / Password',
+        type: 'expression',
+        defaultValue: '""',
+        description: 'Bearer token, or Basic password (with Username).'
+      },
+      {
+        name: 'username',
+        label: 'Username (Basic)',
+        type: 'string',
+        defaultValue: ''
+      },
+      {
         name: 'body',
         label: 'Body',
         type: 'multiline',
@@ -1372,9 +1649,84 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
       },
       {
         name: 'result',
-        label: 'Result',
+        label: 'Result (body)',
         type: 'expression',
         defaultValue: 'response'
+      },
+      {
+        name: 'statusCode',
+        label: 'Status Code',
+        type: 'expression',
+        defaultValue: 'statusCode',
+        description: 'Variable to store HTTP status code from dry-run / robot.'
+      }
+    ]
+  },
+  {
+    type: 'Messaging.GetEmail',
+    displayName: 'Get Email',
+    category: 'Messaging',
+    description: 'Retrieves mail messages (IMAP/Outlook-style; simulated in dry-run).',
+    icon: '$(inbox)',
+    color: '#EC4899',
+    properties: [
+      {
+        name: 'mailFolder',
+        label: 'Mail Folder',
+        type: 'string',
+        defaultValue: 'Inbox'
+      },
+      {
+        name: 'top',
+        label: 'Top',
+        type: 'number',
+        defaultValue: 10
+      },
+      {
+        name: 'filter',
+        label: 'Filter',
+        type: 'string',
+        defaultValue: '',
+        description: 'Optional subject/from filter expression.'
+      },
+      {
+        name: 'result',
+        label: 'Result',
+        type: 'expression',
+        defaultValue: 'mails',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Messaging.SelectToken',
+    displayName: 'Select Token (JSON Path)',
+    category: 'Messaging',
+    description: 'Selects a value from JSON using a simple path (e.g. data.items[0].id).',
+    icon: '$(symbol-namespace)',
+    color: '#EC4899',
+    properties: [
+      {
+        name: 'json',
+        label: 'JSON / Object',
+        type: 'expression',
+        defaultValue: 'jsonObj',
+        required: true
+      },
+      {
+        name: 'path',
+        label: 'Path',
+        type: 'string',
+        defaultValue: 'data.id',
+        required: true,
+        description: 'Dot path with optional [index], e.g. items[0].name'
+      },
+      {
+        name: 'result',
+        label: 'Result',
+        type: 'expression',
+        defaultValue: 'tokenValue',
+        required: true
       }
     ]
   },
@@ -1659,13 +2011,159 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     ]
   },
   {
+    type: 'Orchestrator.GetTransactionItem',
+    displayName: 'Get Transaction Item',
+    category: 'Orchestrator',
+    description: 'Gets the next queue item (Get Queue Item). Dry-run uses scenario fixtures.',
+    icon: '$(inbox)',
+    color: '#8B5CF6',
+    properties: [
+      {
+        name: 'queueName',
+        label: 'Queue Name',
+        type: 'string',
+        defaultValue: 'MainQueue',
+        required: true
+      },
+      {
+        name: 'folderPath',
+        label: 'Folder Path',
+        type: 'string',
+        defaultValue: ''
+      },
+      {
+        name: 'reference',
+        label: 'Reference',
+        type: 'string',
+        defaultValue: ''
+      },
+      {
+        name: 'result',
+        label: 'Transaction Item',
+        type: 'expression',
+        defaultValue: 'TransactionItem',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Orchestrator.AddQueueItem',
+    displayName: 'Add Queue Item',
+    category: 'Orchestrator',
+    description: 'Adds an item to an Orchestrator queue.',
+    icon: '$(add)',
+    color: '#8B5CF6',
+    properties: [
+      {
+        name: 'queueName',
+        label: 'Queue Name',
+        type: 'string',
+        defaultValue: 'MainQueue',
+        required: true
+      },
+      {
+        name: 'folderPath',
+        label: 'Folder Path',
+        type: 'string',
+        defaultValue: ''
+      },
+      {
+        name: 'reference',
+        label: 'Reference',
+        type: 'expression',
+        defaultValue: '""'
+      },
+      {
+        name: 'itemInformation',
+        label: 'Item Information (JSON)',
+        type: 'multiline',
+        defaultValue: '{\n  "Name": "Sample"\n}',
+        description: 'Specific content as JSON object / expression.'
+      },
+      {
+        name: 'priority',
+        label: 'Priority',
+        type: 'enum',
+        options: ['Low', 'Normal', 'High'],
+        defaultValue: 'Normal'
+      }
+    ]
+  },
+  {
+    type: 'Orchestrator.GetAsset',
+    displayName: 'Get Asset',
+    category: 'Orchestrator',
+    description: 'Reads an Orchestrator asset value (dry-run uses Config Assets / fixtures).',
+    icon: '$(key)',
+    color: '#8B5CF6',
+    properties: [
+      {
+        name: 'assetName',
+        label: 'Asset Name',
+        type: 'string',
+        defaultValue: 'AssetName',
+        required: true
+      },
+      {
+        name: 'folderPath',
+        label: 'Folder Path',
+        type: 'string',
+        defaultValue: ''
+      },
+      {
+        name: 'result',
+        label: 'Result',
+        type: 'expression',
+        defaultValue: 'assetValue',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Orchestrator.SetAsset',
+    displayName: 'Set Asset',
+    category: 'Orchestrator',
+    description: 'Updates an Orchestrator asset value (simulated in dry-run).',
+    icon: '$(key)',
+    color: '#8B5CF6',
+    properties: [
+      {
+        name: 'assetName',
+        label: 'Asset Name',
+        type: 'string',
+        defaultValue: 'AssetName',
+        required: true
+      },
+      {
+        name: 'value',
+        label: 'Value',
+        type: 'expression',
+        defaultValue: '""',
+        required: true
+      },
+      {
+        name: 'folderPath',
+        label: 'Folder Path',
+        type: 'string',
+        defaultValue: ''
+      }
+    ]
+  },
+  {
     type: 'REFramework.SetTransactionStatus',
     displayName: 'Set Transaction Status',
     category: 'REFramework',
-    description: 'Marks the current transaction Success / Business / System exception.',
+    description: 'Marks the current Orchestrator transaction Success / Business / System exception.',
     icon: '$(checklist)',
     color: '#0EA5E9',
     properties: [
+      {
+        name: 'transactionItem',
+        label: 'Transaction Item',
+        type: 'expression',
+        defaultValue: 'TransactionItem',
+        required: true
+      },
       {
         name: 'status',
         label: 'Status',

@@ -34,6 +34,12 @@ export interface DryRunFixtures {
   tables?: Record<string, { columns: string[]; rows: unknown[][] }>;
   /** HTTP response fixtures by activity id, result var, or URL fragment */
   http?: Record<string, { status?: number; body?: unknown }>;
+  /** Queue items for Get Transaction Item by queue name (consumed in order) */
+  queueItems?: Record<string, unknown[]>;
+  /** Orchestrator asset values by asset name */
+  assets?: Record<string, unknown>;
+  /** Mail messages for Get Email by folder */
+  mails?: Record<string, unknown[]>;
 }
 
 export interface DryRunResult {
@@ -328,13 +334,41 @@ function runChildren(
   } else if (activity.type === 'ControlFlow.Switch') {
     const expr = String(activity.properties?.expression ?? 'status');
     const value = resolveExpression(expr, variables);
-    log.push(`${indent}Switch (${expr}) => ${JSON.stringify(value)} (running Default body)`);
+    const cases = String(activity.properties?.cases || 'Default')
+      .split(',')
+      .map((c) => c.trim())
+      .filter(Boolean);
+    const matched = cases.find((c) => c.toLowerCase() !== 'default' && String(value) === c);
+    log.push(
+      `${indent}Switch (${expr}) => ${JSON.stringify(value)}` +
+        (matched ? ` matched case ${matched}` : ' → Default body')
+    );
     runList(activity.children, depth + 1);
   } else if (activity.type === 'ControlFlow.While' || activity.type === 'ControlFlow.DoWhile') {
     log.push(`${indent}${activity.type === 'ControlFlow.DoWhile' ? 'DoWhile' : 'While'} simulated for 1 iteration`);
     runList(activity.children, depth + 1);
   } else if (activity.type === 'ControlFlow.RetryScope') {
     log.push(`${indent}RetryScope (1 attempt in dry-run)`);
+    runList(activity.children, depth + 1);
+  } else if (activity.type === 'ControlFlow.Parallel') {
+    warnings.push('Parallel runs sequentially in dry-run (not concurrent).');
+    log.push(`${indent}Parallel (sequential dry-run)`);
+    runList(activity.children, depth + 1);
+  } else if (activity.type === 'ControlFlow.ParallelForEach') {
+    warnings.push('Parallel For Each runs sequentially in dry-run (not concurrent).');
+    const valuesExpr = String(activity.properties?.values ?? '[]');
+    const values = asArray(resolveExpression(valuesExpr, variables));
+    const itemName = String(activity.properties?.item ?? 'item');
+    log.push(`${indent}Parallel For Each ${itemName} in ${valuesExpr} (${values.length} items, sequential)`);
+    for (const item of values.slice(0, 5)) {
+      variables[itemName] = item;
+      runList(activity.children, depth + 1);
+    }
+  } else if (activity.type === 'ControlFlow.TimeoutScope') {
+    log.push(`${indent}TimeoutScope ${activity.properties?.timeoutMs || 30000}ms (not enforced in dry-run)`);
+    runList(activity.children, depth + 1);
+  } else if (activity.type === 'Excel.ExcelApplicationScope') {
+    log.push(`${indent}ExcelApplicationScope ${activity.properties?.workbookPath}`);
     runList(activity.children, depth + 1);
   } else if (activity.type === 'Python.PythonScope') {
     log.push(`${indent}PythonScope body`);
@@ -670,6 +704,12 @@ function executeStub(
     case 'Excel.WriteRange':
       log.push(`${indent}Excel.WriteRange ${activity.properties.workbookPath}`);
       break;
+    case 'Excel.AppendRange':
+      log.push(`${indent}Excel.AppendRange ${activity.properties.workbookPath}`);
+      break;
+    case 'Excel.ExcelApplicationScope':
+      log.push(`${indent}ExcelApplicationScope ${activity.properties.workbookPath}`);
+      break;
     case 'Excel.ReadCell': {
       const result = String(activity.properties.result || 'cellValue');
       variables[result] = 'cell';
@@ -800,6 +840,7 @@ function executeStub(
       const tableName = String(activity.properties.dataTable || 'dt');
       const resultName = String(activity.properties.result || 'filteredDt');
       const col = String(activity.properties.columnName || '');
+      const op = String(activity.properties.operator || '=');
       const expected = resolveExpression(String(activity.properties.value ?? ''), variables);
       const table = (variables[tableName] || { columns: [], rows: [] }) as {
         columns: string[];
@@ -809,11 +850,72 @@ function executeStub(
       const rows =
         colIndex < 0
           ? table.rows || []
-          : (table.rows || []).filter((r) => String(r[colIndex]) === String(expected));
+          : (table.rows || []).filter((r) => matchFilterOp(r[colIndex], op, expected));
       variables[resultName] = { columns: table.columns || [], rows };
       log.push(
-        `${indent}FilterDataTable ${tableName} where ${col}==${JSON.stringify(expected)} -> ${resultName} (${rows.length} rows)`
+        `${indent}FilterDataTable ${tableName} where ${col} ${op} ${JSON.stringify(expected)} -> ${resultName} (${rows.length} rows)`
       );
+      break;
+    }
+    case 'Data.JoinDataTable': {
+      const leftName = String(activity.properties.dataTable1 || 'dtLeft');
+      const rightName = String(activity.properties.dataTable2 || 'dtRight');
+      const resultName = String(activity.properties.result || 'joinedDt');
+      const left = (variables[leftName] || { columns: [], rows: [] }) as DataTableLike;
+      const right = (variables[rightName] || { columns: [], rows: [] }) as DataTableLike;
+      const c1 = String(activity.properties.column1 || 'Id');
+      const c2 = String(activity.properties.column2 || 'Id');
+      const i1 = (left.columns || []).indexOf(c1);
+      const i2 = (right.columns || []).indexOf(c2);
+      const columns = [...(left.columns || []), ...(right.columns || []).map((c) => (left.columns || []).includes(c) ? c + '_2' : c)];
+      const rows: unknown[][] = [];
+      for (const lr of left.rows || []) {
+        for (const rr of right.rows || []) {
+          if (i1 >= 0 && i2 >= 0 && String(lr[i1]) === String(rr[i2])) {
+            rows.push([...(lr as unknown[]), ...(rr as unknown[])]);
+          }
+        }
+      }
+      variables[resultName] = { columns, rows };
+      log.push(`${indent}JoinDataTable ${leftName} ⨝ ${rightName} -> ${resultName} (${rows.length} rows)`);
+      break;
+    }
+    case 'Data.LookupDataTable': {
+      const tableName = String(activity.properties.dataTable || 'dt');
+      const resultName = String(activity.properties.result || 'lookupResult');
+      const table = (variables[tableName] || { columns: [], rows: [] }) as DataTableLike;
+      const lookupCol = String(activity.properties.lookupColumn || 'Id');
+      const targetCol = String(activity.properties.targetColumn || 'Name');
+      const lookupVal = resolveExpression(String(activity.properties.lookupValue ?? ''), variables);
+      const li = (table.columns || []).indexOf(lookupCol);
+      const ti = (table.columns || []).indexOf(targetCol);
+      let found: unknown = null;
+      if (li >= 0 && ti >= 0) {
+        const hit = (table.rows || []).find((r) => String(r[li]) === String(lookupVal));
+        if (hit) found = hit[ti];
+      }
+      variables[resultName] = found;
+      log.push(`${indent}LookupDataTable ${tableName} ${lookupCol}=${JSON.stringify(lookupVal)} -> ${resultName}=${JSON.stringify(found)}`);
+      break;
+    }
+    case 'Data.SortDataTable': {
+      const tableName = String(activity.properties.dataTable || 'dt');
+      const resultName = String(activity.properties.result || 'sortedDt');
+      const table = (variables[tableName] || { columns: [], rows: [] }) as DataTableLike;
+      const col = String(activity.properties.columnName || 'Id');
+      const desc = String(activity.properties.order || 'Ascending') === 'Descending';
+      const ci = (table.columns || []).indexOf(col);
+      const rows = [...(table.rows || [])];
+      if (ci >= 0) {
+        rows.sort((a, b) => {
+          const av = a[ci];
+          const bv = b[ci];
+          const cmp = String(av).localeCompare(String(bv), undefined, { numeric: true });
+          return desc ? -cmp : cmp;
+        });
+      }
+      variables[resultName] = { columns: table.columns || [], rows };
+      log.push(`${indent}SortDataTable ${tableName} by ${col} -> ${resultName}`);
       break;
     }
     case 'Data.ClearDataTable': {
@@ -983,14 +1085,84 @@ function executeStub(
       break;
     case 'Messaging.HttpRequest': {
       const result = String(activity.properties.result || 'response');
+      const statusVar = String(activity.properties.statusCode || '').trim();
       const urlRaw = String(activity.properties.url || '');
       const urlResolved = resolveExpression(urlRaw, variables);
       const url = String(urlResolved ?? urlRaw);
       const fromFixture = lookupFixtureHttp(fixtures.http, activity, result, url);
-      variables[result] = fromFixture || { status: 200, body: { ok: true } };
+      const payload = fromFixture || { status: 200, body: { ok: true } };
+      variables[result] = payload;
+      if (statusVar) {
+        variables[statusVar] = payload.status ?? 200;
+      }
+      const auth = String(activity.properties.authType || 'None');
       log.push(
-        `${indent}HTTP ${activity.properties.method} ${url} -> ${result}${fromFixture ? ' (fixture)' : ''}`
+        `${indent}HTTP ${activity.properties.method} ${url} auth=${auth} -> ${result} status=${payload.status ?? 200}${fromFixture ? ' (fixture)' : ''}`
       );
+      break;
+    }
+    case 'Messaging.GetEmail': {
+      const result = String(activity.properties.result || 'mails');
+      const folder = String(activity.properties.mailFolder || 'Inbox');
+      const top = Number(activity.properties.top ?? 10);
+      const fromFixture = fixtures.mails?.[folder] || fixtures.mails?.[result];
+      const mails = (fromFixture || [
+        { subject: 'Sample mail', from: 'bot@example.com', body: 'Hello from dry-run' }
+      ]).slice(0, top);
+      variables[result] = mails;
+      log.push(`${indent}GetEmail ${folder} top=${top} -> ${result} (${mails.length})${fromFixture ? ' (fixture)' : ''}`);
+      break;
+    }
+    case 'Messaging.SelectToken': {
+      const result = String(activity.properties.result || 'tokenValue');
+      const json = resolveExpression(String(activity.properties.json || 'jsonObj'), variables);
+      const pathExpr = String(activity.properties.path || '');
+      variables[result] = selectJsonPath(json, pathExpr);
+      log.push(`${indent}SelectToken ${pathExpr} -> ${result}=${JSON.stringify(variables[result])}`);
+      break;
+    }
+    case 'Orchestrator.GetTransactionItem': {
+      const result = String(activity.properties.result || 'TransactionItem');
+      const queue = String(activity.properties.queueName || 'MainQueue');
+      const list = fixtures.queueItems?.[queue];
+      if (list && list.length) {
+        variables[result] = list.shift();
+        log.push(`${indent}GetTransactionItem ${queue} -> ${result} (fixture)`);
+      } else {
+        const n = Number(variables.TransactionNumber ?? 1);
+        const max = Number(variables.MaxTransactions ?? 3);
+        if (n > max) {
+          variables[result] = null;
+          log.push(`${indent}GetTransactionItem ${queue} -> null (no more)`);
+        } else {
+          variables[result] = { Reference: `REF-${n}`, SpecificContent: { Id: n } };
+          log.push(`${indent}GetTransactionItem ${queue} -> ${result} id=${n}`);
+        }
+      }
+      break;
+    }
+    case 'Orchestrator.AddQueueItem': {
+      const queue = String(activity.properties.queueName || 'MainQueue');
+      log.push(`${indent}AddQueueItem ${queue} ref=${activity.properties.reference}`);
+      break;
+    }
+    case 'Orchestrator.GetAsset': {
+      const result = String(activity.properties.result || 'assetValue');
+      const name = String(activity.properties.assetName || 'AssetName');
+      const fromFixture = fixtures.assets?.[name];
+      variables[result] =
+        fromFixture !== undefined
+          ? fromFixture
+          : variables[`Asset_${name}`] ?? variables[name] ?? `asset:${name}`;
+      log.push(`${indent}GetAsset ${name} -> ${result}${fromFixture !== undefined ? ' (fixture)' : ''}`);
+      break;
+    }
+    case 'Orchestrator.SetAsset': {
+      const name = String(activity.properties.assetName || 'AssetName');
+      const value = resolveExpression(String(activity.properties.value ?? ''), variables);
+      if (fixtures.assets) fixtures.assets[name] = value;
+      variables[`Asset_${name}`] = value;
+      log.push(`${indent}SetAsset ${name}=${JSON.stringify(value)}`);
       break;
     }
     case 'Flowchart.Start':
@@ -1036,7 +1208,9 @@ function executeStub(
     }
     case 'REFramework.SetTransactionStatus':
       variables.TransactionResult = activity.properties.status;
-      log.push(`${indent}SetTransactionStatus ${activity.properties.status}`);
+      log.push(
+        `${indent}SetTransactionStatus ${activity.properties.status} item=${activity.properties.transactionItem || 'TransactionItem'}`
+      );
       break;
     default: {
       const def = getActivityDefinition(activity.type) as CustomActivityDefinition | undefined;
@@ -1172,8 +1346,48 @@ function hasFixtures(fixtures: DryRunFixtures): boolean {
     (fixtures.uiText && Object.keys(fixtures.uiText).length) ||
       (fixtures.elementExists && Object.keys(fixtures.elementExists).length) ||
       (fixtures.tables && Object.keys(fixtures.tables).length) ||
-      (fixtures.http && Object.keys(fixtures.http).length)
+      (fixtures.http && Object.keys(fixtures.http).length) ||
+      (fixtures.queueItems && Object.keys(fixtures.queueItems).length) ||
+      (fixtures.assets && Object.keys(fixtures.assets).length) ||
+      (fixtures.mails && Object.keys(fixtures.mails).length)
   );
+}
+
+function matchFilterOp(cell: unknown, op: string, expected: unknown): boolean {
+  const left = String(cell ?? '');
+  const right = String(expected ?? '');
+  switch (op) {
+    case '!=':
+      return left !== right;
+    case 'Contains':
+      return left.includes(right);
+    case 'StartsWith':
+      return left.startsWith(right);
+    case '>':
+      return Number(cell) > Number(expected);
+    case '<':
+      return Number(cell) < Number(expected);
+    case '=':
+    default:
+      return left === right;
+  }
+}
+
+function selectJsonPath(root: unknown, pathExpr: string): unknown {
+  if (!pathExpr.trim()) return root;
+  let cur: unknown = root;
+  const parts = pathExpr.replace(/\[(\d+)\]/g, '.$1').split('.').filter(Boolean);
+  for (const p of parts) {
+    if (cur == null) return null;
+    if (Array.isArray(cur) && /^\d+$/.test(p)) {
+      cur = cur[Number(p)];
+    } else if (typeof cur === 'object') {
+      cur = (cur as Record<string, unknown>)[p];
+    } else {
+      return null;
+    }
+  }
+  return cur;
 }
 
 function cloneVars(variables: Record<string, unknown>): Record<string, unknown> {
