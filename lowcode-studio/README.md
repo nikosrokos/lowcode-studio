@@ -44,9 +44,15 @@ Design on Mac (REFramework)
 
 ## What’s in 0.6.21
 
+- Dock chrome polish: **Save** top-right only; clearer bottom-dock tooltips
+- Side panels: no red close — show/hide via bottom dock; float/dock traffic lights kept
+- Expand/collapse actions use **▾▾ / ▸▸** symbols
+
+### Also in 0.6.20
+
 - **Maestro-inspired canvas chrome**
   - Framed, resizable left Toolbox and right Properties panels
-  - macOS traffic lights: collapse · float · dock
+  - macOS traffic lights: float · dock
   - Floating frames with drag + height resize; docked frames with width resize
   - Bottom-center dock (zoom, insert, validate, dry-run, step, panel toggles)
   - Slim top bar (brand · workflow · mode · Save)
