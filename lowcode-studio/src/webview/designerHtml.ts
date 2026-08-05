@@ -5,6 +5,24 @@ import { ActivityPaletteState } from '../interop/activityPalette';
 import { PropertySuggestions } from '../interop/propertySuggestions';
 import { DesignerProjectEntry } from '../interop/projectResolve';
 
+export type DesignerSettings = {
+  showLineNumbers: boolean;
+  defaultWorkflowType: 'Sequence' | 'Flowchart';
+  autoOpenDesigner: boolean;
+  syncStudioWebOnSave: boolean;
+  uipathTargetFramework: 'Windows' | 'Portable';
+  canvasStyle: 'plain' | 'dots';
+};
+
+const DEFAULT_DESIGNER_SETTINGS: DesignerSettings = {
+  showLineNumbers: true,
+  defaultWorkflowType: 'Sequence',
+  autoOpenDesigner: true,
+  syncStudioWebOnSave: true,
+  uipathTargetFramework: 'Windows',
+  canvasStyle: 'plain'
+};
+
 export function getDesignerHtml(
   nonce: string,
   cspSource: string,
@@ -17,7 +35,8 @@ export function getDesignerHtml(
     workflowPaths: []
   },
   palette: ActivityPaletteState = { favorites: [], recent: [] },
-  projects: DesignerProjectEntry[] = []
+  projects: DesignerProjectEntry[] = [],
+  settings: DesignerSettings = DEFAULT_DESIGNER_SETTINGS
 ): string {
   const workflowJson = JSON.stringify(workflow).replace(/</g, '\\u003c');
   const catalogJson = JSON.stringify(catalog).replace(/</g, '\\u003c');
@@ -25,6 +44,7 @@ export function getDesignerHtml(
   const suggestionsJson = JSON.stringify(suggestions).replace(/</g, '\\u003c');
   const paletteJson = JSON.stringify(palette).replace(/</g, '\\u003c');
   const projectsJson = JSON.stringify(projects).replace(/</g, '\\u003c');
+  const settingsJson = JSON.stringify(settings).replace(/</g, '\\u003c');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -353,6 +373,54 @@ export function getDesignerHtml(
       background: rgba(0,0,0,.45); backdrop-filter: blur(4px);
     }
     .expr-overlay.show { display: flex; }
+    .settings-overlay {
+      position: fixed; inset: 0; z-index: 55; display: none;
+      align-items: center; justify-content: center;
+      background: rgba(0,0,0,.45); backdrop-filter: blur(4px);
+    }
+    .settings-overlay.show { display: flex; }
+    .settings-dialog {
+      width: min(440px, 92vw); max-height: 84vh;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 14px; box-shadow: var(--shadow-frame);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .settings-dialog-head {
+      display: flex; align-items: center; gap: 8px; padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .settings-dialog-head .title { flex: 1; font-weight: 700; font-size: 13px; }
+    .settings-dialog-body {
+      overflow: auto; padding: 12px 14px 16px;
+    }
+    .settings-section { margin-bottom: 16px; }
+    .settings-section h3 {
+      margin: 0 0 8px; font-size: 11px; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--muted); font-weight: 700;
+    }
+    .settings-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+    }
+    .settings-row:last-child { border-bottom: none; }
+    .settings-row .label { flex: 1; min-width: 0; }
+    .settings-row .label .name { display: block; font-size: 12px; font-weight: 600; }
+    .settings-row .label .hint { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
+    .settings-row select {
+      background: var(--input-bg); color: var(--text);
+      border: 1px solid var(--input-border); border-radius: 8px;
+      padding: 6px 8px; font-size: 12px; min-width: 130px;
+    }
+    .settings-dialog-foot {
+      display: flex; gap: 8px; justify-content: flex-end; padding: 10px 14px;
+      border-top: 1px solid var(--border);
+    }
+    .app.hide-steps .step { display: none; }
+    .sequence.canvas-dots, .flow-stage.canvas-dots {
+      background-color: var(--board);
+      background-image: radial-gradient(circle, color-mix(in srgb, var(--muted) 40%, transparent) 1px, transparent 1px);
+      background-size: 14px 14px;
+    }
     .expr-dialog {
       width: min(640px, 92vw); max-height: 80vh;
       background: var(--panel); border: 1px solid var(--border);
@@ -843,6 +911,7 @@ export function getDesignerHtml(
       <div class="spacer"></div>
       <button class="btn" id="btnLink" title="Connect two flowchart nodes" style="display:none">Link</button>
       <button class="btn" id="btnAutoLayout" style="display:none" title="Tidy flowchart layout">Tidy</button>
+      <button class="btn symbol" id="btnSettings" type="button" title="Settings">⚙</button>
       <button class="btn primary" id="btnSave">Save</button>
     </div>
 
@@ -990,6 +1059,78 @@ export function getDesignerHtml(
       </div>
     </div>
 
+    <div class="settings-overlay" id="settingsOverlay">
+      <div class="settings-dialog" role="dialog" aria-label="Settings">
+        <div class="settings-dialog-head">
+          <div class="title">Settings</div>
+          <button class="btn" type="button" id="settingsDialogCancel">Close</button>
+        </div>
+        <div class="settings-dialog-body">
+          <div class="settings-section">
+            <h3>Canvas</h3>
+            <div class="settings-row">
+              <div class="label">
+                <span class="name">Step numbers</span>
+                <span class="hint">Show #1, #2… on sequence cards</span>
+              </div>
+              <input type="checkbox" id="set_showLineNumbers" />
+            </div>
+            <div class="settings-row">
+              <div class="label">
+                <span class="name">Canvas background</span>
+                <span class="hint">Plain board or subtle dot grid</span>
+              </div>
+              <select id="set_canvasStyle">
+                <option value="plain">Plain</option>
+                <option value="dots">Dots</option>
+              </select>
+            </div>
+          </div>
+          <div class="settings-section">
+            <h3>Defaults</h3>
+            <div class="settings-row">
+              <div class="label">
+                <span class="name">New workflow type</span>
+                <span class="hint">Used when creating a workflow</span>
+              </div>
+              <select id="set_defaultWorkflowType">
+                <option value="Sequence">Sequence</option>
+                <option value="Flowchart">Flowchart</option>
+              </select>
+            </div>
+            <div class="settings-row">
+              <div class="label">
+                <span class="name">Auto-open designer</span>
+                <span class="hint">Open the visual designer for new workflows</span>
+              </div>
+              <input type="checkbox" id="set_autoOpenDesigner" />
+            </div>
+            <div class="settings-row">
+              <div class="label">
+                <span class="name">Sync Studio Web on Save</span>
+                <span class="hint">Write .xaml into a linked Local Workspace</span>
+              </div>
+              <input type="checkbox" id="set_syncStudioWebOnSave" />
+            </div>
+            <div class="settings-row">
+              <div class="label">
+                <span class="name">UiPath target framework</span>
+                <span class="hint">Windows robots vs Portable (cross-platform)</span>
+              </div>
+              <select id="set_uipathTargetFramework">
+                <option value="Windows">Windows</option>
+                <option value="Portable">Portable</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="settings-dialog-foot">
+          <button class="btn" type="button" id="settingsDialogDismiss">Cancel</button>
+          <button class="btn primary" type="button" id="settingsDialogApply">Save</button>
+        </div>
+      </div>
+    </div>
+
     <div class="palette-overlay" id="paletteOverlay">
       <div class="palette" role="dialog" aria-label="Insert activity">
         <div class="palette-head">
@@ -1064,6 +1205,8 @@ export function getDesignerHtml(
       suggestions: ${suggestionsJson},
       palette: ${paletteJson},
       projects: ${projectsJson},
+      settings: ${settingsJson},
+      settingsOpen: false,
       collapsedLeftSections: { project: true, activities: false, variables: true, arguments: true, watch: true, fixtures: true },
       selectedId: null,
       dragType: null,
@@ -1127,10 +1270,56 @@ export function getDesignerHtml(
       exprOverlay: document.getElementById('exprOverlay'),
       exprDialogTitle: document.getElementById('exprDialogTitle'),
       exprDialogValue: document.getElementById('exprDialogValue'),
+      settingsOverlay: document.getElementById('settingsOverlay'),
       watchView: document.getElementById('watchView'),
       watchCount: document.getElementById('watchCount'),
       fixturesEditor: document.getElementById('fixturesEditor')
     };
+
+    function applyDesignerSettings() {
+      const s = state.settings || {};
+      els.app?.classList.toggle('hide-steps', s.showLineNumbers === false);
+      const dots = s.canvasStyle === 'dots';
+      els.sequence?.classList.toggle('canvas-dots', dots);
+      els.flowStage?.classList.toggle('canvas-dots', dots);
+    }
+    function fillSettingsForm() {
+      const s = state.settings || {};
+      const setChk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+      const setSel = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+      setChk('set_showLineNumbers', s.showLineNumbers !== false);
+      setSel('set_canvasStyle', s.canvasStyle === 'dots' ? 'dots' : 'plain');
+      setSel('set_defaultWorkflowType', s.defaultWorkflowType === 'Flowchart' ? 'Flowchart' : 'Sequence');
+      setChk('set_autoOpenDesigner', s.autoOpenDesigner !== false);
+      setChk('set_syncStudioWebOnSave', s.syncStudioWebOnSave !== false);
+      setSel('set_uipathTargetFramework', s.uipathTargetFramework === 'Portable' ? 'Portable' : 'Windows');
+    }
+    function openSettings() {
+      state.settingsOpen = true;
+      fillSettingsForm();
+      els.settingsOverlay?.classList.add('show');
+    }
+    function closeSettings() {
+      state.settingsOpen = false;
+      els.settingsOverlay?.classList.remove('show');
+    }
+    function saveSettingsFromForm() {
+      const chk = (id) => !!document.getElementById(id)?.checked;
+      const sel = (id) => document.getElementById(id)?.value;
+      const next = {
+        showLineNumbers: chk('set_showLineNumbers'),
+        canvasStyle: sel('set_canvasStyle') === 'dots' ? 'dots' : 'plain',
+        defaultWorkflowType: sel('set_defaultWorkflowType') === 'Flowchart' ? 'Flowchart' : 'Sequence',
+        autoOpenDesigner: chk('set_autoOpenDesigner'),
+        syncStudioWebOnSave: chk('set_syncStudioWebOnSave'),
+        uipathTargetFramework: sel('set_uipathTargetFramework') === 'Portable' ? 'Portable' : 'Windows'
+      };
+      state.settings = Object.assign({}, state.settings, next);
+      applyDesignerSettings();
+      vscode.postMessage({ type: 'updateSettings', settings: next });
+      closeSettings();
+    }
+    applyDesignerSettings();
 
     function applyLeftSections() {
       document.querySelectorAll('.left-section').forEach((sec) => {
@@ -2295,7 +2484,7 @@ export function getDesignerHtml(
       const node = hit.node;
       const def = findDef(node.type);
       const currentColor = node.color || def?.color || '#64748B';
-      const presets = ['#3B82F6','#8B5CF6','#F59E0B','#10B981','#EF4444','#0EA5E9','#EC4899','#64748B','#22C55E','#A855F7'];
+      const presets = ['#3B82F6','#8B5CF6','#F59E0B','#10B981','#EF4444','#64748B'];
 
       let general = fieldHtml('Display Name', '<input id="prop_displayName" value="' + escapeAttr(node.displayName) + '" />');
       general += fieldHtml('Type', '<input value="' + escapeAttr(node.type) + '" disabled />');
@@ -3112,12 +3301,24 @@ export function getDesignerHtml(
       }
     });
     document.getElementById('exprDialogApply')?.addEventListener('click', () => applyExprEditor());
+    document.getElementById('btnSettings')?.addEventListener('click', () => openSettings());
+    document.getElementById('settingsDialogCancel')?.addEventListener('click', () => closeSettings());
+    document.getElementById('settingsDialogDismiss')?.addEventListener('click', () => closeSettings());
+    document.getElementById('settingsDialogApply')?.addEventListener('click', () => saveSettingsFromForm());
+    els.settingsOverlay?.addEventListener('click', (e) => {
+      if (e.target === els.settingsOverlay) closeSettings();
+    });
     document.getElementById('exprDialogCancel')?.addEventListener('click', () => closeExprEditor());
     document.getElementById('exprDialogDismiss')?.addEventListener('click', () => closeExprEditor());
     els.exprOverlay?.addEventListener('click', (e) => {
       if (e.target === els.exprOverlay) closeExprEditor();
     });
     document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && state.settingsOpen) {
+        e.preventDefault();
+        closeSettings();
+        return;
+      }
       if (e.key === 'Escape' && state.exprEdit) {
         e.preventDefault();
         closeExprEditor();
@@ -3184,6 +3385,11 @@ export function getDesignerHtml(
       if (msg.type === 'projectTree' && Array.isArray(msg.projects)) {
         state.projects = msg.projects;
         renderProjectTree();
+      }
+      if (msg.type === 'settings' && msg.settings) {
+        state.settings = Object.assign({}, state.settings, msg.settings);
+        applyDesignerSettings();
+        if (state.settingsOpen) fillSettingsForm();
       }
       if (msg.type === 'toast' && msg.message) toast(msg.message, { skipLog: !!msg.logged });
       if (msg.type === 'requestFlush') {
@@ -3402,7 +3608,10 @@ export function getDesignerHtml(
       }
       if (!state.paletteOpen) return;
       const entries = paletteEntries();
-      if (e.key === 'Escape') { e.preventDefault(); closePalette(); return; }
+      if (e.key === 'Escape') {
+        if (state.settingsOpen) { e.preventDefault(); closeSettings(); return; }
+        e.preventDefault(); closePalette(); return;
+      }
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         state.paletteActive = Math.min(entries.length - 1, state.paletteActive + 1);

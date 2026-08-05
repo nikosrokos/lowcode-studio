@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Mac-first low-code RPA for VS Code/Cursor: REFramework design, scenario dry-runs (Shift+F5), and the easiest Connect to Studio Web handoff for Orchestrator publish.",
-  "version": "0.6.25",
+  "version": "0.6.26",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -517,6 +517,15 @@
           "type": "boolean",
           "default": true,
           "description": "Show step numbers on the designer canvas."
+        },
+        "lowcodeStudio.canvasStyle": {
+          "type": "string",
+          "default": "plain",
+          "enum": [
+            "plain",
+            "dots"
+          ],
+          "description": "Designer canvas background: plain board or subtle dot grid."
         },
         "lowcodeStudio.syncStudioWebOnSave": {
           "type": "boolean",

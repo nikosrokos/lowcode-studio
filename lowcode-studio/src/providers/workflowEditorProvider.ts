@@ -13,7 +13,7 @@ import {
   formatDryRunReport,
   validateWorkflow
 } from '../commands/simulator';
-import { getDesignerHtml } from '../webview/designerHtml';
+import { DesignerSettings, getDesignerHtml } from '../webview/designerHtml';
 import {
   getLowCodeOutput,
   logNotification,
@@ -526,10 +526,64 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           });
           break;
         }
+        case 'updateSettings': {
+          await this.applyDesignerSettings(message.settings as Partial<DesignerSettings>);
+          webviewPanel.webview.postMessage({
+            type: 'settings',
+            settings: this.readDesignerSettings()
+          });
+          webviewPanel.webview.postMessage({
+            type: 'toast',
+            message: 'Settings saved'
+          });
+          break;
+        }
         case 'ready':
+          webviewPanel.webview.postMessage({
+            type: 'settings',
+            settings: this.readDesignerSettings()
+          });
           break;
       }
     });
+  }
+
+  private readDesignerSettings(): DesignerSettings {
+    const cfg = vscode.workspace.getConfiguration('lowcodeStudio');
+    const workflowType = cfg.get<string>('defaultWorkflowType', 'Sequence');
+    const framework = cfg.get<string>('uipathTargetFramework', 'Windows');
+    const canvasStyle = cfg.get<string>('canvasStyle', 'plain');
+    return {
+      showLineNumbers: cfg.get<boolean>('showLineNumbers', true),
+      defaultWorkflowType: workflowType === 'Flowchart' ? 'Flowchart' : 'Sequence',
+      autoOpenDesigner: cfg.get<boolean>('autoOpenDesigner', true),
+      syncStudioWebOnSave: cfg.get<boolean>('syncStudioWebOnSave', true),
+      uipathTargetFramework: framework === 'Portable' ? 'Portable' : 'Windows',
+      canvasStyle: canvasStyle === 'dots' ? 'dots' : 'plain'
+    };
+  }
+
+  private async applyDesignerSettings(
+    patch: Partial<DesignerSettings> | undefined
+  ): Promise<void> {
+    if (!patch || typeof patch !== 'object') {
+      return;
+    }
+    const cfg = vscode.workspace.getConfiguration('lowcodeStudio');
+    const entries: Array<[keyof DesignerSettings, unknown]> = [
+      ['showLineNumbers', patch.showLineNumbers],
+      ['defaultWorkflowType', patch.defaultWorkflowType],
+      ['autoOpenDesigner', patch.autoOpenDesigner],
+      ['syncStudioWebOnSave', patch.syncStudioWebOnSave],
+      ['uipathTargetFramework', patch.uipathTargetFramework],
+      ['canvasStyle', patch.canvasStyle]
+    ];
+    for (const [key, value] of entries) {
+      if (value === undefined) {
+        continue;
+      }
+      await cfg.update(key, value, vscode.ConfigurationTarget.Global);
+    }
   }
 
   private async openInvokedWorkflow(
@@ -599,7 +653,8 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
       getActivityCatalog(),
       suggestions,
       this.getPaletteState(),
-      this.buildProjectTree()
+      this.buildProjectTree(),
+      this.readDesignerSettings()
     );
   }
 
