@@ -49,10 +49,10 @@ Highest leverage for *not opening Studio Web to finish work*.
 - **Invoke Workflow** argument mapping (today: path only → bare `InvokeWorkflowFile`)
 - Cross-workflow argument chips / validation (“missing Out: `out_TransactionItem`”)
 
-### A2. Import / export fidelity
-- Shrink `Imported.*` → real LCS types for top Studio Web activities
-- Preserve more properties on round-trip (HTTP, Excel, UI modern fields)
-- Flowchart: FlowSwitch / multi-branch fidelity; fewer Comment placeholders
+### A2. Import / export fidelity — **shipped in 0.6.29 (File IO + FlowSwitch)**
+- Shrink `Imported.*` → real LCS types for top Studio Web activities — File IO + FlowSwitch mapped
+- Preserve more properties on round-trip (HTTP, Excel, UI modern fields) — ongoing
+- Flowchart: FlowSwitch / multi-branch fidelity; fewer Comment placeholders — FlowSwitch mapped + dry-run case edges
 - Keep Studio Web-only triggers out of designer (already partially done)
 
 ### A3. Selectors that ship — **shipped in 0.6.27**
@@ -108,9 +108,9 @@ Highest leverage for *not opening Studio Web to finish work*.
 - Fixture library UI (HTTP, UI selectors, tables) instead of only JSON
 - Clear per-activity: `simulated` | `real` | `unsupported`
 
-### C2. Real local runners (Mac-capable)
-- Real HTTP in dry-run (opt-in)
-- Real Python via local interpreter when Python Scope path is set
+### C2. Real local runners (Mac-capable) — **shipped in 0.6.29 (HTTP + Python)**
+- Real HTTP in dry-run (opt-in) — **shipped**
+- Real Python via local interpreter when Python Scope path is set — **shipped**
 - Optional headless browser smoke for Click/Type/GetText against a URL (experimental; not UiPath robot)
 
 ### C3. Logs & traces
@@ -161,12 +161,14 @@ Highest leverage for *not opening Studio Web to finish work*.
 
 ## Phase F — “Assist (AI) — greenfield”
 
-Only after A–C foundations; avoid Autopilot theater.
+Only after A–C foundations; avoid Autopilot theater. **F0/F1 0.6.29 · F3 0.6.30 · F4 0.6.31** (deterministic, no LLM).
 
-- Generate sequence from natural language → LCS activities (constrained to catalog)
-- Suggest selectors / repair placeholders from page HTML snippet or failed dry-run
-- Scenario generator from Process description
-- “Explain this workflow” / “why Studio Web will reject this Save”
+- Generate sequence from natural language → LCS activities (constrained to catalog) — later (F2)
+- Suggest selectors / repair placeholders from page HTML snippet or failed dry-run — **F3 shipped**
+- Scenario generator from Process description — **F1 shipped**
+- “Explain this workflow” / “why Studio Web will reject this Save” — **F0 shipped**
+- VB expression typo / function-style repairs (UiPath Visual Basic) — **F4 shipped**
+- Repair from failed dry-run traces — later
 
 ---
 

@@ -415,6 +415,37 @@ export function getDesignerHtml(
       display: flex; gap: 8px; justify-content: flex-end; padding: 10px 14px;
       border-top: 1px solid var(--border);
     }
+    .assist-help-dialog {
+      width: min(520px, 94vw); max-height: 86vh;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 14px; box-shadow: var(--shadow-frame);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .assist-help-body { overflow: auto; padding: 12px 16px 18px; font-size: 12px; line-height: 1.45; }
+    .assist-help-body p { margin: 0 0 10px; color: var(--text); }
+    .assist-help-body .lead { color: var(--muted); margin-bottom: 14px; }
+    .assist-help-body h3 {
+      margin: 14px 0 6px; font-size: 11px; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--muted); font-weight: 700;
+    }
+    .assist-help-body h3:first-child { margin-top: 0; }
+    .assist-help-body .cmd {
+      display: block; font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+      font-size: 11.5px; padding: 6px 8px; margin: 4px 0 8px;
+      background: var(--input-bg); border: 1px solid var(--input-border);
+      border-radius: 8px; word-break: break-word;
+    }
+    .assist-help-body ul { margin: 0 0 10px; padding-left: 18px; }
+    .assist-help-body li { margin: 4px 0; }
+    .assist-help-body kbd {
+      font-family: inherit; font-size: 11px; padding: 1px 5px;
+      border: 1px solid var(--border); border-radius: 4px;
+      background: color-mix(in srgb, var(--input-bg) 80%, transparent);
+    }
+    .btn.symbol.active-assist {
+      outline: 1px solid color-mix(in srgb, var(--accent, #3b82f6) 70%, transparent);
+      background: color-mix(in srgb, var(--accent, #3b82f6) 18%, transparent);
+    }
     .app.hide-steps .step { display: none; }
     .sequence.canvas-dots, .flow-stage.canvas-dots {
       background-color: var(--board);
@@ -966,6 +997,7 @@ export function getDesignerHtml(
       <div class="spacer"></div>
       <button class="btn" id="btnLink" title="Connect two flowchart nodes" style="display:none">Link</button>
       <button class="btn" id="btnAutoLayout" style="display:none" title="Tidy flowchart layout">Tidy</button>
+      <button class="btn symbol" id="btnAssistHelp" type="button" title="Assist (AI) — how to use" aria-expanded="false">✦</button>
       <button class="btn symbol" id="btnSettings" type="button" title="Settings">⚙</button>
       <button class="btn primary" id="btnSave">Save</button>
     </div>
@@ -1110,6 +1142,89 @@ export function getDesignerHtml(
         <div class="expr-dialog-foot">
           <button class="btn" type="button" id="exprDialogDismiss">Cancel</button>
           <button class="btn primary" type="button" id="exprDialogApply">Apply</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-overlay" id="assistHelpOverlay">
+      <div class="assist-help-dialog" role="dialog" aria-label="Assist help" aria-modal="true">
+        <div class="settings-dialog-head">
+          <div class="title">Assist — how to use</div>
+          <button class="btn" type="button" id="assistHelpClose">Close</button>
+        </div>
+        <div class="assist-help-body">
+          <p class="lead">
+            Assist helpers are <strong>deterministic</strong> (no chat LLM). They run from the
+            Command Palette or Project Explorer and write results to the
+            <strong>LowCode Studio</strong> Output channel.
+          </p>
+
+          <h3>Where to run commands</h3>
+          <ul>
+            <li>Command Palette → type <strong>LowCode Studio</strong> (or <kbd>⌘/Ctrl+Shift+P</kbd>)</li>
+            <li>Editor title bar on a <code>.lcs.json</code> file (Explain)</li>
+            <li>Project Explorer toolbar / title actions</li>
+            <li><strong>Manage Scenarios</strong> → <em>Generate from description…</em></li>
+          </ul>
+
+          <h3>Explain / critique workflow (F0)</h3>
+          <span class="cmd">LowCode Studio: Explain / critique workflow (Assist)</span>
+          <p>
+            Open the workflow in the designer (or select its <code>.lcs.json</code>), run the command.
+            Output shows structure, package/selector critique, and why Studio Web may reject a Save.
+            Read-only — it does not change the workflow.
+          </p>
+
+          <h3>Generate scenarios (F1)</h3>
+          <span class="cmd">LowCode Studio: Generate scenarios from description (Assist)</span>
+          <p>
+            Or: <strong>Manage Scenarios</strong> → <em>Generate from description…</em>.
+            Type a short process description in the input box, for example:
+          </p>
+          <span class="cmd">REFramework queue with HTTP API and login UI</span>
+          <p>
+            Keywords map to templates (<code>queue</code>, <code>http</code>, <code>login</code>,
+            <code>excel</code>, <code>fail</code>, …) and are saved to
+            <code>Data/Test/scenarios.json</code>. Then run with <kbd>Shift+F5</kbd> or Dry Run Scenarios.
+          </p>
+
+          <h3>Suggest / repair selectors (F3)</h3>
+          <span class="cmd">LowCode Studio: Suggest / repair selectors (Assist)</span>
+          <p>Two modes (propose first — nothing is applied until you confirm):</p>
+          <ul>
+            <li><strong>From HTML / Explorer paste</strong> — paste a DOM snippet, <code>#id</code>, or UI Explorer dump; copy the best classic <code>&lt;html&gt;/&lt;webctrl&gt;</code> into Selector Builder</li>
+            <li><strong>Repair weak selectors</strong> — scans the open workflow for empty / placeholder / weak UI steps; apply all or pick which proposals to write</li>
+          </ul>
+          <span class="cmd">&lt;button id="loginBtn" aria-label="Sign in"&gt;Sign in&lt;/button&gt;</span>
+
+          <h3>Repair VB expressions (F4)</h3>
+          <span class="cmd">LowCode Studio: Repair VB expressions (Assist)</span>
+          <p>
+            Scans expression fields for UiPath Visual Basic typos / JS-style calls and proposes fixes
+            (confirm before apply). Examples:
+          </p>
+          <ul>
+            <li><code>TRim(name)</code> → <code>name.Trim()</code></li>
+            <li><code>name.toUpperCase()</code> → <code>name.ToUpper()</code></li>
+            <li><code>x == null</code> → <code>x Is Nothing</code> · <code>&amp;&amp;</code> → <code>AndAlso</code></li>
+            <li><code>Len(s)</code> → <code>s.Length</code> · <code>Left(s, 3)</code> → <code>s.Substring(0, 3)</code></li>
+          </ul>
+
+          <h3>Related dry-run settings (not Assist)</h3>
+          <p>
+            Optional real HTTP / Python live under Settings → VS Code
+            <code>lowcodeStudio.dryRun.*</code> (allow-listed hosts; fixtures always win).
+          </p>
+
+          <h3>Tips</h3>
+          <ul>
+            <li>Always check <strong>View → Output → LowCode Studio</strong> after Assist commands</li>
+            <li>Explain works best with the active project open (package pins + Invoke paths)</li>
+            <li>Scenario names starting with <code>assist-</code> are safe to edit or delete in <code>scenarios.json</code></li>
+          </ul>
+        </div>
+        <div class="settings-dialog-foot">
+          <button class="btn primary" type="button" id="assistHelpDone">Got it</button>
         </div>
       </div>
     </div>
@@ -1262,6 +1377,7 @@ export function getDesignerHtml(
       projects: ${projectsJson},
       settings: ${settingsJson},
       settingsOpen: false,
+      assistHelpOpen: false,
       collapsedLeftSections: { project: true, activities: false, variables: true, arguments: true, watch: true, fixtures: true },
       selectedId: null,
       dragType: null,
@@ -1326,6 +1442,8 @@ export function getDesignerHtml(
       exprDialogTitle: document.getElementById('exprDialogTitle'),
       exprDialogValue: document.getElementById('exprDialogValue'),
       settingsOverlay: document.getElementById('settingsOverlay'),
+      assistHelpOverlay: document.getElementById('assistHelpOverlay'),
+      btnAssistHelp: document.getElementById('btnAssistHelp'),
       watchView: document.getElementById('watchView'),
       watchCount: document.getElementById('watchCount'),
       fixturesEditor: document.getElementById('fixturesEditor')
@@ -1350,6 +1468,7 @@ export function getDesignerHtml(
       setSel('set_uipathTargetFramework', s.uipathTargetFramework === 'Portable' ? 'Portable' : 'Windows');
     }
     function openSettings() {
+      closeAssistHelp();
       state.settingsOpen = true;
       fillSettingsForm();
       els.settingsOverlay?.classList.add('show');
@@ -1357,6 +1476,23 @@ export function getDesignerHtml(
     function closeSettings() {
       state.settingsOpen = false;
       els.settingsOverlay?.classList.remove('show');
+    }
+    function openAssistHelp() {
+      closeSettings();
+      state.assistHelpOpen = true;
+      els.assistHelpOverlay?.classList.add('show');
+      els.btnAssistHelp?.classList.add('active-assist');
+      els.btnAssistHelp?.setAttribute('aria-expanded', 'true');
+    }
+    function closeAssistHelp() {
+      state.assistHelpOpen = false;
+      els.assistHelpOverlay?.classList.remove('show');
+      els.btnAssistHelp?.classList.remove('active-assist');
+      els.btnAssistHelp?.setAttribute('aria-expanded', 'false');
+    }
+    function toggleAssistHelp() {
+      if (state.assistHelpOpen) closeAssistHelp();
+      else openAssistHelp();
     }
     function saveSettingsFromForm() {
       const chk = (id) => !!document.getElementById(id)?.checked;
@@ -3595,12 +3731,23 @@ export function getDesignerHtml(
     els.settingsOverlay?.addEventListener('click', (e) => {
       if (e.target === els.settingsOverlay) closeSettings();
     });
+    els.btnAssistHelp?.addEventListener('click', () => toggleAssistHelp());
+    document.getElementById('assistHelpClose')?.addEventListener('click', () => closeAssistHelp());
+    document.getElementById('assistHelpDone')?.addEventListener('click', () => closeAssistHelp());
+    els.assistHelpOverlay?.addEventListener('click', (e) => {
+      if (e.target === els.assistHelpOverlay) closeAssistHelp();
+    });
     document.getElementById('exprDialogCancel')?.addEventListener('click', () => closeExprEditor());
     document.getElementById('exprDialogDismiss')?.addEventListener('click', () => closeExprEditor());
     els.exprOverlay?.addEventListener('click', (e) => {
       if (e.target === els.exprOverlay) closeExprEditor();
     });
     document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && state.assistHelpOpen) {
+        e.preventDefault();
+        closeAssistHelp();
+        return;
+      }
       if (e.key === 'Escape' && state.settingsOpen) {
         e.preventDefault();
         closeSettings();

@@ -13,13 +13,30 @@ import {
   WorkflowDocument
 } from './models/workflow';
 import {
-  dryRunWorkflow,
+  dryRunWorkflowAsync,
   formatDryRunReport,
   toPseudocode,
   validateWorkflow
 } from './commands/simulator';
 import { getLowCodeOutput } from './util/outputChannel';
+import { readDryRunSettings } from './util/dryRunSettings';
 import { maybeShowWhatsNew, showWhatsNewCommand } from './util/whatsNew';
+import { explainWorkflow } from './commands/assistExplain';
+import {
+  applyGeneratedScenarios,
+  generateScenariosFromDescription
+} from './commands/assistScenarios';
+import {
+  applySelectorRepairs,
+  formatSelectorAssistReport,
+  proposeSelectorRepairs,
+  suggestSelectorsFromHtml
+} from './commands/assistSelectors';
+import {
+  applyExpressionRepairs,
+  formatExpressionAssistReport,
+  proposeExpressionRepairs
+} from './commands/assistExpressions';
 import {
   createQuickScenario,
   duplicateScenario,
@@ -240,7 +257,17 @@ export function activate(context: vscode.ExtensionContext): void {
       if (!mode) {
         return;
       }
-      const result = dryRunWorkflow(doc);
+      const projectDir =
+        projectDirFromOpenDocument() ||
+        (await resolveLcsProjectDirQuiet()) ||
+        undefined;
+      const drySettings = readDryRunSettings(
+        vscode.workspace.getConfiguration('lowcodeStudio')
+      );
+      const result = await dryRunWorkflowAsync(doc, {
+        projectDir,
+        ...drySettings
+      });
       const channel = getOutput();
       channel.clear();
       channel.appendLine(formatDryRunReport(result, `Dry Run — ${doc.name}`));
@@ -268,6 +295,18 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand('lowcodeStudio.manageScenarios', () =>
       manageScenariosCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.explainWorkflow', () =>
+      explainWorkflowCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.generateScenarios', () =>
+      generateScenariosCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.suggestSelectors', () =>
+      suggestSelectorsCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.repairExpressions', () =>
+      repairExpressionsCommand()
     ),
     vscode.commands.registerCommand('lowcodeStudio.registerCustomActivity', () =>
       registerCustomActivityCommand()
@@ -2388,6 +2427,11 @@ async function manageScenariosCommand(): Promise<void> {
         value: 'add'
       },
       {
+        label: '$(sparkle) Generate from description…',
+        description: 'Assist F1 — keyword templates → scenarios.json',
+        value: 'generate'
+      },
+      {
         label: '$(copy) Duplicate scenario',
         value: 'duplicate'
       },
@@ -2412,6 +2456,10 @@ async function manageScenariosCommand(): Promise<void> {
   }
   if (action.value === 'add') {
     await addQuickScenarioCommand(projectDir);
+    return;
+  }
+  if (action.value === 'generate') {
+    await generateScenariosCommand(projectDir);
     return;
   }
   if (action.value === 'open') {
@@ -2448,6 +2496,294 @@ async function manageScenariosCommand(): Promise<void> {
   }
   if (action.value === 'run-one') {
     await dryRunScenarioCommand();
+  }
+}
+
+async function explainWorkflowCommand(): Promise<void> {
+  const doc = await getActiveWorkflowDocument();
+  if (!doc) {
+    return;
+  }
+  const projectDir =
+    projectDirFromOpenDocument() || (await resolveLcsProjectDirQuiet()) || undefined;
+  let workflowRel: string | undefined;
+  const active = vscode.window.activeTextEditor?.document;
+  if (projectDir && active?.fileName.endsWith('.lcs.json')) {
+    workflowRel = path.relative(projectDir, active.fileName).replace(/\\/g, '/');
+  }
+  const report = explainWorkflow(doc, { projectDir, workflowRel });
+  const channel = getOutput();
+  channel.clear();
+  channel.appendLine(report.markdown);
+  channel.show(true);
+  vscode.window.showInformationMessage(
+    report.critiqueCount
+      ? `Explain: ${report.critiqueCount} critique item(s) — see Output`
+      : 'Explain: no local critique items — see Output'
+  );
+}
+
+async function repairExpressionsCommand(): Promise<void> {
+  const doc = await getActiveWorkflowDocument();
+  if (!doc) {
+    return;
+  }
+  const proposals = proposeExpressionRepairs(doc);
+  const channel = getOutput();
+  channel.clear();
+  channel.appendLine(formatExpressionAssistReport(proposals));
+  channel.show(true);
+
+  if (!proposals.length) {
+    vscode.window.showInformationMessage(
+      'Assist F4: no VB expression typos / function wrappers found.'
+    );
+    return;
+  }
+
+  const pick = await vscode.window.showQuickPick(
+    [
+      {
+        label: `$(check) Apply all ${proposals.length} repair(s)`,
+        value: 'all' as const
+      },
+      {
+        label: '$(list-selection) Pick which to apply…',
+        value: 'pick' as const
+      },
+      {
+        label: '$(book) Report only (no changes)',
+        value: 'none' as const
+      }
+    ],
+    {
+      placeHolder: `Assist F4 — ${proposals.length} UiPath VB expression repair(s)`
+    }
+  );
+  if (!pick || pick.value === 'none') {
+    return;
+  }
+
+  let toApply = proposals;
+  if (pick.value === 'pick') {
+    const chosen = await vscode.window.showQuickPick(
+      proposals.map((p) => ({
+        label: `${p.displayName} · ${p.propertyLabel}`,
+        description: p.fixes.map((f) => f.label).join('; '),
+        detail: `${oneLineExpr(p.original)} → ${oneLineExpr(p.proposed)}`,
+        proposal: p
+      })),
+      { canPickMany: true, placeHolder: 'Select expression repairs to apply' }
+    );
+    if (!chosen?.length) {
+      return;
+    }
+    toApply = chosen.map((c) => c.proposal);
+  }
+
+  const next = applyExpressionRepairs(doc, toApply);
+  const applied = await editorProvider.applyWorkflowDocument(next);
+  if (!applied) {
+    const active = vscode.window.activeTextEditor?.document;
+    if (active?.fileName.endsWith('.lcs.json')) {
+      const edit = new vscode.WorkspaceEdit();
+      const full = new vscode.Range(
+        active.positionAt(0),
+        active.positionAt(active.getText().length)
+      );
+      edit.replace(active.uri, full, stringifyWorkflow(next));
+      await vscode.workspace.applyEdit(edit);
+    } else {
+      vscode.window.showWarningMessage(
+        'Open the workflow in the LowCode Studio designer to apply repairs.'
+      );
+      return;
+    }
+  }
+  vscode.window.showInformationMessage(
+    `Assist F4: applied ${toApply.length} VB expression repair(s). Spot-check in Studio Web.`
+  );
+}
+
+function oneLineExpr(s: string): string {
+  return String(s || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+}
+
+async function suggestSelectorsCommand(): Promise<void> {
+  const mode = await vscode.window.showQuickPick(
+    [
+      {
+        label: '$(code) From HTML / Explorer paste',
+        description: 'Paste HTML snippet, #id, or UI Explorer dump → classic selector',
+        value: 'html' as const
+      },
+      {
+        label: '$(tools) Repair weak selectors in workflow',
+        description: 'Propose fixes for empty / placeholder / weak UI steps (confirm to apply)',
+        value: 'repair' as const
+      }
+    ],
+    { placeHolder: 'Assist F3 — suggest / repair selectors' }
+  );
+  if (!mode) {
+    return;
+  }
+
+  const channel = getOutput();
+
+  if (mode.value === 'html') {
+    const paste = await vscode.window.showInputBox({
+      prompt: 'Paste HTML element, #id, or UI Explorer selector dump',
+      placeHolder: '<button id="login" aria-label="Sign in">Sign in</button>',
+      ignoreFocusOut: true
+    });
+    if (paste == null) {
+      return;
+    }
+    const suggestions = suggestSelectorsFromHtml(paste);
+    const report = formatSelectorAssistReport('Assist F3 — selectors from paste', suggestions, []);
+    channel.clear();
+    channel.appendLine(report);
+    channel.show(true);
+    if (!suggestions.length) {
+      vscode.window.showWarningMessage('Assist F3: could not build a selector from that paste.');
+      return;
+    }
+    const best = suggestions[0];
+    const action = await vscode.window.showInformationMessage(
+      `Best: ${best.quality.label} (score ${best.quality.score}) — ${best.rationale}`,
+      'Copy selector',
+      'Dismiss'
+    );
+    if (action === 'Copy selector') {
+      await vscode.env.clipboard.writeText(best.selector);
+      vscode.window.showInformationMessage('Selector copied — paste into Selector Builder.');
+    }
+    return;
+  }
+
+  const doc = await getActiveWorkflowDocument();
+  if (!doc) {
+    return;
+  }
+  const repairs = proposeSelectorRepairs(doc);
+  const report = formatSelectorAssistReport('Assist F3 — selector repairs', [], repairs);
+  channel.clear();
+  channel.appendLine(report);
+  channel.show(true);
+
+  const actionable = repairs.filter((r) => r.actionable);
+  if (!repairs.length) {
+    vscode.window.showInformationMessage('Assist F3: no empty/placeholder/weak UI selectors found.');
+    return;
+  }
+  if (!actionable.length) {
+    vscode.window.showInformationMessage(
+      `Assist F3: ${repairs.length} weak selector(s) noted — see Output (nothing safer to auto-propose).`
+    );
+    return;
+  }
+
+  const pick = await vscode.window.showQuickPick(
+    [
+      {
+        label: `$(check) Apply all ${actionable.length} proposal(s)`,
+        value: 'all' as const
+      },
+      {
+        label: '$(list-selection) Pick which to apply…',
+        value: 'pick' as const
+      },
+      {
+        label: '$(book) Report only (no changes)',
+        value: 'none' as const
+      }
+    ],
+    { placeHolder: `${actionable.length} actionable selector repair(s)` }
+  );
+  if (!pick || pick.value === 'none') {
+    return;
+  }
+
+  let toApply = actionable;
+  if (pick.value === 'pick') {
+    const chosen = await vscode.window.showQuickPick(
+      actionable.map((r) => ({
+        label: r.displayName,
+        description: `${r.currentQuality.label} → ${r.proposedQuality.label}`,
+        detail: r.rationale,
+        proposal: r
+      })),
+      { canPickMany: true, placeHolder: 'Select repairs to apply' }
+    );
+    if (!chosen?.length) {
+      return;
+    }
+    toApply = chosen.map((c) => c.proposal);
+  }
+
+  const next = applySelectorRepairs(doc, toApply);
+  const applied = await editorProvider.applyWorkflowDocument(next);
+  if (!applied) {
+    // Designer not active — write active text editor if it is the workflow
+    const active = vscode.window.activeTextEditor?.document;
+    if (active?.fileName.endsWith('.lcs.json')) {
+      const edit = new vscode.WorkspaceEdit();
+      const full = new vscode.Range(
+        active.positionAt(0),
+        active.positionAt(active.getText().length)
+      );
+      edit.replace(active.uri, full, stringifyWorkflow(next));
+      await vscode.workspace.applyEdit(edit);
+    } else {
+      vscode.window.showWarningMessage(
+        'Open the workflow in the LowCode Studio designer to apply repairs.'
+      );
+      return;
+    }
+  }
+  vscode.window.showInformationMessage(
+    `Assist F3: applied ${toApply.length} selector repair(s). Verify on Windows.`
+  );
+}
+
+async function generateScenariosCommand(projectDirArg?: string): Promise<void> {
+  const projectDir = projectDirArg || (await resolveLcsProjectDir());
+  if (!projectDir) {
+    return;
+  }
+  const description = await vscode.window.showInputBox({
+    prompt: 'Describe the process (queue, HTTP, login, Excel, fail…)',
+    placeHolder: 'e.g. REFramework queue with HTTP API and login UI',
+    ignoreFocusOut: true
+  });
+  if (description == null) {
+    return;
+  }
+  const projectName = path.basename(projectDir);
+  const generated = generateScenariosFromDescription(description, projectName);
+  const file = ensureScenariosFile(projectDir, projectName);
+  const next = applyGeneratedScenarios(file, generated);
+  saveScenariosFile(projectDir, next);
+  projectProvider.refresh();
+  const channel = getOutput();
+  channel.clear();
+  channel.appendLine(`Assist F1 — generated ${generated.length} scenario(s) for ${projectName}`);
+  for (const s of generated) {
+    channel.appendLine(`- ${s.name}: ${s.description || ''}`);
+  }
+  channel.show(true);
+  const runNow = await vscode.window.showInformationMessage(
+    `Generated ${generated.length} scenario(s) into Data/Test/scenarios.json`,
+    'Run all',
+    'Open file'
+  );
+  if (runNow === 'Run all') {
+    await showScenarioResults(runAllScenarios(projectDir));
+  }
+  if (runNow === 'Open file') {
+    const doc = await vscode.workspace.openTextDocument(scenariosFilePath(projectDir));
+    await vscode.window.showTextDocument(doc);
   }
 }
 

@@ -349,6 +349,46 @@ const MAP: Array<{
     xamlNamespace: 'ui'
   },
   {
+    lcsType: 'System.ReadTextFile',
+    xamlLocalNames: ['ReadTextFile'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'System.WriteTextFile',
+    xamlLocalNames: ['WriteTextFile'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'System.AppendLine',
+    xamlLocalNames: ['AppendLine'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'System.PathExists',
+    xamlLocalNames: ['PathExists'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'System.CreateDirectory',
+    xamlLocalNames: ['CreateDirectory'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'System.CopyFile',
+    xamlLocalNames: ['CopyFile'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'System.DeleteFile',
+    xamlLocalNames: ['DeleteFile'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Flowchart.FlowSwitch',
+    xamlLocalNames: ['FlowSwitch'],
+    xamlNamespace: 'default'
+  },
+  {
     lcsType: 'Flowchart.FlowDecision',
     xamlLocalNames: ['FlowDecision'],
     xamlNamespace: 'default'

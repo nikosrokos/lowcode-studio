@@ -5,6 +5,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.31] — 2026-08-05
+
+### Added
+- **F4** Assist — **Repair VB expressions** for UiPath Visual Basic (e.g. `TRim(x)` → `x.Trim()`, JS-style `.toUpperCase()` / `== null` / `&&`, confirm before apply)
+- Assist help popup documents F4
+
+## [0.6.30] — 2026-08-05
+
+### Added
+- **F3** Assist — **Suggest / repair selectors** from HTML / Explorer paste, or propose repairs for empty / placeholder / weak UI steps (confirm before apply)
+- Assist help popup documents F3
+
+## [0.6.29] — 2026-08-05
+
+### Added
+- **A2** Import map shrink — File IO (`ReadTextFile`, `WriteTextFile`, `AppendLine`, `PathExists`, `CreateDirectory`, `CopyFile`, `DeleteFile`) and **FlowSwitch** map to real LCS types (not `Imported.*`)
+- **C2** Opt-in real HTTP + local Python in dry-run (`lowcodeStudio.dryRun.realHttp` / `realPython`, host allow list; fixtures always win)
+- **F0** Assist — **Explain / critique workflow** (deterministic report in Output)
+- **F1** Assist — **Generate scenarios from description** (Manage Scenarios + command palette)
+- Designer toolbar **✦ Assist** button — open/close popup with how-to for Assist commands and where to run them
+
+### Changed
+- Dry-run uses project directory for real File IO stubs; File IO steps classify as `real`
+
 ## [0.6.28] — 2026-08-05
 
 ### Added

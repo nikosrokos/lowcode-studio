@@ -9,10 +9,11 @@ import {
 } from '../models/workflow';
 import {
   DryRunResult,
-  dryRunWorkflow,
+  dryRunWorkflowAsync,
   formatDryRunReport,
   validateWorkflow
 } from '../commands/simulator';
+import { readDryRunSettings } from '../util/dryRunSettings';
 import { DesignerSettings, getDesignerHtml } from '../webview/designerHtml';
 import {
   getLowCodeOutput,
@@ -233,6 +234,18 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
     });
   }
 
+  /** Apply a workflow edit (e.g. Assist F3 selector repairs) and refresh the designer. */
+  async applyWorkflowDocument(workflow: WorkflowDocument): Promise<boolean> {
+    const document = this.activeDocument;
+    if (!document) {
+      return false;
+    }
+    await this.updateTextDocument(document, workflow);
+    this.onWorkflowChanged(workflow);
+    this.activePanel?.webview.postMessage({ type: 'setWorkflow', workflow });
+    return true;
+  }
+
   async resolveCustomTextEditor(
     document: vscode.TextDocument,
     webviewPanel: vscode.WebviewPanel,
@@ -383,9 +396,16 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           break;
         }
         case 'dryRun': {
-          const result = dryRunWorkflow(message.workflow as WorkflowDocument, {
+          const projectDir =
+            findProjectRoot(path.dirname(document.uri.fsPath)) || undefined;
+          const drySettings = readDryRunSettings(
+            vscode.workspace.getConfiguration('lowcodeStudio')
+          );
+          const result = await dryRunWorkflowAsync(message.workflow as WorkflowDocument, {
             fixtures: message.fixtures,
-            initialVariables: message.initialVariables
+            initialVariables: message.initialVariables,
+            projectDir,
+            ...drySettings
           });
           const title = message.runToActivityId
             ? `Dry Run (run-to-here) — ${document.fileName}`

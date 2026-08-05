@@ -166,6 +166,173 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     ]
   },
   {
+    type: 'System.ReadTextFile',
+    displayName: 'Read Text File',
+    category: 'System',
+    description: 'Reads a text file into a string variable (real in dry-run when path exists).',
+    icon: '$(file-text)',
+    color: '#3B82F6',
+    properties: [
+      {
+        name: 'fileName',
+        label: 'File Name',
+        type: 'expression',
+        defaultValue: '"data.txt"',
+        required: true
+      },
+      {
+        name: 'result',
+        label: 'Result',
+        type: 'expression',
+        defaultValue: 'fileText',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'System.WriteTextFile',
+    displayName: 'Write Text File',
+    category: 'System',
+    description: 'Writes text to a file (real in dry-run when path is writable).',
+    icon: '$(save)',
+    color: '#3B82F6',
+    properties: [
+      {
+        name: 'fileName',
+        label: 'File Name',
+        type: 'expression',
+        defaultValue: '"out.txt"',
+        required: true
+      },
+      {
+        name: 'text',
+        label: 'Text',
+        type: 'expression',
+        defaultValue: '"Hello"',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'System.AppendLine',
+    displayName: 'Append Line',
+    category: 'System',
+    description: 'Appends a line to a text file.',
+    icon: '$(diff-added)',
+    color: '#3B82F6',
+    properties: [
+      {
+        name: 'fileName',
+        label: 'File Name',
+        type: 'expression',
+        defaultValue: '"log.txt"',
+        required: true
+      },
+      {
+        name: 'text',
+        label: 'Text',
+        type: 'expression',
+        defaultValue: '"line"',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'System.PathExists',
+    displayName: 'Path Exists',
+    category: 'System',
+    description: 'Checks whether a file or folder exists.',
+    icon: '$(search)',
+    color: '#64748B',
+    properties: [
+      {
+        name: 'path',
+        label: 'Path',
+        type: 'expression',
+        defaultValue: '"data.txt"',
+        required: true
+      },
+      {
+        name: 'pathType',
+        label: 'Path Type',
+        type: 'enum',
+        options: ['File', 'Folder', 'Any'],
+        defaultValue: 'Any'
+      },
+      {
+        name: 'result',
+        label: 'Result',
+        type: 'expression',
+        defaultValue: 'exists',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'System.CreateDirectory',
+    displayName: 'Create Directory',
+    category: 'System',
+    description: 'Creates a folder if it does not exist.',
+    icon: '$(new-folder)',
+    color: '#64748B',
+    properties: [
+      {
+        name: 'path',
+        label: 'Path',
+        type: 'expression',
+        defaultValue: '"output"',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'System.CopyFile',
+    displayName: 'Copy File',
+    category: 'System',
+    description: 'Copies a file to a destination path.',
+    icon: '$(files)',
+    color: '#64748B',
+    properties: [
+      {
+        name: 'path',
+        label: 'Source',
+        type: 'expression',
+        defaultValue: '"in.txt"',
+        required: true
+      },
+      {
+        name: 'destination',
+        label: 'Destination',
+        type: 'expression',
+        defaultValue: '"out.txt"',
+        required: true
+      },
+      {
+        name: 'overwrite',
+        label: 'Overwrite',
+        type: 'boolean',
+        defaultValue: true
+      }
+    ]
+  },
+  {
+    type: 'System.DeleteFile',
+    displayName: 'Delete File',
+    category: 'System',
+    description: 'Deletes a file if it exists.',
+    icon: '$(trash)',
+    color: '#EF4444',
+    properties: [
+      {
+        name: 'path',
+        label: 'Path',
+        type: 'expression',
+        defaultValue: '"temp.txt"',
+        required: true
+      }
+    ]
+  },
+  {
     type: 'Programming.Assign',
     displayName: 'Assign',
     category: 'Programming',
@@ -1967,6 +2134,29 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         type: 'expression',
         defaultValue: 'true',
         required: true
+      }
+    ]
+  },
+  {
+    type: 'Flowchart.FlowSwitch',
+    displayName: 'Flow Switch',
+    category: 'Flowchart',
+    description: 'Multi-branch flowchart switch (expression → labeled outgoing links).',
+    icon: '$(type-hierarchy-sub)',
+    color: '#F59E0B',
+    properties: [
+      {
+        name: 'expression',
+        label: 'Expression',
+        type: 'expression',
+        defaultValue: 'key',
+        required: true
+      },
+      {
+        name: 'cases',
+        label: 'Cases (comma-separated labels)',
+        type: 'string',
+        defaultValue: 'A,B,Default'
       }
     ]
   },
