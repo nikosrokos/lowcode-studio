@@ -133,6 +133,7 @@ let variablesProvider: VariablesTreeProvider;
 let projectProvider: ProjectTreeProvider;
 let activityProvider: ActivityTreeProvider;
 let projectsTreeView: vscode.TreeView<ProjectTreeItem>;
+let homeProviderRef: HomeViewProvider | undefined;
 let extensionContext: vscode.ExtensionContext;
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -169,8 +170,32 @@ export function activate(context: vscode.ExtensionContext): void {
       const id = map[command] || command;
       await vscode.commands.executeCommand(id);
       homeProvider.refresh();
+    },
+    async (projectPath) => {
+      if (!projectPath || !fs.existsSync(projectPath)) {
+        vscode.window.showWarningMessage('Recent project folder is missing.');
+        homeProvider.refresh();
+        return;
+      }
+      await setActiveProjectDir(projectPath);
+      const opened = await ensureFolderInWorkspace(projectPath, path.basename(projectPath));
+      if (opened === 'reloading') {
+        return;
+      }
+      const main =
+        readProjectMainWorkflow(projectPath) ||
+        path.join(projectPath, 'Main.lcs.json');
+      if (fs.existsSync(main)) {
+        await vscode.commands.executeCommand(
+          'vscode.openWith',
+          vscode.Uri.file(main),
+          WorkflowEditorProvider.viewType
+        );
+      }
+      homeProvider.refresh();
     }
   );
+  homeProviderRef = homeProvider;
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(HomeViewProvider.viewType, homeProvider, {
       webviewOptions: { retainContextWhenHidden: true }
@@ -181,14 +206,57 @@ export function activate(context: vscode.ExtensionContext): void {
     treeDataProvider: projectProvider,
     showCollapseAll: true
   });
+  const activitiesTreeView = vscode.window.createTreeView('lowcodeStudio.activities', {
+    treeDataProvider: activityProvider
+  });
+  const variablesTreeView = vscode.window.createTreeView('lowcodeStudio.variables', {
+    treeDataProvider: variablesProvider
+  });
+
+  // When the activity-bar container was hidden and any LCS view becomes visible,
+  // focus Home so clicking the extension icon lands on the Home Screen.
+  let lcsContainerVisible = false;
+  let homeViewVisible = false;
+  const preferHomeOnContainerShow = () =>
+    vscode.workspace
+      .getConfiguration('lowcodeStudio')
+      .get<boolean>('openHomeOnStartup', true);
+  const recomputeContainerHidden = () => {
+    lcsContainerVisible =
+      homeViewVisible ||
+      projectsTreeView.visible ||
+      activitiesTreeView.visible ||
+      variablesTreeView.visible;
+  };
+  const onLcsViewVisibility = (visible: boolean) => {
+    const wasHidden = !lcsContainerVisible;
+    if (visible) {
+      lcsContainerVisible = true;
+      if (wasHidden && preferHomeOnContainerShow()) {
+        void homeProvider.focusSidebar();
+      } else {
+        homeProvider.refresh();
+      }
+    } else {
+      recomputeContainerHidden();
+    }
+  };
+  homeProvider.setVisibilityListener((visible) => {
+    homeViewVisible = visible;
+    if (visible) {
+      lcsContainerVisible = true;
+      homeProvider.refresh();
+    } else {
+      recomputeContainerHidden();
+    }
+  });
   context.subscriptions.push(
     projectsTreeView,
-    vscode.window.createTreeView('lowcodeStudio.activities', {
-      treeDataProvider: activityProvider
-    }),
-    vscode.window.createTreeView('lowcodeStudio.variables', {
-      treeDataProvider: variablesProvider
-    }),
+    activitiesTreeView,
+    variablesTreeView,
+    projectsTreeView.onDidChangeVisibility((e) => onLcsViewVisibility(e.visible)),
+    activitiesTreeView.onDidChangeVisibility((e) => onLcsViewVisibility(e.visible)),
+    variablesTreeView.onDidChangeVisibility((e) => onLcsViewVisibility(e.visible)),
     projectsTreeView.onDidChangeSelection((e) => {
       const dir = projectDirFromTreeItem(e.selection[0]);
       if (dir) {
@@ -359,7 +427,12 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('lowcodeStudio.repairFromDryRunTrace', () =>
       repairFromDryRunTraceCommand()
     ),
-    vscode.commands.registerCommand('lowcodeStudio.openHome', () => homeProvider.showPanel()),
+    vscode.commands.registerCommand('lowcodeStudio.openHome', () =>
+      homeProvider.focusSidebar()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.openHomePanel', () =>
+      homeProvider.showPanel()
+    ),
     vscode.commands.registerCommand('lowcodeStudio.registerCustomActivity', () =>
       registerCustomActivityCommand()
     ),
@@ -569,7 +642,7 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.window.showTextDocument(doc, { preview: true });
     }),
     vscode.commands.registerCommand('lowcodeStudio.showGettingStarted', () => {
-      void homeProvider.showPanel();
+      void homeProvider.focusSidebar();
     }),
     vscode.commands.registerCommand('lowcodeStudio.showWhatsNew', () => {
       void showWhatsNewCommand(context, packageVersion);
@@ -635,13 +708,11 @@ export function activate(context: vscode.ExtensionContext): void {
     .getConfiguration('lowcodeStudio')
     .get<boolean>('openHomeOnStartup', true);
   if (openHome) {
-    // Reveal the LowCode Studio activity container + Home webview
-    void vscode.commands
-      .executeCommand('workbench.view.extension.lowcodeStudio')
-      .then(() => vscode.commands.executeCommand('lowcodeStudio.home.focus'));
+    void homeProvider.focusSidebar();
   }
   if (!context.globalState.get('lowcodeStudio.welcomeShown')) {
     void context.globalState.update('lowcodeStudio.welcomeShown', true);
+    // First run: also open the full Home tab once for discoverability
     void homeProvider.showPanel();
   }
 }
@@ -1683,6 +1754,8 @@ async function setActiveProjectDir(projectDir: string): Promise<void> {
   projectProvider?.setActiveProject(projectDir);
   projectProvider?.refresh();
   editorProvider?.refreshProjectTree?.();
+  homeProviderRef?.rememberProject(projectDir);
+  homeProviderRef?.refresh();
 }
 
 /**

@@ -8,10 +8,11 @@ import {
   WorkflowVariable,
   newId
 } from '../models/workflow';
+import { normalizeWorkflowDocument } from './activityNormalize';
 import { lcsTypeFromXamlName, unknownActivityType } from './activityMap';
 import { applySelectorProps, extractSelectorProps } from './selectorRoundTrip';
 import { fromXamlInteractionMode } from './inputMethod';
-import { fromVbStringArgument } from './xamlExport';
+import { fromVbStringArgument, normalizeLogLevel } from './xamlExport';
 import { formatArgumentMappings } from './workflowArguments';
 
 export interface ImportWarning {
@@ -72,7 +73,7 @@ export function importXaml(xamlText: string, workflowName = 'Imported'): XamlImp
       warnings
     );
     return {
-      workflow: {
+      workflow: normalizeWorkflowDocument({
         schemaVersion: '1.0',
         name: workflowName,
         description: 'Imported from UiPath XAML (Flowchart)',
@@ -87,14 +88,14 @@ export function importXaml(xamlText: string, workflowName = 'Imported'): XamlImp
           updatedAt: new Date().toISOString(),
           template: 'imported-uipath'
         }
-      },
+      }),
       warnings
     };
   }
 
   const activities = collectActivities(body, warnings);
   return {
-    workflow: {
+    workflow: normalizeWorkflowDocument({
       schemaVersion: '1.0',
       name: workflowName,
       description: 'Imported from UiPath XAML',
@@ -117,7 +118,7 @@ export function importXaml(xamlText: string, workflowName = 'Imported'): XamlImp
         updatedAt: new Date().toISOString(),
         template: 'imported-uipath'
       }
-    },
+    }),
     warnings
   };
 }
@@ -468,7 +469,7 @@ function mapActivity(
         message: fromVbStringArgument(
           cleanExpr(raw['@_Message'] ?? extractArgument(raw, 'Message') ?? '')
         ),
-        level: String(raw['@_Level'] || 'Info').replace('TraceLevel.', '')
+        level: normalizeLogLevel(raw['@_Level'] || extractArgument(raw, 'Level') || 'Info')
       }
     };
   }

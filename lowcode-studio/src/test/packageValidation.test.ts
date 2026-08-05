@@ -34,9 +34,9 @@ function run(): void {
   const process = parseWorkflow(fs.readFileSync(processPath, 'utf8'));
   process.activities.push({
     id: 'imp1',
-    type: 'Imported.Click',
-    displayName: 'Legacy Click',
-    properties: { selector: '', hint: 'Imported.Click' }
+    type: 'Imported.MysteryWidget',
+    displayName: 'Legacy Mystery',
+    properties: { selector: '', hint: 'Imported.MysteryWidget' }
   });
   process.activities.push({
     id: 'inv1',

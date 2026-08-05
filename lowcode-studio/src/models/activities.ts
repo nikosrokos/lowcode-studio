@@ -87,7 +87,7 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         name: 'level',
         label: 'Level',
         type: 'enum',
-        options: ['Trace', 'Info', 'Warn', 'Error'],
+        options: ['Trace', 'Info', 'Warn', 'Error', 'Fatal'],
         defaultValue: 'Info'
       }
     ]
