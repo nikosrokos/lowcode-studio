@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Mac-first low-code RPA for VS Code/Cursor: REFramework design, scenario dry-runs (Shift+F5), and the easiest Connect to Studio Web handoff for Orchestrator publish.",
-  "version": "0.6.13",
+  "version": "0.6.14",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -69,7 +69,7 @@
     "commands": [
       {
         "command": "lowcodeStudio.openLocalProject",
-        "title": "Open Local Project \u2014 browse for a folder with project.json",
+        "title": "Open Local Project \u2014 LCS project or Studio Web solution (.uipx)",
         "icon": "$(folder-opened)",
         "shortTitle": "Open",
         "category": "LowCode Studio"
@@ -263,7 +263,7 @@
           "command": "lowcodeStudio.openLocalProject",
           "when": "view == lowcodeStudio.projects",
           "group": "navigation@0",
-          "tooltip": "Open Local Project \u2014 browse for a folder with project.json"
+          "tooltip": "Open Local Project \u2014 LCS project or Studio Web solution (.uipx)"
         },
         {
           "command": "lowcodeStudio.dryRunScenario",

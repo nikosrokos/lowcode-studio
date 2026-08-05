@@ -35,12 +35,19 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
     const roots = this.workspaceRoots();
     if (!roots.length) {
       return [
-        new ProjectTreeItem(
-          'Open Local Project (title bar) or File → Open Folder',
-          '',
-          vscode.TreeItemCollapsibleState.None,
-          'info'
-        )
+        (() => {
+          const tip = new ProjectTreeItem(
+            'Open Local Project (title bar) or File → Open Folder',
+            '',
+            vscode.TreeItemCollapsibleState.None,
+            'info'
+          );
+          tip.command = {
+            command: 'lowcodeStudio.openLocalProject',
+            title: 'Open Local Project'
+          };
+          return tip;
+        })()
       ];
     }
 
