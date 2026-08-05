@@ -38,6 +38,17 @@ import {
   proposeExpressionRepairs
 } from './commands/assistExpressions';
 import {
+  applyScaffoldToWorkflow,
+  formatScaffoldReport,
+  scaffoldSequenceFromDescription
+} from './commands/assistScaffold';
+import {
+  applyTraceRepairs,
+  formatTraceRepairReport,
+  proposeRepairsFromDryRunTrace
+} from './commands/assistTraceRepair';
+import { HomeViewProvider } from './providers/homeViewProvider';
+import {
   createQuickScenario,
   duplicateScenario,
   ensureScenariosFile,
@@ -136,6 +147,36 @@ export function activate(context: vscode.ExtensionContext): void {
   activityProvider = new ActivityTreeProvider();
   refreshCustomActivityOverlay();
 
+  const homeProvider = new HomeViewProvider(
+    context,
+    () =>
+      extensionContext.workspaceState.get<string>('lowcodeStudio.activeProjectDir') ||
+      projectDirFromOpenDocument() ||
+      undefined,
+    async (command) => {
+      const map: Record<string, string> = {
+        openLocalProject: 'lowcodeStudio.openLocalProject',
+        newREFramework: 'lowcodeStudio.newREFramework',
+        newBlueprint: 'lowcodeStudio.newBlueprint',
+        connectStudioWeb: 'lowcodeStudio.connectStudioWeb',
+        openStudioWeb: 'lowcodeStudio.openStudioWeb',
+        firstRunWizard: 'lowcodeStudio.firstRunWizard',
+        scaffoldFromDescription: 'lowcodeStudio.scaffoldFromDescription',
+        repairFromDryRunTrace: 'lowcodeStudio.repairFromDryRunTrace',
+        showWhatsNew: 'lowcodeStudio.showWhatsNew',
+        openHome: 'lowcodeStudio.openHome'
+      };
+      const id = map[command] || command;
+      await vscode.commands.executeCommand(id);
+      homeProvider.refresh();
+    }
+  );
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(HomeViewProvider.viewType, homeProvider, {
+      webviewOptions: { retainContextWhenHidden: true }
+    })
+  );
+
   projectsTreeView = vscode.window.createTreeView('lowcodeStudio.projects', {
     treeDataProvider: projectProvider,
     showCollapseAll: true
@@ -152,6 +193,7 @@ export function activate(context: vscode.ExtensionContext): void {
       const dir = projectDirFromTreeItem(e.selection[0]);
       if (dir) {
         void setActiveProjectDir(dir);
+        homeProvider.refresh();
       }
     })
   );
@@ -311,6 +353,13 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('lowcodeStudio.repairExpressions', () =>
       repairExpressionsCommand()
     ),
+    vscode.commands.registerCommand('lowcodeStudio.scaffoldFromDescription', () =>
+      scaffoldFromDescriptionCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.repairFromDryRunTrace', () =>
+      repairFromDryRunTraceCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.openHome', () => homeProvider.showPanel()),
     vscode.commands.registerCommand('lowcodeStudio.registerCustomActivity', () =>
       registerCustomActivityCommand()
     ),
@@ -520,7 +569,7 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.window.showTextDocument(doc, { preview: true });
     }),
     vscode.commands.registerCommand('lowcodeStudio.showGettingStarted', () => {
-      showGettingStarted();
+      void homeProvider.showPanel();
     }),
     vscode.commands.registerCommand('lowcodeStudio.showWhatsNew', () => {
       void showWhatsNewCommand(context, packageVersion);
@@ -582,24 +631,18 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
-  const showWelcome = vscode.workspace
+  const openHome = vscode.workspace
     .getConfiguration('lowcodeStudio')
-    .get<boolean>('autoOpenDesigner', true);
-  if (showWelcome && !context.globalState.get('lowcodeStudio.welcomeShown')) {
+    .get<boolean>('openHomeOnStartup', true);
+  if (openHome) {
+    // Reveal the LowCode Studio activity container + Home webview
+    void vscode.commands
+      .executeCommand('workbench.view.extension.lowcodeStudio')
+      .then(() => vscode.commands.executeCommand('lowcodeStudio.home.focus'));
+  }
+  if (!context.globalState.get('lowcodeStudio.welcomeShown')) {
     void context.globalState.update('lowcodeStudio.welcomeShown', true);
-    void (async () => {
-      const pick = await vscode.window.showInformationMessage(
-        'Welcome to LowCode Studio — run the first-run wizard (REF → Scenario → Connect)?',
-        'Start wizard',
-        'Getting Started',
-        'Later'
-      );
-      if (pick === 'Start wizard') {
-        await firstRunWizardCommand();
-      } else if (pick === 'Getting Started') {
-        showGettingStarted();
-      }
-    })();
+    void homeProvider.showPanel();
   }
 }
 
@@ -2567,6 +2610,144 @@ async function manageScenariosCommand(): Promise<void> {
   if (action.value === 'run-one') {
     await dryRunScenarioCommand();
   }
+}
+
+async function scaffoldFromDescriptionCommand(): Promise<void> {
+  const doc = await getActiveWorkflowDocument();
+  if (!doc) {
+    return;
+  }
+  const description = await vscode.window.showInputBox({
+    title: 'Assist F2 — Scaffold sequence',
+    prompt: 'Describe steps (newlines, “then”, or “;”). Keywords map to catalog activities.',
+    placeHolder: 'use browser https://example.com then type into then click then log message "done"',
+    ignoreFocusOut: true
+  });
+  if (description === undefined) {
+    return;
+  }
+  const proposal = scaffoldSequenceFromDescription(description);
+  const channel = getOutput();
+  channel.clear();
+  channel.appendLine(formatScaffoldReport(proposal));
+  channel.show(true);
+
+  const mode = await vscode.window.showQuickPick(
+    [
+      {
+        label: `$(add) Append ${proposal.activities.length} activity(ies)`,
+        value: 'append' as const
+      },
+      {
+        label: '$(replace) Replace entire sequence',
+        value: 'replace' as const
+      },
+      { label: '$(book) Report only', value: 'none' as const }
+    ],
+    { placeHolder: 'Assist F2 — apply scaffold?' }
+  );
+  if (!mode || mode.value === 'none') {
+    return;
+  }
+  const next = applyScaffoldToWorkflow(doc, proposal, mode.value);
+  const applied = await editorProvider.applyWorkflowDocument(next);
+  if (!applied) {
+    vscode.window.showWarningMessage(
+      'Open the workflow in the LowCode Studio designer to apply the scaffold.'
+    );
+    return;
+  }
+  vscode.window.showInformationMessage(
+    `Assist F2: ${mode.value === 'replace' ? 'replaced with' : 'appended'} ${proposal.activities.length} activity(ies).`
+  );
+}
+
+async function repairFromDryRunTraceCommand(): Promise<void> {
+  const doc = await getActiveWorkflowDocument();
+  if (!doc) {
+    return;
+  }
+  const projectDir =
+    projectDirFromOpenDocument() || (await resolveLcsProjectDirQuiet()) || undefined;
+  const dryCfg = readDryRunSettings(
+    vscode.workspace.getConfiguration('lowcodeStudio')
+  );
+  const result = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: 'Assist F2 — dry-run for trace repair…'
+    },
+    async () =>
+      dryRunWorkflowAsync(doc, {
+        projectDir,
+        realHttp: dryCfg.realHttp,
+        httpAllowHosts: dryCfg.httpAllowHosts,
+        httpTimeoutMs: dryCfg.httpTimeoutMs,
+        realPython: dryCfg.realPython,
+        pythonTimeoutMs: dryCfg.pythonTimeoutMs
+      })
+  );
+  const repairs = proposeRepairsFromDryRunTrace(doc, result);
+  const channel = getOutput();
+  channel.clear();
+  channel.appendLine(formatDryRunReport(result));
+  channel.appendLine('');
+  channel.appendLine(formatTraceRepairReport(repairs, result));
+  channel.show(true);
+
+  if (!repairs.length) {
+    vscode.window.showInformationMessage(
+      result.ok
+        ? 'Assist F2: dry-run OK — no trace repairs needed.'
+        : 'Assist F2: dry-run had issues but no automatic repairs were proposed — see Output.'
+    );
+    return;
+  }
+
+  const pick = await vscode.window.showQuickPick(
+    [
+      {
+        label: `$(check) Apply all ${repairs.length} repair(s)`,
+        value: 'all' as const
+      },
+      {
+        label: '$(list-selection) Pick which to apply…',
+        value: 'pick' as const
+      },
+      { label: '$(book) Report only', value: 'none' as const }
+    ],
+    { placeHolder: `Assist F2 — ${repairs.length} dry-run trace repair(s)` }
+  );
+  if (!pick || pick.value === 'none') {
+    return;
+  }
+  let toApply = repairs;
+  if (pick.value === 'pick') {
+    const chosen = await vscode.window.showQuickPick(
+      repairs.map((r) => ({
+        label: `${r.displayName} · ${r.kind}`,
+        description: r.property || r.type,
+        detail: r.reason,
+        repair: r
+      })),
+      { canPickMany: true, placeHolder: 'Select trace repairs to apply' }
+    );
+    if (!chosen?.length) {
+      return;
+    }
+    toApply = chosen.map((c) => c.repair);
+  }
+  const next = applyTraceRepairs(doc, toApply);
+  const applied = await editorProvider.applyWorkflowDocument(next);
+  if (!applied) {
+    vscode.window.showWarningMessage(
+      'Open the workflow in the LowCode Studio designer to apply repairs.'
+    );
+    return;
+  }
+  vscode.window.showInformationMessage(
+    `Assist F2: applied ${toApply.length} dry-run trace repair(s).`
+  );
 }
 
 async function explainWorkflowCommand(): Promise<void> {

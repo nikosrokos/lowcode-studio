@@ -12,6 +12,11 @@ export type DesignerSettings = {
   syncStudioWebOnSave: boolean;
   uipathTargetFramework: 'Windows' | 'Portable';
   canvasStyle: 'plain' | 'dots';
+  showCardSummaries: boolean;
+  compactCards: boolean;
+  showConnectors: boolean;
+  defaultZoom: number;
+  openHomeOnStartup: boolean;
 };
 
 const DEFAULT_DESIGNER_SETTINGS: DesignerSettings = {
@@ -20,7 +25,12 @@ const DEFAULT_DESIGNER_SETTINGS: DesignerSettings = {
   autoOpenDesigner: true,
   syncStudioWebOnSave: true,
   uipathTargetFramework: 'Windows',
-  canvasStyle: 'plain'
+  canvasStyle: 'plain',
+  showCardSummaries: true,
+  compactCards: false,
+  showConnectors: true,
+  defaultZoom: 1,
+  openHomeOnStartup: true
 };
 
 export function getDesignerHtml(
@@ -121,10 +131,38 @@ export function getDesignerHtml(
     }
     .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; min-width: 170px; }
     .brand-mark {
-      width: 26px; height: 26px; border-radius: 8px;
-      background: linear-gradient(135deg, #0ea5e9, #22c55e);
+      width: 28px; height: 28px; border-radius: 8px;
+      background: linear-gradient(135deg, #0ea5e9, #14b8a6);
       box-shadow: 0 0 0 1px rgba(255,255,255,.08), var(--shadow);
+      position: relative; overflow: hidden;
     }
+    .brand-mark::before {
+      content: ''; position: absolute; left: 6px; top: 8px; width: 14px; height: 2px;
+      border-radius: 1px; background: rgba(255,255,255,.92);
+      box-shadow: 0 5px 0 rgba(255,255,255,.92), 0 10px 0 rgba(255,255,255,.92);
+    }
+    .brand-mark::after {
+      content: ''; position: absolute; left: 17px; top: 16px;
+      width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,.95);
+    }
+    .toolbar .btn.symbol {
+      min-width: 36px; min-height: 34px; padding: 6px 10px;
+      font-size: 16px; line-height: 1;
+    }
+    .var-row, .arg-row {
+      display: grid; grid-template-columns: 1fr 86px 28px; gap: 6px; align-items: center;
+      margin-bottom: 6px;
+    }
+    .arg-row { grid-template-columns: 1fr 64px 78px 28px; }
+    .var-row input, .var-row select, .arg-row input, .arg-row select {
+      width: 100%; font-size: 11px; padding: 5px 7px; border-radius: 6px;
+      border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text);
+      font-family: var(--mono);
+    }
+    .app.hide-summaries .card-summary { display: none; }
+    .app.compact-cards .card { padding: 7px 8px 7px 10px; }
+    .app.compact-cards .card-title { font-size: 12px; }
+    .app.hide-connectors .connector, .app.hide-connectors .drop-zone::before { display: none; }
     .workflow-name {
       font-size: 14px; font-weight: 600; background: transparent; border: none; color: var(--text);
       border-bottom: 1px dashed transparent; min-width: 140px;
@@ -1230,6 +1268,19 @@ export function getDesignerHtml(
             <code>Data/Test/scenarios.json</code>. Then run with <kbd>Shift+F5</kbd> or Dry Run Scenarios.
           </p>
 
+          <h3>Scaffold / dry-run-trace repair (F2)</h3>
+          <span class="cmd">LowCode Studio: Scaffold sequence from description (Assist)</span>
+          <p>
+            Describe steps in plain language (split with newlines, <code>;</code>, or <em>then</em>).
+            Keywords map to catalog activities only — no LLM. Example:
+          </p>
+          <span class="cmd">use browser https://example.com then type into then click then log message "done"</span>
+          <span class="cmd">LowCode Studio: Repair from dry-run trace (Assist)</span>
+          <p>
+            Runs a dry-run (or uses the last designer dry-run), then proposes fills for empty required
+            props, TODO selectors, and <code>Imported.*</code> → Comment replacements.
+          </p>
+
           <h3>Suggest / repair selectors (F3)</h3>
           <span class="cmd">LowCode Studio: Suggest / repair selectors (Assist)</span>
           <p>Two modes (propose first — nothing is applied until you confirm):</p>
@@ -1299,6 +1350,38 @@ export function getDesignerHtml(
                 <option value="dots">Dots</option>
               </select>
             </div>
+            <div class="settings-row">
+              <div class="label">
+                <span class="name">Card summaries</span>
+                <span class="hint">One-line property preview under each activity title</span>
+              </div>
+              <input type="checkbox" id="set_showCardSummaries" />
+            </div>
+            <div class="settings-row">
+              <div class="label">
+                <span class="name">Compact activity cards</span>
+                <span class="hint">Tighter padding for dense sequences</span>
+              </div>
+              <input type="checkbox" id="set_compactCards" />
+            </div>
+            <div class="settings-row">
+              <div class="label">
+                <span class="name">Show connectors</span>
+                <span class="hint">Spine / lines between sequence steps</span>
+              </div>
+              <input type="checkbox" id="set_showConnectors" />
+            </div>
+            <div class="settings-row">
+              <div class="label">
+                <span class="name">Default zoom</span>
+                <span class="hint">Applied when opening a workflow</span>
+              </div>
+              <select id="set_defaultZoom">
+                <option value="0.75">75%</option>
+                <option value="1">100%</option>
+                <option value="1.25">125%</option>
+              </select>
+            </div>
           </div>
           <div class="settings-section">
             <h3>Defaults</h3>
@@ -1318,6 +1401,13 @@ export function getDesignerHtml(
                 <span class="hint">Open the visual designer for new workflows</span>
               </div>
               <input type="checkbox" id="set_autoOpenDesigner" />
+            </div>
+            <div class="settings-row">
+              <div class="label">
+                <span class="name">Open Home on startup</span>
+                <span class="hint">Show LowCode Studio Home when the extension activates</span>
+              </div>
+              <input type="checkbox" id="set_openHomeOnStartup" />
             </div>
             <div class="settings-row">
               <div class="label">
@@ -1498,9 +1588,16 @@ export function getDesignerHtml(
     function applyDesignerSettings() {
       const s = state.settings || {};
       els.app?.classList.toggle('hide-steps', s.showLineNumbers === false);
+      els.app?.classList.toggle('hide-summaries', s.showCardSummaries === false);
+      els.app?.classList.toggle('compact-cards', !!s.compactCards);
+      els.app?.classList.toggle('hide-connectors', s.showConnectors === false);
       const dots = s.canvasStyle === 'dots';
       els.sequence?.classList.toggle('canvas-dots', dots);
       els.flowStage?.classList.toggle('canvas-dots', dots);
+      if (typeof s.defaultZoom === 'number' && s.defaultZoom > 0 && !state._zoomUserTouched) {
+        state.zoom = s.defaultZoom;
+        applyZoom();
+      }
     }
     function fillSettingsForm() {
       const s = state.settings || {};
@@ -1508,8 +1605,14 @@ export function getDesignerHtml(
       const setSel = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
       setChk('set_showLineNumbers', s.showLineNumbers !== false);
       setSel('set_canvasStyle', s.canvasStyle === 'dots' ? 'dots' : 'plain');
+      setChk('set_showCardSummaries', s.showCardSummaries !== false);
+      setChk('set_compactCards', !!s.compactCards);
+      setChk('set_showConnectors', s.showConnectors !== false);
+      const z = Number(s.defaultZoom);
+      setSel('set_defaultZoom', z === 0.75 || z === 1.25 ? String(z) : '1');
       setSel('set_defaultWorkflowType', s.defaultWorkflowType === 'Flowchart' ? 'Flowchart' : 'Sequence');
       setChk('set_autoOpenDesigner', s.autoOpenDesigner !== false);
+      setChk('set_openHomeOnStartup', s.openHomeOnStartup !== false);
       setChk('set_syncStudioWebOnSave', s.syncStudioWebOnSave !== false);
       setSel('set_uipathTargetFramework', s.uipathTargetFramework === 'Portable' ? 'Portable' : 'Windows');
     }
@@ -1543,15 +1646,22 @@ export function getDesignerHtml(
     function saveSettingsFromForm() {
       const chk = (id) => !!document.getElementById(id)?.checked;
       const sel = (id) => document.getElementById(id)?.value;
+      const zoomRaw = Number(sel('set_defaultZoom'));
       const next = {
         showLineNumbers: chk('set_showLineNumbers'),
         canvasStyle: sel('set_canvasStyle') === 'dots' ? 'dots' : 'plain',
+        showCardSummaries: chk('set_showCardSummaries'),
+        compactCards: chk('set_compactCards'),
+        showConnectors: chk('set_showConnectors'),
+        defaultZoom: zoomRaw === 0.75 || zoomRaw === 1.25 ? zoomRaw : 1,
         defaultWorkflowType: sel('set_defaultWorkflowType') === 'Flowchart' ? 'Flowchart' : 'Sequence',
         autoOpenDesigner: chk('set_autoOpenDesigner'),
+        openHomeOnStartup: chk('set_openHomeOnStartup'),
         syncStudioWebOnSave: chk('set_syncStudioWebOnSave'),
         uipathTargetFramework: sel('set_uipathTargetFramework') === 'Portable' ? 'Portable' : 'Windows'
       };
       state.settings = Object.assign({}, state.settings, next);
+      state._zoomUserTouched = false;
       applyDesignerSettings();
       vscode.postMessage({ type: 'updateSettings', settings: next });
       closeSettings();
@@ -2330,6 +2440,7 @@ export function getDesignerHtml(
       els.zoomLabel.textContent = Math.round(state.zoom * 100) + '%';
     }
     function setZoom(next) {
+      state._zoomUserTouched = true;
       state.zoom = Math.min(1.75, Math.max(0.5, Math.round(next * 100) / 100));
       applyZoom();
     }
@@ -3405,29 +3516,21 @@ export function getDesignerHtml(
         els.variablesView.innerHTML = '<div class="empty">No variables yet. Use Add Variable below.</div>';
         return;
       }
+      // Compact single row: name + type (+ delete). Default stays in Properties / watch.
       els.variablesView.innerHTML = vars.map((v, i) => (
-        '<div class="field" style="display:grid;grid-template-columns:1fr 90px 28px;gap:6px;align-items:end;">' +
-          '<div><label>Name</label><input data-var="' + i + '" data-field="name" value="' + escapeAttr(v.name) + '" /></div>' +
-          '<div><label>Type</label><select data-var="' + i + '" data-field="type">' +
+        '<div class="var-row" title="Default: ' + escapeAttr(v.defaultValue === undefined || v.defaultValue === null ? '' : String(v.defaultValue)) + '">' +
+          '<input data-var="' + i + '" data-field="name" value="' + escapeAttr(v.name) + '" placeholder="Name" />' +
+          '<select data-var="' + i + '" data-field="type" title="Type">' +
             ['String','Int32','Boolean','Double','Object','DataTable','Array'].map(t => '<option' + (v.type===t?' selected':'') + '>' + t + '</option>').join('') +
-          '</select></div>' +
+          '</select>' +
           '<button class="icon-btn" data-del-var="' + i + '" title="Remove">✕</button>' +
-        '</div>' +
-        '<div class="field"><label>Default</label><input data-var="' + i + '" data-field="defaultValue" value="' + escapeAttr(v.defaultValue === undefined || v.defaultValue === null ? '' : String(v.defaultValue)) + '" /></div>'
+        '</div>'
       )).join('');
       els.variablesView.querySelectorAll('[data-var]').forEach(input => {
         input.addEventListener('change', () => {
           const i = Number(input.getAttribute('data-var'));
           const field = input.getAttribute('data-field');
-          if (field === 'defaultValue') {
-            const t = state.workflow.variables[i].type;
-            let val = input.value;
-            if (t === 'Int32' || t === 'Double') val = Number(val || 0);
-            if (t === 'Boolean') val = val === 'true';
-            state.workflow.variables[i].defaultValue = val;
-          } else {
-            state.workflow.variables[i][field] = input.value;
-          }
+          state.workflow.variables[i][field] = input.value;
           persist(false);
           vscode.postMessage({ type: 'variablesChanged', variables: state.workflow.variables, workflow: state.workflow });
         });
@@ -3452,36 +3555,24 @@ export function getDesignerHtml(
       }
       const types = ['String','Int32','Boolean','Double','Object','DataTable','Array'];
       const dirs = ['In','Out','InOut'];
+      // Compact single row: name + direction + type (+ delete)
       els.argumentsView.innerHTML = args.map((a, i) => (
-        '<div class="field arg-card" data-arg-card="' + i + '">' +
-          '<div style="display:grid;grid-template-columns:1fr 28px;gap:6px;align-items:end;">' +
-            '<div><label>Name</label><input data-arg="' + i + '" data-field="name" value="' + escapeAttr(a.name || '') + '" /></div>' +
-            '<button class="icon-btn" data-del-arg="' + i + '" title="Remove">✕</button>' +
-          '</div>' +
-          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">' +
-            '<div><label>Direction</label><select data-arg="' + i + '" data-field="direction">' +
-              dirs.map(d => '<option' + ((a.direction || 'In') === d ? ' selected' : '') + '>' + d + '</option>').join('') +
-            '</select></div>' +
-            '<div><label>Type</label><select data-arg="' + i + '" data-field="type">' +
-              types.map(t => '<option' + (a.type === t ? ' selected' : '') + '>' + t + '</option>').join('') +
-            '</select></div>' +
-          '</div>' +
-          '<div class="field" style="margin-top:6px;margin-bottom:0"><label>Default</label><input data-arg="' + i + '" data-field="defaultValue" value="' + escapeAttr(a.defaultValue === undefined || a.defaultValue === null ? '' : String(a.defaultValue)) + '" /></div>' +
+        '<div class="arg-row" data-arg-card="' + i + '" title="Default: ' + escapeAttr(a.defaultValue === undefined || a.defaultValue === null ? '' : String(a.defaultValue)) + '">' +
+          '<input data-arg="' + i + '" data-field="name" value="' + escapeAttr(a.name || '') + '" placeholder="Name" />' +
+          '<select data-arg="' + i + '" data-field="direction" title="Direction">' +
+            dirs.map(d => '<option' + ((a.direction || 'In') === d ? ' selected' : '') + '>' + d + '</option>').join('') +
+          '</select>' +
+          '<select data-arg="' + i + '" data-field="type" title="Type">' +
+            types.map(t => '<option' + (a.type === t ? ' selected' : '') + '>' + t + '</option>').join('') +
+          '</select>' +
+          '<button class="icon-btn" data-del-arg="' + i + '" title="Remove">✕</button>' +
         '</div>'
-      )).join('<div style="height:10px"></div>');
+      )).join('');
       const applyArgField = (input) => {
         const i = Number(input.getAttribute('data-arg'));
         const field = input.getAttribute('data-field');
         if (!state.workflow.arguments || !state.workflow.arguments[i] || !field) return;
-        if (field === 'defaultValue') {
-          const t = state.workflow.arguments[i].type;
-          let val = input.value;
-          if (t === 'Int32' || t === 'Double') val = Number(val || 0);
-          if (t === 'Boolean') val = val === 'true';
-          state.workflow.arguments[i].defaultValue = val;
-        } else {
-          state.workflow.arguments[i][field] = input.value;
-        }
+        state.workflow.arguments[i][field] = input.value;
         vscode.postMessage({ type: 'edit', workflow: state.workflow });
         vscode.postMessage({
           type: 'argumentsChanged',

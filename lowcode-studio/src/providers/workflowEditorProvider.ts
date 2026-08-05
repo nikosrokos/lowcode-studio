@@ -664,13 +664,19 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
     const workflowType = cfg.get<string>('defaultWorkflowType', 'Sequence');
     const framework = cfg.get<string>('uipathTargetFramework', 'Windows');
     const canvasStyle = cfg.get<string>('canvasStyle', 'plain');
+    const zoom = Number(cfg.get<number>('defaultZoom', 1));
     return {
       showLineNumbers: cfg.get<boolean>('showLineNumbers', true),
       defaultWorkflowType: workflowType === 'Flowchart' ? 'Flowchart' : 'Sequence',
       autoOpenDesigner: cfg.get<boolean>('autoOpenDesigner', true),
       syncStudioWebOnSave: cfg.get<boolean>('syncStudioWebOnSave', true),
       uipathTargetFramework: framework === 'Portable' ? 'Portable' : 'Windows',
-      canvasStyle: canvasStyle === 'dots' ? 'dots' : 'plain'
+      canvasStyle: canvasStyle === 'dots' ? 'dots' : 'plain',
+      showCardSummaries: cfg.get<boolean>('showCardSummaries', true),
+      compactCards: cfg.get<boolean>('compactCards', false),
+      showConnectors: cfg.get<boolean>('showConnectors', true),
+      defaultZoom: zoom === 0.75 || zoom === 1.25 ? zoom : 1,
+      openHomeOnStartup: cfg.get<boolean>('openHomeOnStartup', true)
     };
   }
 
@@ -687,7 +693,12 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
       ['autoOpenDesigner', patch.autoOpenDesigner],
       ['syncStudioWebOnSave', patch.syncStudioWebOnSave],
       ['uipathTargetFramework', patch.uipathTargetFramework],
-      ['canvasStyle', patch.canvasStyle]
+      ['canvasStyle', patch.canvasStyle],
+      ['showCardSummaries', patch.showCardSummaries],
+      ['compactCards', patch.compactCards],
+      ['showConnectors', patch.showConnectors],
+      ['defaultZoom', patch.defaultZoom],
+      ['openHomeOnStartup', patch.openHomeOnStartup]
     ];
     for (const [key, value] of entries) {
       if (value === undefined) {
