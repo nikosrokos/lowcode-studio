@@ -642,6 +642,7 @@ export function getDesignerHtml(
       margin-top: 6px; font-size: 10px; font-weight: 600; color: #d97706;
       letter-spacing: .02em;
     }
+    .card-warn.weak { color: #ca8a04; }
     .card-actions {
       position: absolute; right: 6px; top: 6px; display: flex; gap: 3px; align-items: center;
       z-index: 3;
@@ -726,8 +727,37 @@ export function getDesignerHtml(
       line-height: 1.35;
     }
     .selector-warn.ok { color: color-mix(in srgb, #16a34a 80%, var(--muted)); }
+    .selector-warn.weak { color: #ca8a04; }
+    .sb-score {
+      display: flex; align-items: center; gap: 8px; margin: 8px 0 4px;
+      font-size: 11px;
+    }
+    .sb-score .sb-meter {
+      flex: 1; height: 6px; border-radius: 999px;
+      background: color-mix(in srgb, var(--muted) 22%, transparent);
+      overflow: hidden;
+    }
+    .sb-score .sb-meter > span {
+      display: block; height: 100%; border-radius: 999px;
+      background: #d97706; transition: width .15s ease;
+    }
+    .sb-score.ok .sb-meter > span { background: #16a34a; }
+    .sb-score.strong .sb-meter > span { background: #15803d; }
+    .sb-score.weak .sb-meter > span { background: #ca8a04; }
+    .sb-score.empty .sb-meter > span,
+    .sb-score.placeholder .sb-meter > span { background: #ea580c; }
+    .sb-score-label { font-weight: 700; min-width: 72px; }
+    .sb-hints { margin: 0 0 6px; padding-left: 16px; font-size: 10px; color: var(--muted); }
+    .sb-hints li { margin: 2px 0; }
     .sb-actions { display: flex; gap: 6px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
     .sb-hint { font-size: 10px; color: var(--muted); flex: 1; min-width: 120px; }
+    .sb-paste-row { display: flex; gap: 6px; margin-top: 8px; align-items: stretch; }
+    .sb-paste-row textarea {
+      flex: 1; min-height: 52px; font-family: var(--mono); font-size: 11px;
+      background: var(--input-bg); color: var(--text);
+      border: 1px solid var(--input-border); border-radius: 8px; padding: 6px 8px;
+      resize: vertical;
+    }
     .modern-sel {
       margin: 0 0 12px; padding: 8px 10px; border-radius: 8px;
       border: 1px dashed color-mix(in srgb, var(--border) 85%, transparent);
@@ -1634,30 +1664,135 @@ export function getDesignerHtml(
       return { kind: 'browser', app: 'chrome.exe', title: '*', tag: '', id: '', aaname: '', cls: '', name: '', idx: '' };
     }
     function isPlaceholderSel(raw) {
+      const q = scoreSelector(raw);
+      return q.level === 'empty' || q.level === 'placeholder';
+    }
+    function scoreSelector(raw) {
       const s = String(raw || '').trim();
-      if (!s) return true;
-      if (/<target\\b/i.test(s) || s === '<target />') return true;
-      if (/id=['"]btnSubmit['"]/i.test(s)) return true;
-      if (/id=['"]input['"]/i.test(s)) return true;
-      if (/id=['"]label['"]/i.test(s)) return true;
-      if (/id=['"]popup['"]/i.test(s)) return true;
-      if (/id=['"]chkAgree['"]/i.test(s)) return true;
-      if (/id=['"]menu['"]/i.test(s)) return true;
-      if (/id=['"]cmbCountry['"]/i.test(s)) return true;
-      if (/id=['"]element['"]/i.test(s)) return true;
-      if (/<webctrl\\b/i.test(s)) {
-        const hasId = /\\bid\\s*=/i.test(s);
-        const hasName = /\\b(?:aaname|name)\\s*=/i.test(s);
-        const hasIdx = /\\bidx\\s*=/i.test(s);
-        if (!hasId && !hasName && !hasIdx) return true;
+      const stock = new Set(['btnsubmit','input','label','popup','chkagree','menu','cmbcountry','element']);
+      if (!s) {
+        return { score: 0, level: 'empty', label: 'Empty', hints: ['Paste a Studio UI Explorer selector or use a template.'], cardMessage: 'Windows TODO · missing selector' };
       }
-      if (/<wnd\\b/i.test(s) && /app=['"]app\\.exe['"]/i.test(s)) {
-        const hasCls = /\\bcls\\s*=/i.test(s);
-        const hasTitle = /\\btitle\\s*=\\s*['"](?!\\*)/i.test(s);
-        const hasName = /\\bname\\s*=/i.test(s);
-        if (!hasCls && !hasTitle && !hasName) return true;
+      if (/<target\\b/i.test(s)) {
+        return { score: 8, level: 'placeholder', label: 'Placeholder', hints: ['Replace <target> with classic <html>/<webctrl> or <wnd>.'], cardMessage: 'Windows TODO · <target> placeholder' };
       }
-      return false;
+      const parts = parseWindowsSelector(s);
+      if (stock.has(String(parts.id || '').toLowerCase())) {
+        return { score: 15, level: 'placeholder', label: 'Starter example', hints: ['Id "' + parts.id + '" is a demo value — set a real Id / aaname.'], cardMessage: 'Windows TODO · starter selector' };
+      }
+      let score = 20;
+      if (/<(html|webctrl|wnd)\\b/i.test(s)) score += 15;
+      const hints = [];
+      if (parts.kind === 'browser') {
+        if (parts.tag && parts.tag !== '*') score += 10; else hints.push('Set a Tag (BUTTON, INPUT, A…).');
+        if (parts.id) score += 30;
+        if (parts.aaname) score += 22;
+        if (parts.name) score += 18;
+        if (parts.cls) score += 8;
+        if (parts.idx) {
+          score += 6;
+          if (!parts.id && !parts.aaname && !parts.name) hints.push('Index-only selectors are brittle — add Id or aaname.');
+        }
+        if (parts.title && parts.title !== '*') score += 6;
+        if (!parts.id && !parts.aaname && !parts.name && !parts.idx) {
+          return { score: Math.min(score, 28), level: 'placeholder', label: 'Under-specified', hints: ['Set Id, aaname, Name, or Index before Windows run.'], cardMessage: 'Windows TODO · under-specified selector' };
+        }
+      } else {
+        if (parts.app && parts.app !== 'app.exe') score += 20; else hints.push('Set a real App (e.g. notepad.exe).');
+        if (parts.cls) score += 22;
+        if (parts.title && parts.title !== '*') score += 18;
+        else if (parts.title === '*') { score += 4; hints.push('A concrete window Title is more reliable than *.'); }
+        if (parts.name) score += 16;
+        if (parts.idx) score += 6;
+        if ((!parts.app || parts.app === 'app.exe') && !parts.cls && (!parts.title || parts.title === '*') && !parts.name) {
+          return { score: 12, level: 'placeholder', label: 'Generic window', hints: ['Set App + Title or cls for desktop selectors.'], cardMessage: 'Windows TODO · generic <wnd>' };
+        }
+      }
+      score = Math.max(0, Math.min(100, score));
+      if (score < 40) {
+        if (!hints.length) hints.push('Add Id or aaname to raise specificity.');
+        return { score: score, level: 'weak', label: 'Weak', hints: hints, cardMessage: 'Weak selector — add Id / aaname' };
+      }
+      if (score < 70) {
+        if (!hints.length) hints.push('Good enough to try on Windows; Indicate Element if it misses.');
+        return { score: score, level: 'ok', label: 'OK', hints: hints, cardMessage: '' };
+      }
+      if (!hints.length) hints.push('Specific classic selector — still verify on Windows.');
+      return { score: score, level: 'strong', label: 'Strong', hints: hints, cardMessage: '' };
+    }
+    function tryDecodeSelectorPaste(raw) {
+      const text = String(raw || '').trim();
+      if (!text) return null;
+      if (/<(html|webctrl|wnd|java|sap|ctrl)\\b/i.test(text)) return text;
+      if (/<target\\b/i.test(text) || /^#[\\w.-]+$/.test(text) || /^[\\w.-]+$/.test(text)) {
+        // mirror normalizeWindowsSelector lightly
+        if (/^#[\\w.-]+$/.test(text)) {
+          return "<html app='chrome.exe' title='*' />\\n<webctrl tag='*' id='" + escSel(text.slice(1)) + "' />";
+        }
+        if (/^[\\w.-]+$/.test(text) && text.length < 80) {
+          return "<html app='chrome.exe' title='*' />\\n<webctrl tag='*' id='" + escSel(text) + "' />";
+        }
+        const tm = text.match(/<target\\b([^>]*)\\/?>/i);
+        if (tm) {
+          const attrs = parseSelAttrs(tm[1] || '');
+          return buildWindowsSelector({
+            kind: 'browser', app: attrs.app || 'chrome.exe', title: attrs.title || '*',
+            tag: (attrs.tag || 'BUTTON').toUpperCase(), id: attrs.id || '',
+            aaname: attrs.aaname || attrs.name || '', name: '', cls: '', idx: ''
+          });
+        }
+      }
+      const htmlWeb = text.match(/(<html\\b[^>]*\\/?>[\\s\\S]*?<webctrl\\b[^>]*\\/?>)/i);
+      if (htmlWeb && htmlWeb[1]) return htmlWeb[1].replace(/>\\s*</g, '>\\n<');
+      const wnd = text.match(/(<wnd\\b[^>]*\\/?>)/i);
+      if (wnd && wnd[1]) return wnd[1];
+      const webOnly = text.match(/<webctrl\\b([^>]*)\\/?>/i);
+      if (webOnly) {
+        const attrs = parseSelAttrs(webOnly[1] || '');
+        return buildWindowsSelector({
+          kind: 'browser', app: 'chrome.exe', title: '*',
+          tag: attrs.tag || '*', id: attrs.id || '', aaname: attrs.aaname || '',
+          name: attrs.name || '', cls: attrs.class || attrs.cls || '', idx: attrs.idx || ''
+        });
+      }
+      const idMatch = text.match(/\\bid\\s*[=:]\\s*['"]?([\\w.-]+)/i);
+      const tagMatch = text.match(/\\btag\\s*[=:]\\s*['"]?([\\w.-]+)/i);
+      const aanameMatch = text.match(/\\b(?:aaname|name)\\s*[=:]\\s*['"]([^'"]+)/i);
+      if (idMatch || aanameMatch) {
+        return buildWindowsSelector({
+          kind: 'browser', app: 'chrome.exe', title: '*',
+          tag: String(tagMatch && tagMatch[1] || '*').toUpperCase(),
+          id: idMatch && idMatch[1] || '', aaname: aanameMatch && aanameMatch[1] || ''
+        });
+      }
+      return null;
+    }
+    function selectorCardWarn(node) {
+      if (!node || !String(node.type || '').startsWith('UI.')) return null;
+      if (node.type === 'UI.OpenApplication' || node.type === 'UI.TakeScreenshot') return null;
+      const def = findDef(node.type);
+      const hasSelectorProp = !!(def?.properties || []).some(p => p.name === 'selector');
+      if (!hasSelectorProp) return null;
+      const q = scoreSelector(node.properties?.selector);
+      if (q.cardMessage) return { text: q.cardMessage, level: q.level };
+      return null;
+    }
+    function collectSiblingSelectors(excludeId) {
+      const out = [];
+      const visit = (list) => {
+        (list || []).forEach(n => {
+          if (n.id !== excludeId) {
+            const sel = String(n.properties?.selector || '').trim();
+            if (sel && !isPlaceholderSel(sel)) {
+              out.push({ id: n.id, name: n.displayName, type: n.type, selector: sel });
+            }
+          }
+          if (n.children) visit(n.children);
+          if (n.elseChildren) visit(n.elseChildren);
+        });
+      };
+      visit(state.workflow.activities || []);
+      return out;
     }
     function buildWindowsSelector(parts) {
       const kind = parts.kind || 'browser';
@@ -1704,15 +1839,20 @@ export function getDesignerHtml(
     }
     function selectorBuilderHtml(propName, currentValue) {
       const parts = parseWindowsSelector(currentValue);
+      const quality = scoreSelector(currentValue);
       const tplOpts = SELECTOR_TEMPLATES.map(t =>
         '<option value="' + escapeAttr(t.id) + '">' + escapeHtml(t.label) + '</option>'
       ).join('');
       const kindOpts = ['browser', 'desktop'].map(k =>
         '<option value="' + k + '"' + (parts.kind === k ? ' selected' : '') + '>' + k + '</option>'
       ).join('');
-      const warn = isPlaceholderSel(currentValue)
-        ? '<div class="selector-warn" data-sb-warn>Selector is empty or still a starter — set Id / aaname / Name before Windows run.</div>'
-        : '<div class="selector-warn ok" data-sb-warn>Selector looks specific enough to try on Windows.</div>';
+      const warnClass = quality.level === 'ok' || quality.level === 'strong' ? 'ok' : (quality.level === 'weak' ? 'weak' : '');
+      const warn = '<div class="selector-warn ' + warnClass + '" data-sb-warn>' + escapeHtml(
+        quality.level === 'ok' || quality.level === 'strong'
+          ? quality.hints[0] || 'Selector looks specific enough to try on Windows.'
+          : (quality.hints[0] || 'Selector needs work before Windows run.')
+      ) + '</div>';
+      const hints = (quality.hints || []).slice(0, 3).map(h => '<li>' + escapeHtml(h) + '</li>').join('');
       return '<div class="selector-builder" data-sel-for="' + escapeAttr(propName) + '">' +
         '<div class="sb-title">Selector Builder</div>' +
         fieldHtml('Template', '<select data-sb="template"><option value="">— choose template —</option>' + tplOpts + '</select>') +
@@ -1727,11 +1867,21 @@ export function getDesignerHtml(
           fieldHtml('Name', '<input data-sb="name" value="' + escapeAttr(parts.name) + '" />') +
           fieldHtml('Index', '<input data-sb="idx" value="' + escapeAttr(parts.idx) + '" placeholder="1" />') +
         '</div>' +
+        '<div class="sb-score ' + escapeAttr(quality.level) + '" data-sb-score>' +
+          '<span class="sb-score-label" data-sb-score-label>' + escapeHtml(quality.label) + ' · ' + quality.score + '</span>' +
+          '<div class="sb-meter"><span data-sb-meter style="width:' + quality.score + '%"></span></div>' +
+        '</div>' +
+        '<ul class="sb-hints" data-sb-hints>' + hints + '</ul>' +
+        warn +
+        '<div class="sb-paste-row">' +
+          '<textarea data-sb-paste placeholder="Paste Studio UI Explorer / modern selector / #id…"></textarea>' +
+          '<button class="btn" type="button" data-sb-decode title="Decode paste into classic selector">Decode</button>' +
+        '</div>' +
         '<div class="sb-actions">' +
           '<button class="btn primary" type="button" data-sb-apply>Apply</button>' +
-          '<span class="sb-hint">Edits apply live to the selector field</span>' +
+          '<button class="btn" type="button" data-sb-copy-sibling title="Copy selector from another activity">Copy sibling</button>' +
+          '<span class="sb-hint">Edits apply live · Mac browser vs Windows desktop paths differ</span>' +
         '</div>' +
-        warn +
         '<pre class="sb-preview" data-sb-preview>' + escapeHtml(String(currentValue || '').trim() ? String(currentValue) : buildWindowsSelector(parts)) + '</pre>' +
       '</div>';
     }
@@ -1740,6 +1890,10 @@ export function getDesignerHtml(
       if (!box) return;
       const preview = box.querySelector('[data-sb-preview]');
       const warnEl = box.querySelector('[data-sb-warn]');
+      const scoreEl = box.querySelector('[data-sb-score]');
+      const scoreLabel = box.querySelector('[data-sb-score-label]');
+      const meter = box.querySelector('[data-sb-meter]');
+      const hintsEl = box.querySelector('[data-sb-hints]');
       const readParts = () => ({
         kind: box.querySelector('[data-sb="kind"]').value || 'browser',
         app: box.querySelector('[data-sb="app"]').value || '',
@@ -1751,13 +1905,28 @@ export function getDesignerHtml(
         name: box.querySelector('[data-sb="name"]').value || '',
         idx: box.querySelector('[data-sb="idx"]').value || ''
       });
-      const syncWarn = (built) => {
-        if (!warnEl) return;
-        const placeholder = isPlaceholderSel(built);
-        warnEl.classList.toggle('ok', !placeholder);
-        warnEl.textContent = placeholder
-          ? 'Selector is empty or still a starter — set Id / aaname / Name before Windows run.'
-          : 'Selector looks specific enough to try on Windows.';
+      const fillParts = (parts) => {
+        Object.keys(parts).forEach(k => {
+          const input = box.querySelector('[data-sb="' + k + '"]');
+          if (input) input.value = parts[k] == null ? '' : String(parts[k]);
+        });
+      };
+      const syncQuality = (built) => {
+        const q = scoreSelector(built);
+        if (warnEl) {
+          warnEl.className = 'selector-warn' + (q.level === 'ok' || q.level === 'strong' ? ' ok' : (q.level === 'weak' ? ' weak' : ''));
+          warnEl.textContent = q.level === 'ok' || q.level === 'strong'
+            ? (q.hints[0] || 'Selector looks specific enough to try on Windows.')
+            : (q.hints[0] || 'Selector needs work before Windows run.');
+        }
+        if (scoreEl) {
+          scoreEl.className = 'sb-score ' + q.level;
+          if (scoreLabel) scoreLabel.textContent = q.label + ' · ' + q.score;
+          if (meter) meter.style.width = q.score + '%';
+        }
+        if (hintsEl) {
+          hintsEl.innerHTML = (q.hints || []).slice(0, 3).map(h => '<li>' + escapeHtml(h) + '</li>').join('');
+        }
       };
       const applyLive = (opts) => {
         const built = buildWindowsSelector(readParts());
@@ -1765,13 +1934,19 @@ export function getDesignerHtml(
         if (target) target.value = built;
         node.properties[propName] = built;
         if (preview) preview.textContent = built;
-        syncWarn(built);
+        syncQuality(built);
         const cardSum = document.querySelector('.card.selected .card-summary');
         if (cardSum) cardSum.textContent = summary(node);
         const cardWarn = document.querySelector('.card.selected .card-warn');
+        const cw = selectorCardWarn(node);
         if (cardWarn) {
-          cardWarn.style.display = isPlaceholderSel(built) ? '' : 'none';
-          cardWarn.textContent = 'Needs a real selector';
+          if (cw) {
+            cardWarn.style.display = '';
+            cardWarn.textContent = cw.text;
+            cardWarn.className = 'card-warn' + (cw.level === 'weak' ? ' weak' : '');
+          } else {
+            cardWarn.style.display = 'none';
+          }
         }
         vscode.postMessage({ type: 'edit', workflow: state.workflow });
         if (opts && opts.toast) toast('Selector applied');
@@ -1790,24 +1965,44 @@ export function getDesignerHtml(
             if (tpl) {
               const base = emptySelParts(tpl.kind);
               const merged = Object.assign({}, base, tpl.parts, { kind: tpl.kind });
-              Object.keys(merged).forEach(k => {
-                const input = box.querySelector('[data-sb="' + k + '"]');
-                if (input) input.value = merged[k] == null ? '' : String(merged[k]);
-              });
+              fillParts(merged);
               applyLive({ toast: true });
             }
-            return;
-          }
-          if (el.getAttribute('data-sb') === 'kind') {
-            // Keep overlapping fields — switching Kind must not wipe Id / aaname / Title.
-            applyLive();
             return;
           }
           applyLive();
         });
       });
       box.querySelector('[data-sb-apply]')?.addEventListener('click', () => applyLive({ toast: true }));
-      syncWarn(node.properties[propName] || '');
+      box.querySelector('[data-sb-decode]')?.addEventListener('click', () => {
+        const paste = box.querySelector('[data-sb-paste]');
+        const decoded = tryDecodeSelectorPaste(paste?.value || '');
+        if (!decoded) {
+          toast('Could not decode paste — try classic <html>/<webctrl>, #id, or tag/id pairs');
+          return;
+        }
+        fillParts(parseWindowsSelector(decoded));
+        if (paste) paste.value = '';
+        applyLive({ toast: true });
+        toast('Decoded paste → classic selector');
+      });
+      box.querySelector('[data-sb-copy-sibling]')?.addEventListener('click', async () => {
+        const siblings = collectSiblingSelectors(node.id);
+        if (!siblings.length) {
+          toast('No sibling activities with a real selector yet');
+          return;
+        }
+        // Lightweight picker via prompt when few; otherwise first strong match
+        const labels = siblings.map((s, i) => (i + 1) + '. ' + s.name + ' (' + s.type + ')');
+        const pick = window.prompt('Copy selector from sibling:\\n' + labels.join('\\n') + '\\n\\nEnter number:', '1');
+        const idx = Math.max(1, parseInt(String(pick || '1'), 10) || 1) - 1;
+        const hit = siblings[idx];
+        if (!hit) { toast('Invalid sibling'); return; }
+        fillParts(parseWindowsSelector(hit.selector));
+        applyLive({ toast: true });
+        toast('Copied selector from ' + hit.name);
+      });
+      syncQuality(node.properties[propName] || '');
       refreshPreview();
     }
 
@@ -2052,8 +2247,7 @@ export function getDesignerHtml(
         ? '<button class="icon-btn" data-act="open" title="Open workflow in new tab">↗</button>'
         : '';
       const bpOn = !!state.breakpoints[node.id];
-      const needsSelector = !!(def?.properties || []).some(p => p.name === 'selector' && p.required);
-      const selMissing = needsSelector && isPlaceholderSel(node.properties?.selector);
+      const selWarn = selectorCardWarn(node);
       if (bpOn) card.classList.add('has-bp');
       card.innerHTML =
         '<div class="card-accent" style="background:' + color + '"></div>' +
@@ -2069,9 +2263,9 @@ export function getDesignerHtml(
         '<div class="card-head"><span class="step">#' + stepNo + '</span>' +
         '<div class="card-title">' + escapeHtml(node.displayName) + '</div></div>' +
         '<div class="card-summary">' + escapeHtml(summary(node)) + '</div>' +
-        (needsSelector
-          ? '<div class="card-warn"' + (selMissing ? '' : ' style="display:none"') + '>Needs a real selector</div>'
-          : '');
+        (selWarn
+          ? '<div class="card-warn' + (selWarn.level === 'weak' ? ' weak' : '') + '">' + escapeHtml(selWarn.text) + '</div>'
+          : '<div class="card-warn" style="display:none"></div>');
       card.addEventListener('mouseenter', (e) => showTip(tipHtml(node), e.clientX, e.clientY));
       card.addEventListener('mousemove', (e) => showTip(tipHtml(node), e.clientX, e.clientY));
       card.addEventListener('mouseleave', hideTip);
@@ -2229,16 +2423,17 @@ export function getDesignerHtml(
         const isDecision = node.type === 'Flowchart.FlowDecision';
         const isStart = node.type === 'Flowchart.Start';
         const isEnd = node.type === 'Flowchart.End';
-        const needsSelector = !!(def?.properties || []).some(p => p.name === 'selector' && p.required);
-        const selMissing = needsSelector && isPlaceholderSel(node.properties?.selector);
-        const warnHtml = selMissing ? '<div class="card-warn" style="margin-top:4px;">Needs a real selector</div>' : '';
+        const selWarn = selectorCardWarn(node);
+        const warnHtml = selWarn
+          ? '<div class="card-warn' + (selWarn.level === 'weak' ? ' weak' : '') + '" style="margin-top:4px;">' + escapeHtml(selWarn.text) + '</div>'
+          : '';
         el.dataset.id = node.id;
         el.className = 'flow-node' +
           (state.selectedId === node.id ? ' selected' : '') +
           (isDecision ? ' decision' : '') +
           (isStart ? ' start' : '') +
           (isEnd ? ' end' : '') +
-          (selMissing ? ' selector-missing' : '') +
+          (selWarn && (selWarn.level === 'empty' || selWarn.level === 'placeholder') ? ' selector-missing' : '') +
           dryRunClass(node.id);
         el.style.left = (node.x || 40) + 'px';
         el.style.top = (node.y || 40) + 'px';

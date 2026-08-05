@@ -55,11 +55,15 @@ Highest leverage for *not opening Studio Web to finish work*.
 - Flowchart: FlowSwitch / multi-branch fidelity; fewer Comment placeholders
 - Keep Studio Web-only triggers out of designer (already partially done)
 
-### A3. Selectors that ship
-- Stronger Selector Builder (preview, specificity score, “copy from sibling”)
-- Inline validation + `WINDOWS_TODO` items surfaced **in the card**, not only on Connect
-- Optional: paste from Studio UI Explorer / modern encoding decode helper
-- Document clear Mac browser vs Windows desktop selector paths
+### A3. Selectors that ship — **shipped in 0.6.27**
+- Stronger Selector Builder: specificity score, Decode paste, copy from sibling
+- Inline validation + Windows TODO messages on canvas cards
+- Validate / Packages / Connect surface Windows TODO in Output
+- Paste helper for UI Explorer / `#id` / embedded classic (modern blob: best-effort extract)
+- Still later: richer modern FullSelectorEncoding decode; remote Indicate Element bridge
+
+### A3 (historical notes)
+- Document clear Mac browser vs Windows desktop selector paths (partially in builder hint)
 
 ### A4. Project explorer as the hub
 - Multi-file edit without friction (tabs already VS Code — deepen LCS project tree actions)

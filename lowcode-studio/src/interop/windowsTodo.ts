@@ -24,6 +24,7 @@ export interface WindowsTodoChecklist {
 const HIGH_CODES = new Set([
   'ui-missing-selector',
   'ui-placeholder-selector',
+  'ui-weak-selector',
   'imported-placeholder',
   'invoke-missing-path',
   'invoke-missing-file',

@@ -3,7 +3,9 @@ import {
   applyTemplate,
   buildWindowsSelector,
   parseWindowsSelector,
-  SELECTOR_TEMPLATES
+  scoreSelector,
+  SELECTOR_TEMPLATES,
+  tryDecodeSelectorPaste
 } from '../interop/selectorBuilder';
 
 function run(): void {
@@ -60,6 +62,54 @@ function run(): void {
     id: 'checkout'
   });
   assert.ok(specific.includes("id='checkout'"));
+
+  // Specificity scoring
+  const emptyQ = scoreSelector('');
+  assert.strictEqual(emptyQ.level, 'empty');
+  assert.ok(emptyQ.cardMessage.includes('missing'));
+
+  const starterQ = scoreSelector(specific.replace('checkout', 'btnSubmit'));
+  assert.strictEqual(starterQ.level, 'placeholder');
+
+  const strongQ = scoreSelector(
+    buildWindowsSelector({
+      kind: 'browser',
+      app: 'chrome.exe',
+      title: 'Checkout*',
+      tag: 'BUTTON',
+      id: 'checkoutBtn',
+      aaname: 'Pay now'
+    })
+  );
+  assert.ok(strongQ.score >= 70, `expected strong score, got ${strongQ.score}`);
+  assert.strictEqual(strongQ.level, 'strong');
+
+  const weakQ = scoreSelector(
+    buildWindowsSelector({
+      kind: 'browser',
+      app: 'chrome.exe',
+      title: '*',
+      tag: 'BUTTON',
+      idx: '1'
+    })
+  );
+  assert.ok(
+    weakQ.level === 'weak' || weakQ.level === 'placeholder' || weakQ.score < 70,
+    `idx-only should not be strong: ${weakQ.level}/${weakQ.score}`
+  );
+
+  // Paste decode
+  assert.strictEqual(
+    tryDecodeSelectorPaste('#orderId'),
+    "<html app='chrome.exe' title='*' />\n<webctrl tag='*' id='orderId' />"
+  );
+  const classicPaste = tryDecodeSelectorPaste(
+    "noise <html app='chrome.exe' title='*' />\n<webctrl tag='INPUT' id='email' /> trailing"
+  );
+  assert.ok(classicPaste && classicPaste.includes("id='email'"));
+
+  const webOnly = tryDecodeSelectorPaste("<webctrl tag='A' aaname='Next' />");
+  assert.ok(webOnly && webOnly.includes('webctrl') && webOnly.includes('aaname'));
 
   console.log('selectorBuilder.test.ts: all assertions passed');
 }
