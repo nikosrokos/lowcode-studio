@@ -48,7 +48,7 @@ Design on Mac (REFramework)
   - Framed, resizable left Toolbox and right Properties panels
   - macOS traffic lights: collapse · float · dock
   - Floating frames with drag + height resize; docked frames with width resize
-  - Bottom-center dock (zoom, insert, validate, dry-run, step, panel toggles, Save)
+  - Bottom-center dock (zoom, insert, validate, dry-run, step, panel toggles)
   - Slim top bar (brand · workflow · mode · Save)
 - README screenshots refreshed (2 images)
 
