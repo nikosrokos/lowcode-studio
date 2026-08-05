@@ -157,7 +157,9 @@ export function getDesignerHtml(
     .left-section[data-section="project"] { flex: 0 1 24%; }
     .left-section[data-section="activities"] { flex: 1 1 40%; min-height: 140px; }
     .left-section[data-section="variables"] { flex: 0 1 18%; }
-    .left-section[data-section="arguments"] { flex: 0 1 18%; border-bottom: none; }
+    .left-section[data-section="arguments"] { flex: 0 1 14%; }
+    .left-section[data-section="watch"] { flex: 0 1 16%; }
+    .left-section[data-section="fixtures"] { flex: 0 1 16%; border-bottom: none; }
     .left-section.collapsed { flex: 0 0 auto; min-height: 0; }
     .left-section.collapsed .left-section-body { display: none; }
     .left-section-head {
@@ -513,6 +515,37 @@ export function getDesignerHtml(
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .card-summary.mono { font-family: var(--mono); }
+    .card-bp {
+      position: absolute; left: -2px; top: 50%; transform: translateY(-50%);
+      width: 10px; height: 10px; border-radius: 50%;
+      border: 1px solid color-mix(in srgb, #ef4444 60%, var(--border));
+      background: transparent; cursor: pointer; padding: 0; z-index: 2;
+    }
+    .card-bp.on, .flow-node .card-bp.on {
+      background: #ef4444; border-color: #ef4444;
+      box-shadow: 0 0 0 2px color-mix(in srgb, #ef4444 25%, transparent);
+    }
+    .kind-badge {
+      display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .04em;
+      text-transform: uppercase; padding: 1px 5px; border-radius: 4px; margin-left: 6px;
+      vertical-align: middle;
+    }
+    .kind-badge.real { color: #15803d; background: color-mix(in srgb, #22c55e 18%, transparent); }
+    .kind-badge.simulated { color: #a16207; background: color-mix(in srgb, #f59e0b 18%, transparent); }
+    .kind-badge.unsupported { color: #b91c1c; background: color-mix(in srgb, #ef4444 16%, transparent); }
+    .watch-panel { padding: 0 10px 12px; font-size: 12px; }
+    .watch-panel .watch-row {
+      display: grid; grid-template-columns: 1fr 1.2fr; gap: 6px; margin-bottom: 6px; align-items: center;
+    }
+    .watch-panel label { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
+    .watch-panel input { font-family: var(--mono); font-size: 11px; }
+    .fixtures-editor {
+      width: 100%; min-height: 120px; font-family: var(--mono); font-size: 11px;
+      background: var(--input-bg); color: var(--text); border: 1px solid var(--input-border);
+      border-radius: 8px; padding: 8px; resize: vertical;
+    }
+    .pb-kind { opacity: .85; font-size: 10px; margin-left: 6px; }
+    .card.has-bp { outline: 1px dashed color-mix(in srgb, #ef4444 45%, transparent); }
     .card-warn {
       margin-top: 6px; font-size: 10px; font-weight: 600; color: #d97706;
       letter-spacing: .02em;
@@ -839,6 +872,38 @@ export function getDesignerHtml(
             </div>
           </div>
         </section>
+        <section class="left-section collapsed" data-section="watch">
+          <button type="button" class="left-section-head" data-toggle-section="watch">
+            <span class="chev">▸</span><span class="grow">Watch</span>
+            <span class="count" id="watchCount">0</span>
+          </button>
+          <div class="left-section-body">
+            <div class="watch-panel" id="watchView"><div class="empty">Run Step-through to watch variables.</div></div>
+            <div style="padding:0 12px 12px;display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn" id="btnWatchApply" type="button" title="Re-run dry-run using edited watch values as seeds">Re-run with watch</button>
+            </div>
+          </div>
+        </section>
+        <section class="left-section collapsed" data-section="fixtures">
+          <button type="button" class="left-section-head" data-toggle-section="fixtures">
+            <span class="chev">▸</span><span class="grow">Fixtures</span>
+          </button>
+          <div class="left-section-body">
+            <div style="padding:0 10px 8px;color:var(--muted);font-size:11px;line-height:1.4;">
+              Session fixtures for dry-run (HTTP, UI text, tables, queue, assets). JSON object.
+            </div>
+            <div style="padding:0 10px;">
+              <textarea class="fixtures-editor" id="fixturesEditor" spellcheck="false" placeholder='{
+  "http": { "api.example.com": { "status": 200, "body": {} } },
+  "assets": { "AppUrl": "https://..." }
+}'></textarea>
+            </div>
+            <div style="padding:8px 12px 12px;display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn" id="btnFixturesApply" type="button">Apply fixtures</button>
+              <button class="btn" id="btnFixturesClear" type="button">Clear</button>
+            </div>
+          </div>
+        </section>
       </div>
       <div class="frame-resize-y" id="leftResizeY" title="Drag to resize height (float mode)"></div>
       <div class="collapsed-only">
@@ -849,9 +914,10 @@ export function getDesignerHtml(
     <main class="canvas-wrap" id="canvasWrap">
       <div class="playback-bar" id="playbackBar">
         <span class="pb-label" id="playbackLabel">Step-through</span>
-        <button class="btn" id="btnPbStep" type="button">Step</button>
-        <button class="btn primary" id="btnPbContinue" type="button">Continue</button>
+        <button class="btn" id="btnPbStep" type="button" title="Next step (stops at breakpoints)">Step</button>
+        <button class="btn primary" id="btnPbContinue" type="button" title="Continue until breakpoint or end">Continue</button>
         <button class="btn" id="btnPbStop" type="button">Stop</button>
+        <button class="btn" id="btnPbRunTo" type="button" title="Run step-through until the selected activity">Run to here</button>
         <div class="pb-vars" id="playbackVars"></div>
       </div>
       <div class="canvas-bar">
@@ -887,7 +953,6 @@ export function getDesignerHtml(
       </div>
     </div>
 
-    <div class="palette-overlay" id="paletteOverlay">
     <div class="palette-overlay" id="paletteOverlay">
       <div class="palette" role="dialog" aria-label="Insert activity">
         <div class="palette-head">
@@ -962,7 +1027,7 @@ export function getDesignerHtml(
       suggestions: ${suggestionsJson},
       palette: ${paletteJson},
       projects: ${projectsJson},
-      collapsedLeftSections: {},
+      collapsedLeftSections: { watch: true, fixtures: true },
       selectedId: null,
       dragType: null,
       linkFrom: null,
@@ -980,6 +1045,8 @@ export function getDesignerHtml(
       leftHeight: Math.round(window.innerHeight * 0.72),
       leftFloatPos: { x: null, y: null },
       playback: null,
+      breakpoints: {},
+      fixtures: {},
       paletteOpen: false,
       paletteQuery: '',
       paletteActive: 0,
@@ -1020,7 +1087,10 @@ export function getDesignerHtml(
       dockProps: document.getElementById('dockProps'),
       exprOverlay: document.getElementById('exprOverlay'),
       exprDialogTitle: document.getElementById('exprDialogTitle'),
-      exprDialogValue: document.getElementById('exprDialogValue')
+      exprDialogValue: document.getElementById('exprDialogValue'),
+      watchView: document.getElementById('watchView'),
+      watchCount: document.getElementById('watchCount'),
+      fixturesEditor: document.getElementById('fixturesEditor')
     };
 
     function applyLeftSections() {
@@ -1094,10 +1164,76 @@ export function getDesignerHtml(
     }
 
     function isFlow() { return state.workflow.type === 'Flowchart'; }
-    function toast(msg) {
+    function toast(msg, opts) {
       els.toast.textContent = msg;
       els.toast.classList.add('show');
       setTimeout(() => els.toast.classList.remove('show'), 1800);
+      // Mirror designer notifications into VS Code Output (skip if host already logged)
+      if (!(opts && opts.skipLog)) {
+        try { vscode.postMessage({ type: 'log', message: String(msg || '') }); } catch (_) {}
+      }
+    }
+    function setLeftSection(id, open) {
+      if (open === false) state.collapsedLeftSections[id] = true;
+      else state.collapsedLeftSections[id] = false;
+      applyLeftSections();
+    }
+    function setLeftTab(id) { setLeftSection(id, true); }
+    function parseFixturesEditor() {
+      const raw = (els.fixturesEditor && els.fixturesEditor.value || '').trim();
+      if (!raw) return {};
+      try { return JSON.parse(raw); }
+      catch (err) { toast('Fixtures JSON invalid'); return state.fixtures || {}; }
+    }
+    function currentFixtures() {
+      return Object.keys(state.fixtures || {}).length ? state.fixtures : parseFixturesEditor();
+    }
+    function postDryRun(opts) {
+      const o = opts || {};
+      vscode.postMessage({
+        type: 'dryRun',
+        workflow: state.workflow,
+        stepThrough: !!o.stepThrough,
+        fixtures: currentFixtures(),
+        initialVariables: o.initialVariables,
+        runToActivityId: o.runToActivityId || undefined,
+        breakpoints: Object.keys(state.breakpoints || {}).filter(k => state.breakpoints[k])
+      });
+    }
+    function toggleBreakpoint(id) {
+      if (!id) return;
+      state.breakpoints[id] = !state.breakpoints[id];
+      if (!state.breakpoints[id]) delete state.breakpoints[id];
+      toast(state.breakpoints[id] ? 'Breakpoint on' : 'Breakpoint off');
+      renderAll();
+    }
+    function renderWatch(snapshot) {
+      if (!els.watchView) return;
+      const vars = snapshot || state.playback?.liveVars || state.playback?.finalVars || {};
+      const keys = Object.keys(vars).sort();
+      if (els.watchCount) els.watchCount.textContent = String(keys.length);
+      if (!keys.length) {
+        els.watchView.innerHTML = '<div class="empty">No variables in this step.</div>';
+        return;
+      }
+      els.watchView.innerHTML = keys.map(k => {
+        let val;
+        try { val = JSON.stringify(vars[k]); } catch (_) { val = String(vars[k]); }
+        return '<div class="watch-row"><label title="' + escapeAttr(k) + '">' + escapeHtml(k) + '</label>' +
+          '<input data-watch-key="' + escapeAttr(k) + '" value="' + escapeAttr(val === undefined ? '' : val) + '" /></div>';
+      }).join('');
+      els.watchView.querySelectorAll('[data-watch-key]').forEach(input => {
+        input.addEventListener('change', () => {
+          const key = input.getAttribute('data-watch-key');
+          if (!key) return;
+          let parsed = input.value;
+          try { parsed = JSON.parse(input.value); } catch (_) {}
+          state.playback = state.playback || { liveVars: {} };
+          state.playback.liveVars = state.playback.liveVars || Object.assign({}, vars);
+          state.playback.liveVars[key] = parsed;
+          toast('Watch: ' + key + ' updated');
+        });
+      });
     }
     function findDef(type) { return state.catalog.find(a => a.type === type); }
     function newId(prefix) {
@@ -1618,12 +1754,16 @@ export function getDesignerHtml(
       const openBtn = node.type === 'REFramework.InvokeWorkflow'
         ? '<button class="icon-btn" data-act="open" title="Open workflow in new tab">↗</button>'
         : '';
+      const bpOn = !!state.breakpoints[node.id];
       const needsSelector = !!(def?.properties || []).some(p => p.name === 'selector' && p.required);
       const selMissing = needsSelector && isPlaceholderSel(node.properties?.selector);
+      if (bpOn) card.classList.add('has-bp');
       card.innerHTML =
+        '<button type="button" class="card-bp' + (bpOn ? ' on' : '') + '" data-act="bp" title="Toggle breakpoint"></button>' +
         '<div class="card-accent" style="background:' + color + '"></div>' +
         '<div class="card-actions">' +
           openBtn +
+          '<button class="icon-btn" data-act="runto" title="Run to here">⏭</button>' +
           '<button class="icon-btn" data-act="up" title="Move up">↑</button>' +
           '<button class="icon-btn" data-act="down" title="Move down">↓</button>' +
           '<button class="icon-btn" data-act="dup" title="Duplicate">⧉</button>' +
@@ -1653,6 +1793,15 @@ export function getDesignerHtml(
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           const act = btn.getAttribute('data-act');
+          if (act === 'bp') {
+            toggleBreakpoint(node.id);
+            return;
+          }
+          if (act === 'runto') {
+            state.selectedId = node.id;
+            postDryRun({ stepThrough: true, runToActivityId: node.id });
+            return;
+          }
           if (act === 'open') {
             vscode.postMessage({
               type: 'openWorkflow',
@@ -1780,13 +1929,27 @@ export function getDesignerHtml(
         el.style.left = (node.x || 40) + 'px';
         el.style.top = (node.y || 40) + 'px';
         el.style.borderColor = node.color || def?.color || undefined;
+        const bpOn = !!state.breakpoints[node.id];
+        const bpBtn = '<button type="button" class="card-bp' + (bpOn ? ' on' : '') + '" data-flow-bp="1" title="Toggle breakpoint"></button>';
+        if (bpOn) el.classList.add('has-bp');
         if (isDecision) {
-          el.innerHTML = '<div class="inner"><div class="title">' + escapeHtml(node.displayName) + '</div><div class="summary">' + escapeHtml(summary(node)) + '</div></div><div class="port" title="Drag to connect"></div>';
+          el.innerHTML = bpBtn + '<div class="inner"><div class="title">' + escapeHtml(node.displayName) + '</div><div class="summary">' + escapeHtml(summary(node)) + '</div></div><div class="port" title="Drag to connect"></div>';
         } else {
-          el.innerHTML = '<div class="title">' + escapeHtml(node.displayName) + '</div>' +
+          el.innerHTML = bpBtn + '<div class="title">' + escapeHtml(node.displayName) + '</div>' +
             (isStart || isEnd ? '' : '<div class="summary">' + escapeHtml(summary(node)) + '</div>') +
+            '' +
             (isEnd ? '' : '<div class="port" title="Drag to connect"></div>');
         }
+        el.querySelector('[data-flow-bp]')?.addEventListener('mousedown', (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          toggleBreakpoint(node.id);
+        });
+        el.querySelector('[data-flow-bp]')?.addEventListener('dblclick', (e) => {
+          e.stopPropagation();
+          state.selectedId = node.id;
+          postDryRun({ stepThrough: true, runToActivityId: node.id });
+        });
 
         el.addEventListener('mousedown', (e) => {
           if (e.target.classList.contains('port')) return;
@@ -2648,6 +2811,8 @@ export function getDesignerHtml(
         if (varsEl) varsEl.textContent = pb.finalVars
           ? Object.keys(pb.finalVars).slice(0, 8).map(k => k + '=' + JSON.stringify(pb.finalVars[k])).join(' · ')
           : '';
+        pb.liveVars = pb.finalVars || pb.liveVars;
+        renderWatch(pb.liveVars);
         if (pb.timer) { clearInterval(pb.timer); pb.timer = null; }
         renderAll();
         toast('Step-through complete');
@@ -2655,8 +2820,10 @@ export function getDesignerHtml(
       }
       const step = pb.steps[pb.index];
       state.selectedId = step.activityId;
+      const kind = step.executionKind || '';
+      const kindHtml = kind ? ' <span class="pb-kind kind-badge ' + kind + '">' + kind + '</span>' : '';
       if (label) {
-        label.textContent = '[' + step.index + '/' + pb.steps.length + '] ' + step.displayName + ' — ' + step.action;
+        label.innerHTML = '[' + step.index + '/' + pb.steps.length + '] ' + escapeHtml(step.displayName) + ' — ' + escapeHtml(step.action) + kindHtml;
       }
       if (varsEl) {
         const keys = step.changedKeys || [];
@@ -2664,10 +2831,24 @@ export function getDesignerHtml(
           ? ('Δ ' + keys.map(k => k + '=' + JSON.stringify((step.variablesSnapshot || {})[k])).join(' · '))
           : 'no variable changes';
       }
-      setLeftTab('variables');
+      pb.liveVars = Object.assign({}, step.variablesSnapshot || pb.liveVars || {});
+      renderWatch(pb.liveVars);
+      setLeftTab('watch');
       renderAll();
       const el = document.querySelector('[data-id="' + step.activityId + '"]');
       if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      // Pause when hitting a breakpoint (except the very first shown step unless continuing)
+      if (pb.timer && pb.index > 0 && state.breakpoints[step.activityId]) {
+        clearInterval(pb.timer);
+        pb.timer = null;
+        toast('Breakpoint · ' + step.displayName);
+      }
+      // Run-to-here target reached
+      if (pb.runToActivityId && step.activityId === pb.runToActivityId) {
+        if (pb.timer) { clearInterval(pb.timer); pb.timer = null; }
+        pb.runToActivityId = null;
+        toast('Stopped at target');
+      }
     }
     function stepPlayback() {
       if (!state.playback) return;
@@ -2678,14 +2859,17 @@ export function getDesignerHtml(
       state.playback.index += 1;
       showPlaybackStep();
     }
-    function startPlayback(result) {
+    function startPlayback(result, opts) {
+      const o = opts || {};
       if (state.playback?.timer) clearInterval(state.playback.timer);
       state.playback = {
         steps: result.steps || [],
         index: 0,
         timer: null,
         doneIds: new Set(),
-        finalVars: result.variables || {}
+        finalVars: result.variables || {},
+        liveVars: Object.assign({}, result.variables || {}),
+        runToActivityId: o.runToActivityId || null
       };
       if (!state.playback.steps.length) {
         toast('No steps to play');
@@ -2693,6 +2877,10 @@ export function getDesignerHtml(
         return;
       }
       showPlaybackStep();
+      // Auto-continue to run-to-here or first breakpoint after start
+      if (state.playback.runToActivityId || Object.keys(state.breakpoints).length) {
+        continuePlayback();
+      }
     }
     function continuePlayback() {
       if (!state.playback) return;
@@ -2709,10 +2897,28 @@ export function getDesignerHtml(
     }
 
     document.getElementById('btnDryRun').addEventListener('click', () => {
-      vscode.postMessage({ type: 'dryRun', workflow: state.workflow, stepThrough: false });
+      postDryRun({ stepThrough: false });
     });
     document.getElementById('btnStepThrough').addEventListener('click', () => {
-      vscode.postMessage({ type: 'dryRun', workflow: state.workflow, stepThrough: true });
+      postDryRun({ stepThrough: true });
+    });
+    document.getElementById('btnPbRunTo')?.addEventListener('click', () => {
+      if (!state.selectedId) { toast('Select an activity first'); return; }
+      postDryRun({ stepThrough: true, runToActivityId: state.selectedId });
+    });
+    document.getElementById('btnFixturesApply')?.addEventListener('click', () => {
+      state.fixtures = parseFixturesEditor();
+      toast('Fixtures applied (' + Object.keys(state.fixtures).length + ' keys)');
+    });
+    document.getElementById('btnFixturesClear')?.addEventListener('click', () => {
+      state.fixtures = {};
+      if (els.fixturesEditor) els.fixturesEditor.value = '';
+      toast('Fixtures cleared');
+    });
+    document.getElementById('btnWatchApply')?.addEventListener('click', () => {
+      const seeds = state.playback?.liveVars;
+      if (!seeds || !Object.keys(seeds).length) { toast('No watch values'); return; }
+      postDryRun({ stepThrough: true, initialVariables: seeds });
     });
     document.getElementById('btnPbStep')?.addEventListener('click', () => stepPlayback());
     document.getElementById('btnPbContinue')?.addEventListener('click', () => continuePlayback());
@@ -2817,13 +3023,17 @@ export function getDesignerHtml(
         state.projects = msg.projects;
         renderProjectTree();
       }
-      if (msg.type === 'toast' && msg.message) toast(msg.message);
+      if (msg.type === 'toast' && msg.message) toast(msg.message, { skipLog: !!msg.logged });
       if (msg.type === 'requestFlush') {
         // Flush typed-but-not-blurred property values into state.workflow before Cmd+S
         vscode.postMessage({ type: 'flushState', workflow: state.workflow });
       }
       if (msg.type === 'dryRunPlayback' && msg.result) {
-        startPlayback(msg.result);
+        if (Array.isArray(msg.breakpoints)) {
+          state.breakpoints = {};
+          msg.breakpoints.forEach(id => { state.breakpoints[id] = true; });
+        }
+        startPlayback(msg.result, { runToActivityId: msg.runToActivityId });
       }
       if (msg.type === 'dryRunDone' && msg.result?.warnings?.length) {
         toast(msg.result.warnings.length + ' dry-run warning(s) — see Output');

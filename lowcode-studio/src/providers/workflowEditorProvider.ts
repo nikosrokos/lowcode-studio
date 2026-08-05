@@ -15,6 +15,11 @@ import {
 } from '../commands/simulator';
 import { getDesignerHtml } from '../webview/designerHtml';
 import {
+  getLowCodeOutput,
+  logNotification,
+  logRunReport
+} from '../util/outputChannel';
+import {
   ACTIVITY_FAVORITES_KEY,
   ACTIVITY_RECENT_KEY,
   ActivityPaletteState,
@@ -326,11 +331,14 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           await document.save();
           await this.syncLinkedStudioWebLocal(document);
           const linked = Boolean(this.lastSyncLabel);
+          const saveMsg = linked
+            ? `Saved · synced .xaml → ${this.lastSyncLabel}`
+            : 'Saved · not linked — Connect to Studio Web to sync .xaml';
+          logNotification(saveMsg, true);
           webviewPanel.webview.postMessage({
             type: 'toast',
-            message: linked
-              ? `Saved · synced .xaml → ${this.lastSyncLabel}`
-              : 'Saved · not linked — Connect to Studio Web to sync .xaml'
+            message: saveMsg,
+            logged: true
           });
           break;
         }
@@ -341,26 +349,33 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           }
           break;
         }
+        case 'log': {
+          const msg = String(message.message || '').trim();
+          if (msg) {
+            logNotification(msg, Boolean(message.show));
+          }
+          break;
+        }
         case 'validate': {
           const issues = validateWorkflow(message.workflow as WorkflowDocument);
           if (!issues.length) {
+            logNotification(`Validation OK — ${document.fileName}`, true);
             vscode.window.showInformationMessage('Workflow is valid.');
             webviewPanel.webview.postMessage({
               type: 'toast',
-              message: 'Workflow is valid'
+              message: 'Workflow is valid',
+              logged: true
             });
           } else {
             const errors = issues.filter((i) => i.severity === 'error').length;
             const warnings = issues.filter((i) => i.severity === 'warning').length;
-            const channel = vscode.window.createOutputChannel('LowCode Studio');
-            channel.clear();
-            channel.appendLine(`Validation for ${document.fileName}`);
+            const lines = [`Validation for ${document.fileName}`];
             for (const issue of issues) {
-              channel.appendLine(
+              lines.push(
                 `[${issue.severity}] ${issue.activityId ? issue.activityId + ' — ' : ''}${issue.message}`
               );
             }
-            channel.show(true);
+            logRunReport(`Validation — ${errors} error(s), ${warnings} warning(s)`, lines, true);
             vscode.window.showWarningMessage(
               `Validation: ${errors} error(s), ${warnings} warning(s). See LowCode Studio output.`
             );
@@ -369,27 +384,40 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
         }
         case 'dryRun': {
           const result = dryRunWorkflow(message.workflow as WorkflowDocument, {
-            fixtures: message.fixtures
+            fixtures: message.fixtures,
+            initialVariables: message.initialVariables
           });
-          const channel = vscode.window.createOutputChannel('LowCode Studio');
-          channel.clear();
-          channel.appendLine(
-            formatDryRunReport(result, `Dry Run — ${document.fileName}`)
-          );
-          channel.appendLine('');
-          channel.appendLine('Log:');
-          for (const line of result.log) {
-            channel.appendLine(line);
+          const title = message.runToActivityId
+            ? `Dry Run (run-to-here) — ${document.fileName}`
+            : message.stepThrough
+              ? `Step-through — ${document.fileName}`
+              : `Dry Run — ${document.fileName}`;
+          const reportLines = [
+            formatDryRunReport(result, title),
+            '',
+            'Log:',
+            ...result.log
+          ];
+          // formatDryRunReport already has title; flatten for channel
+          getLowCodeOutput().clear();
+          for (const line of reportLines.join('\n').split('\n')) {
+            getLowCodeOutput().appendLine(line);
           }
-          channel.show(true);
+          getLowCodeOutput().show(true);
+          logNotification(
+            `${title}: ${result.ok ? 'OK' : 'ERRORS'} · ${result.steps.length} steps` +
+              (result.warnings.length ? ` · ${result.warnings.length} warning(s)` : '')
+          );
           const stepThrough = Boolean(message.stepThrough);
           if (stepThrough) {
             webviewPanel.webview.postMessage({
               type: 'dryRunPlayback',
-              result
+              result,
+              runToActivityId: message.runToActivityId || undefined,
+              breakpoints: message.breakpoints || undefined
             });
             vscode.window.showInformationMessage(
-              `Step-through ready (${result.steps.length} steps). Use Step / Continue in the designer.`
+              `Step-through ready (${result.steps.length} steps). Use Step / Continue in the designer — see Output for the full log.`
             );
           } else {
             webviewPanel.webview.postMessage({
@@ -398,8 +426,8 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
             });
             vscode.window.showInformationMessage(
               result.ok
-                ? `Dry run completed (${result.steps.length} steps${result.warnings.length ? `, ${result.warnings.length} warning(s)` : ''}).`
-                : 'Dry run finished with errors. See output.'
+                ? `Dry run completed (${result.steps.length} steps${result.warnings.length ? `, ${result.warnings.length} warning(s)` : ''}). See Output.`
+                : 'Dry run finished with errors. See Output.'
             );
           }
           break;
