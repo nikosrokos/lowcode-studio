@@ -79,6 +79,8 @@ export function getDesignerHtml(
       --dock-h: 64px;
       --left-width: 280px;
       --props-width: 300px;
+      --activity-column-width: 560px;
+      --flow-node-width: 156px;
     }
     * { box-sizing: border-box; }
     html, body {
@@ -549,11 +551,11 @@ export function getDesignerHtml(
       width: max-content; min-width: 100%;
     }
     .sequence {
-      max-width: 680px; margin: 0 auto;
+      max-width: var(--activity-column-width, 560px); margin: 0 auto;
       background: var(--board);
       border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
       border-radius: 12px;
-      padding: 18px 22px 28px;
+      padding: 16px 18px 24px;
       box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 4%, transparent);
     }
     .canvas-empty {
@@ -564,7 +566,7 @@ export function getDesignerHtml(
     .canvas-empty h3 { margin: 0 0 8px; color: var(--text); font-size: 15px; font-weight: 650; }
     .canvas-empty p { margin: 0; font-size: 12px; line-height: 1.5; }
     .drop-zone {
-      position: relative; height: 18px; margin: 2px 0;
+      position: relative; height: 24px; margin: 2px 0;
       display: flex; align-items: center; justify-content: center;
       cursor: pointer;
     }
@@ -589,8 +591,9 @@ export function getDesignerHtml(
       box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 35%, transparent);
     }
     .drop-zone.active {
-      height: 28px;
+      height: 36px;
     }
+    .drop-zone.active::before { opacity: .85; background: var(--accent); }
     .ctx-menu {
       position: fixed; z-index: 80; min-width: 160px;
       background: var(--panel); border: 1px solid var(--border);
@@ -611,9 +614,13 @@ export function getDesignerHtml(
       position: relative; background: var(--card);
       border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
       border-radius: var(--radius); box-shadow: var(--shadow-sm);
-      padding: 10px 12px 10px 14px; cursor: pointer;
+      padding: 9px 10px 9px 12px; cursor: grab;
       transition: border-color .14s ease, background .14s ease, box-shadow .14s ease, transform .14s ease;
       animation: rise .22s ease both;
+    }
+    .card.dragging {
+      opacity: .55;
+      cursor: grabbing;
     }
     .card:hover {
       border-color: color-mix(in srgb, var(--focus) 40%, var(--border));
@@ -626,9 +633,20 @@ export function getDesignerHtml(
       background: color-mix(in srgb, var(--card) 88%, var(--focus) 12%);
     }
     .card-accent { position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 2px 2px 0; }
-    .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; padding-right: 56px; }
+    .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; padding-right: 28px; }
+    .card-menu {
+      position: absolute; top: 6px; right: 6px; z-index: 2;
+      width: 26px; height: 26px; border-radius: 6px;
+      border: 1px solid transparent; background: transparent; color: var(--muted);
+      font-size: 16px; line-height: 1; cursor: pointer; padding: 0;
+    }
+    .card-menu:hover, .card.selected .card-menu {
+      color: var(--text);
+      background: var(--hover);
+      border-color: color-mix(in srgb, var(--border) 80%, transparent);
+    }
     .step { font-size: 10px; color: var(--muted); font-family: var(--mono); min-width: 26px; opacity: .75; }
-    .card-title { font-size: 13px; font-weight: 650; }
+    .card-title { font-size: 12.5px; font-weight: 650; }
     .card-summary {
       font-size: 11px; color: var(--muted);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -733,9 +751,9 @@ export function getDesignerHtml(
     .flow-svg path { fill: none; stroke: color-mix(in srgb, var(--muted) 75%, var(--text)); stroke-width: 1.75; marker-end: url(#arrow); }
     .flow-svg text { fill: var(--muted); font-size: 11px; font-weight: 700; }
     .flow-node {
-      position: absolute; width: 180px; min-height: 64px;
+      position: absolute; width: var(--flow-node-width, 156px); min-height: 58px;
       background: var(--card); border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-      border-radius: 10px; box-shadow: var(--shadow-sm); padding: 10px 12px 12px;
+      border-radius: 10px; box-shadow: var(--shadow-sm); padding: 8px 10px 10px;
       cursor: grab; user-select: none;
       transition: border-color .12s ease, box-shadow .12s ease, background .12s ease;
     }
@@ -749,7 +767,7 @@ export function getDesignerHtml(
       z-index: 3;
     }
     .flow-node.decision {
-      width: 170px; height: 170px; border-radius: 16px;
+      width: 148px; height: 148px; border-radius: 16px;
       transform: rotate(45deg); display: flex; align-items: center; justify-content: center;
       padding: 0;
     }
@@ -1407,6 +1425,7 @@ export function getDesignerHtml(
       collapsedLeftSections: { project: true, activities: false, variables: true, arguments: true, watch: true, fixtures: true },
       selectedId: null,
       dragType: null,
+      dragActivityId: null,
       linkFrom: null,
       draggingId: null,
       dragOffset: { x: 0, y: 0 },
@@ -1429,7 +1448,8 @@ export function getDesignerHtml(
       paletteActive: 0,
       exprEdit: null,
       insertPath: null,
-      ctxTargetId: null
+      ctxTargetId: null,
+      ctxIgnoreClickUntil: 0
     };
 
     const els = {
@@ -1697,11 +1717,18 @@ export function getDesignerHtml(
       if (menu) menu.classList.remove('show');
       state.ctxTargetId = null;
     }
+    function ensurePropsPanelVisible() {
+      if (state.propsMode === 'collapsed') {
+        state.propsMode = 'docked';
+        applyFrameLayouts();
+      }
+    }
     function showCtxMenu(x, y, activityId) {
       const menu = document.getElementById('ctxMenu');
       if (!menu) return;
       state.ctxTargetId = activityId;
       state.selectedId = activityId;
+      ensurePropsPanelVisible();
       const hit = walkFind(state.workflow.activities, activityId);
       const node = hit?.node;
       const openBtn = menu.querySelector('[data-ctx="open"]');
@@ -1716,16 +1743,21 @@ export function getDesignerHtml(
           ? ('Apply VB repairs (' + repairs.length + ')')
           : 'Apply VB expression repairs';
       }
+      // Ignore the click that often follows contextmenu / ⋯ button (was hiding the menu instantly)
+      state.ctxIgnoreClickUntil = Date.now() + 320;
       menu.classList.add('show');
-      const pad = 8;
-      const mw = menu.offsetWidth || 160;
-      const mh = menu.offsetHeight || 200;
-      let left = x;
-      let top = y;
-      if (left + mw > window.innerWidth - pad) left = window.innerWidth - mw - pad;
-      if (top + mh > window.innerHeight - pad) top = window.innerHeight - mh - pad;
-      menu.style.left = Math.max(pad, left) + 'px';
-      menu.style.top = Math.max(pad, top) + 'px';
+      // Position after paint so offsetWidth/Height are accurate
+      requestAnimationFrame(() => {
+        const pad = 8;
+        const mw = menu.offsetWidth || 180;
+        const mh = menu.offsetHeight || 220;
+        let left = x;
+        let top = y;
+        if (left + mw > window.innerWidth - pad) left = window.innerWidth - mw - pad;
+        if (top + mh > window.innerHeight - pad) top = window.innerHeight - mh - pad;
+        menu.style.left = Math.max(pad, left) + 'px';
+        menu.style.top = Math.max(pad, top) + 'px';
+      });
     }
     function renderWatch(snapshot) {
       if (!els.watchView) return;
@@ -2361,7 +2393,9 @@ export function getDesignerHtml(
       els.catalog.querySelectorAll('.activity-item').forEach(el => {
         el.addEventListener('dragstart', (e) => {
           state.dragType = el.getAttribute('data-type');
-          e.dataTransfer.setData('text/plain', state.dragType);
+          state.dragActivityId = null;
+          e.dataTransfer.setData('text/plain', state.dragType || '');
+          try { e.dataTransfer.setData('application/lcs-activity-id', ''); } catch (_) {}
           e.dataTransfer.effectAllowed = 'copy';
           hideTip();
         });
@@ -2410,21 +2444,59 @@ export function getDesignerHtml(
       if (typeof index === 'number' && !Number.isNaN(index)) list.splice(index, 0, node);
       else list.push(node);
     }
+    function pathContainsActivity(pathKey, activityId) {
+      if (!pathKey || !activityId) return false;
+      const base = String(pathKey).split('@')[0];
+      if (base === activityId || base.startsWith(activityId + ':')) return true;
+      return false;
+    }
+    function moveActivityToPath(activityId, pathKey) {
+      if (!activityId || pathContainsActivity(pathKey, activityId)) return false;
+      const hit = walkFind(state.workflow.activities, activityId);
+      if (!hit) return false;
+      const [item] = hit.list.splice(hit.index, 1);
+      insertAtPath(pathKey, item);
+      state.selectedId = activityId;
+      return true;
+    }
     function dropZone(pathKey) {
       const z = document.createElement('div');
       z.className = 'drop-zone';
       z.dataset.path = pathKey;
       z.title = 'Drop activity here, or click + to insert';
-      z.addEventListener('dragover', (e) => { e.preventDefault(); z.classList.add('active'); });
+      z.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = state.dragActivityId ? 'move' : 'copy';
+        z.classList.add('active');
+      });
       z.addEventListener('dragleave', () => z.classList.remove('active'));
       z.addEventListener('drop', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         z.classList.remove('active');
+        const moveId =
+          e.dataTransfer.getData('application/lcs-activity-id') || state.dragActivityId;
+        if (moveId) {
+          if (moveActivityToPath(moveId, pathKey)) {
+            state.dragActivityId = null;
+            persist(true);
+            toast('Moved activity');
+          }
+          return;
+        }
         const type = e.dataTransfer.getData('text/plain') || state.dragType;
+        if (!type) {
+          toast('Drop an activity from the toolbox');
+          return;
+        }
         const node = createActivity(type);
-        if (!node) return;
+        if (!node) {
+          toast('Unknown activity type — pick from Activities');
+          return;
+        }
         insertAtPath(pathKey, node);
         state.selectedId = node.id;
+        ensurePropsPanelVisible();
         persist(true);
       });
       z.addEventListener('click', (e) => {
@@ -2443,13 +2515,15 @@ export function getDesignerHtml(
       const wrap = document.createElement('div');
       const card = document.createElement('div');
       card.dataset.id = node.id;
+      card.draggable = true;
       card.className = 'card' + (state.selectedId === node.id ? ' selected' : '') + dryRunClass(node.id);
       const bpOn = !!state.breakpoints[node.id];
       const selWarn = selectorCardWarn(node);
       if (bpOn) card.classList.add('has-bp');
       card.innerHTML =
         '<div class="card-accent" style="background:' + color + '"></div>' +
-        (bpOn ? '<span class="card-bp-dot" title="Breakpoint set — right-click to toggle"></span>' : '') +
+        (bpOn ? '<span class="card-bp-dot" title="Breakpoint set — right-click or ⋯ to toggle"></span>' : '') +
+        '<button type="button" class="card-menu" data-card-menu title="Activity menu">⋯</button>' +
         '<div class="card-head"><span class="step">#' + stepNo + '</span>' +
         '<div class="card-title">' + escapeHtml(node.displayName) + '</div></div>' +
         '<div class="card-summary">' + escapeHtml(summary(node)) + '</div>' +
@@ -2459,8 +2533,10 @@ export function getDesignerHtml(
       card.addEventListener('mouseenter', (e) => showTip(tipHtml(node), e.clientX, e.clientY));
       card.addEventListener('mousemove', (e) => showTip(tipHtml(node), e.clientX, e.clientY));
       card.addEventListener('mouseleave', hideTip);
-      card.addEventListener('click', () => {
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('[data-card-menu]')) return;
         state.selectedId = node.id;
+        ensurePropsPanelVisible();
         hideTip();
         hideCtxMenu();
         renderAll();
@@ -2471,6 +2547,39 @@ export function getDesignerHtml(
         state.selectedId = node.id;
         hideTip();
         showCtxMenu(e.clientX, e.clientY, node.id);
+        renderProps();
+      });
+      card.querySelector('[data-card-menu]')?.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      card.querySelector('[data-card-menu]')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hideTip();
+        const rect = e.currentTarget.getBoundingClientRect();
+        showCtxMenu(rect.left, rect.bottom + 4, node.id);
+        renderProps();
+      });
+      card.addEventListener('dragstart', (e) => {
+        if (e.target.closest('[data-card-menu]')) {
+          e.preventDefault();
+          return;
+        }
+        state.dragActivityId = node.id;
+        state.dragType = null;
+        try {
+          e.dataTransfer.setData('application/lcs-activity-id', node.id);
+          e.dataTransfer.setData('text/plain', '');
+        } catch (_) {}
+        e.dataTransfer.effectAllowed = 'move';
+        card.classList.add('dragging');
+        hideTip();
+        hideCtxMenu();
+      });
+      card.addEventListener('dragend', () => {
+        state.dragActivityId = null;
+        card.classList.remove('dragging');
       });
       card.addEventListener('dblclick', (e) => {
         if (node.type === 'REFramework.InvokeWorkflow' && node.properties?.workflowPath) {
@@ -2479,13 +2588,14 @@ export function getDesignerHtml(
         }
       });
       wrap.appendChild(card);
-      if (def?.container) {
+      const showBody = !!(def?.container || (node.children && node.children.length) || (node.elseChildren && node.elseChildren.length));
+      if (showBody) {
         const children = document.createElement('div');
         children.className = 'children';
-        children.appendChild(Object.assign(document.createElement('div'), { className: 'branch-label', textContent: def.hasElse ? 'Then' : 'Body' }));
+        children.appendChild(Object.assign(document.createElement('div'), { className: 'branch-label', textContent: def?.hasElse ? 'Then' : 'Body' }));
         renderList(node.children || [], children, node.id + ':then');
         wrap.appendChild(children);
-        if (def.hasElse) {
+        if (def?.hasElse || (node.elseChildren && node.elseChildren.length)) {
           const elseChildren = document.createElement('div');
           elseChildren.className = 'else-children';
           elseChildren.appendChild(Object.assign(document.createElement('div'), { className: 'branch-label', textContent: node.type === 'ControlFlow.TryCatch' ? 'Catch' : 'Else' }));
@@ -2527,8 +2637,8 @@ export function getDesignerHtml(
     function nodeCenter(node) {
       const isDecision = node.type === 'Flowchart.FlowDecision';
       const isTerminal = node.type === 'Flowchart.Start' || node.type === 'Flowchart.End';
-      const w = isDecision ? 170 : isTerminal ? 120 : 180;
-      const h = isDecision ? 170 : isTerminal ? 48 : 72;
+      const w = isDecision ? 148 : isTerminal ? 120 : 156;
+      const h = isDecision ? 148 : isTerminal ? 48 : 64;
       return { x: (node.x || 0) + w / 2, y: (node.y || 0) + h / 2, w, h };
     }
 
@@ -2665,7 +2775,7 @@ export function getDesignerHtml(
         stage.classList.remove('drop-target');
         const type = e.dataTransfer.getData('text/plain') || state.dragType;
         const pt = stagePoint(e);
-        const node = createActivity(type, pt.x - 60, pt.y - 20);
+        const node = createActivity(type, pt.x - 52, pt.y - 18);
         if (!node) return;
         state.workflow.activities.push(node);
         if (node.type === 'Flowchart.Start') state.workflow.startActivityId = node.id;
@@ -3020,6 +3130,7 @@ export function getDesignerHtml(
         renderBreadcrumbs();
         return;
       }
+      ensurePropsPanelVisible();
       const node = hit.node;
       const def = findDef(node.type);
       const currentColor = node.color || def?.color || '#64748B';
@@ -3027,6 +3138,9 @@ export function getDesignerHtml(
 
       let general = fieldHtml('Display Name', '<input id="prop_displayName" value="' + escapeAttr(node.displayName) + '" />');
       general += fieldHtml('Type', '<input value="' + escapeAttr(node.type) + '" disabled />');
+      if (!def) {
+        general += '<div class="empty" style="margin:0 0 8px">Unknown / imported type — properties below are editable raw fields. Replace with a catalog activity when possible.</div>';
+      }
       general += '<div class="field"><label>Container color</label>' +
         '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">' +
         presets.map(c => '<button type="button" class="icon-btn" data-color="' + c + '" title="' + c + '" style="background:' + c + ';border-color:transparent;width:22px;height:22px;"></button>').join('') +
@@ -3040,6 +3154,7 @@ export function getDesignerHtml(
       let activity = '';
       const selectorProps = [];
       const mode = String(node.properties?.mode || 'Browser');
+      const catalogPropNames = new Set((def?.properties || []).map((p) => p.name));
       for (const p of (def?.properties || [])) {
         if (node.type === 'UI.UseApplicationBrowser') {
           if (p.name === 'browserType' && mode !== 'Browser') continue;
@@ -3070,6 +3185,17 @@ export function getDesignerHtml(
         }
         if (node.type === 'REFramework.InvokeWorkflow' && p.name === 'workflowPath') {
           activity += '<div class="field"><button class="btn primary" id="btnOpenWorkflow" type="button">Open Workflow in New Tab</button></div>';
+        }
+      }
+      // Show leftover / Imported.* keys so open-from-Studio-Web workflows are editable
+      const extraKeys = Object.keys(node.properties || {}).filter((k) => !catalogPropNames.has(k));
+      for (const key of extraKeys) {
+        const val = node.properties[key];
+        const synthetic = { name: key, label: key, type: typeof val === 'boolean' ? 'boolean' : (String(val).length > 80 ? 'multiline' : 'string') };
+        activity += fieldHtml(key, renderPropInput(synthetic, val ?? '', node));
+        if (key === 'selector') {
+          activity += selectorBuilderHtml(key, val ?? '');
+          selectorProps.push(key);
         }
       }
       if (!activity) activity = '<div class="empty">No activity-specific properties.</div>';
@@ -3123,10 +3249,14 @@ export function getDesignerHtml(
       els.props.querySelectorAll('[data-prop]').forEach(input => {
         const apply = () => {
           const key = input.getAttribute('data-prop');
+          if (!key) return;
+          node.properties = node.properties || {};
           let value = input.value;
-          const pdef = def?.properties.find(p => p.name === key);
-          if (pdef?.type === 'number') value = Number(value);
-          if (pdef?.type === 'boolean') value = value === 'true';
+          const pdef = def?.properties?.find(p => p.name === key);
+          if (pdef?.type === 'number' || input.getAttribute('type') === 'number') value = Number(value);
+          if (pdef?.type === 'boolean' || (input.tagName === 'SELECT' && (value === 'true' || value === 'false') && typeof (node.properties[key]) === 'boolean')) {
+            value = value === 'true';
+          }
           node.properties[key] = value;
           persist(true);
         };
@@ -3136,9 +3266,10 @@ export function getDesignerHtml(
         input.addEventListener('input', () => {
           const key = input.getAttribute('data-prop');
           if (!key) return;
+          node.properties = node.properties || {};
           let value = input.value;
-          const pdef = def?.properties.find(p => p.name === key);
-          if (pdef?.type === 'number') value = Number(value);
+          const pdef = def?.properties?.find(p => p.name === key);
+          if (pdef?.type === 'number' || input.getAttribute('type') === 'number') value = Number(value);
           if (pdef?.type === 'boolean') value = value === 'true';
           node.properties[key] = value;
         });
@@ -4208,9 +4339,15 @@ export function getDesignerHtml(
           }
         });
       });
-      document.addEventListener('click', () => hideCtxMenu());
+      document.addEventListener('click', (e) => {
+        if (Date.now() < (state.ctxIgnoreClickUntil || 0)) return;
+        if (e.target.closest('#ctxMenu') || e.target.closest('[data-card-menu]')) return;
+        hideCtxMenu();
+      });
       document.addEventListener('contextmenu', (e) => {
-        if (!e.target.closest('.card') && !e.target.closest('.flow-node')) hideCtxMenu();
+        if (!e.target.closest('.card') && !e.target.closest('.flow-node') && !e.target.closest('#ctxMenu')) {
+          hideCtxMenu();
+        }
       });
     })();
 
