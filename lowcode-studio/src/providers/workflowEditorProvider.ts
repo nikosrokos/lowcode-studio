@@ -37,6 +37,8 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
   private activePanel: vscode.WebviewPanel | undefined;
   private activeDocument: vscode.TextDocument | undefined;
   private lastSyncLabel = '';
+  /** Designer Save will sync after document.save(); skip the parallel onDidSave sync. */
+  private readonly skipNextDidSaveSync = new Set<string>();
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -45,6 +47,15 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
 
   getActiveDocumentPath(): string | undefined {
     return this.activeDocument?.uri.fsPath;
+  }
+
+  /** True if designer Save will handle sync — extension onDidSave should skip. */
+  consumeSkipDidSaveSync(fsPath: string): boolean {
+    if (this.skipNextDidSaveSync.has(fsPath)) {
+      this.skipNextDidSaveSync.delete(fsPath);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -64,12 +75,19 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
       return;
     }
     try {
-      const synced = trySyncToStudioWebLocal(projectRoot);
+      const rel = path.relative(projectRoot, document.uri.fsPath).replace(/\\/g, '/');
+      const overrides =
+        rel.endsWith('.lcs.json') && !rel.startsWith('..')
+          ? { [rel]: document.getText() }
+          : undefined;
+      const synced = trySyncToStudioWebLocal(projectRoot, {
+        contentOverrides: overrides
+      });
       if (synced) {
         this.lastSyncLabel = path.basename(synced.link.solutionDir);
         void vscode.window.setStatusBarMessage(
-          `Synced → Studio Web Local (${this.lastSyncLabel})`,
-          2500
+          `Synced → Studio Web Local (${this.lastSyncLabel}) · ${synced.files.filter((f) => f.endsWith('.xaml')).length} xaml`,
+          3500
         );
       }
     } catch (err) {
@@ -79,6 +97,36 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           : 'Studio Web Local sync failed'
       );
     }
+  }
+
+  /**
+   * Ask the designer webview for the latest in-memory workflow before Cmd+S / native save.
+   */
+  private flushWebviewBeforeSave(document: vscode.TextDocument): Thenable<void> {
+    const panel = this.activePanel;
+    if (!panel || this.activeDocument?.uri.toString() !== document.uri.toString()) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        disposable.dispose();
+        resolve();
+      }, 400);
+      const disposable = panel.webview.onDidReceiveMessage(async (message) => {
+        if (message?.type !== 'flushState' || !message.workflow) {
+          return;
+        }
+        clearTimeout(timeout);
+        disposable.dispose();
+        try {
+          await this.updateTextDocument(document, message.workflow as WorkflowDocument);
+          this.onWorkflowChanged(message.workflow as WorkflowDocument);
+        } finally {
+          resolve();
+        }
+      });
+      panel.webview.postMessage({ type: 'requestFlush' });
+    });
   }
 
   refreshProjectTree(): void {
@@ -217,8 +265,19 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
       }
     });
 
+    const willSaveSubscription = vscode.workspace.onWillSaveTextDocument((e) => {
+      if (e.document.uri.toString() !== document.uri.toString()) {
+        return;
+      }
+      if (this.activePanel !== webviewPanel) {
+        return;
+      }
+      e.waitUntil(this.flushWebviewBeforeSave(e.document));
+    });
+
     webviewPanel.onDidDispose(() => {
       changeDocumentSubscription.dispose();
+      willSaveSubscription.dispose();
       if (this.activePanel === webviewPanel) {
         this.activePanel = undefined;
         this.activeDocument = undefined;
@@ -262,12 +321,24 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
             await this.updateTextDocument(document, message.workflow as WorkflowDocument);
             this.onWorkflowChanged(message.workflow as WorkflowDocument);
           }
+          // Claim sync so onDidSaveTextDocument does not race with a disk-only sync
+          this.skipNextDidSaveSync.add(document.uri.fsPath);
           await document.save();
           await this.syncLinkedStudioWebLocal(document);
+          const linked = Boolean(this.lastSyncLabel);
           webviewPanel.webview.postMessage({
             type: 'toast',
-            message: 'Saved' + (this.lastSyncLabel ? ` · synced ${this.lastSyncLabel}` : '')
+            message: linked
+              ? `Saved · synced .xaml → ${this.lastSyncLabel}`
+              : 'Saved · not linked — Connect to Studio Web to sync .xaml'
           });
+          break;
+        }
+        case 'flushState': {
+          if (message.workflow) {
+            await this.updateTextDocument(document, message.workflow as WorkflowDocument);
+            this.onWorkflowChanged(message.workflow as WorkflowDocument);
+          }
           break;
         }
         case 'validate': {
@@ -462,11 +533,11 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
       return;
     }
     const edit = new vscode.WorkspaceEdit();
-    edit.replace(
-      document.uri,
-      new vscode.Range(0, 0, document.lineCount, 0),
-      next
+    const fullRange = new vscode.Range(
+      document.positionAt(0),
+      document.positionAt(document.getText().length)
     );
+    edit.replace(document.uri, fullRange, next);
     await vscode.workspace.applyEdit(edit);
   }
 
