@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.36] — 2026-08-05
+
+### Fixed
+- **Open Studio Web Local Workspace solution** now **imports `.xaml` → `.lcs.json`** (creates a sibling `*.lcs` project when needed) instead of only adding the `.uipx` folder with no designer files
+- Opening/linking an existing solution **prefers Studio Web content** (does not overwrite `.xaml` with an empty LCS project)
+- **Main `.lcs.json` opens automatically** in the designer after Connect / Open solution
+
+### Changed
+- **Open Local Project** simplified to: Open folder (auto-detects LCS vs `.uipx`) or Create/link Studio Web Local Workspace
+
 ## [0.6.35] — 2026-08-05
 
 ### Added

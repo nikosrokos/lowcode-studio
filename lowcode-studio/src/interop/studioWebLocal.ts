@@ -1,10 +1,22 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { writeUiPathProjectToDir, ExportedStudioWebProject } from './studioProject';
-import { isLcsProjectDir } from './projectResolve';
+import {
+  isUiPathProjectDir,
+  writeUiPathProjectToDir,
+  ExportedStudioWebProject
+} from './studioProject';
+import { findAllLcsProjects, isLcsProjectDir } from './projectResolve';
 import { importXaml, ImportWarning } from './xamlImport';
-import { stringifyWorkflow } from '../models/workflow';
+import {
+  collectActivityTypes,
+  resolveUiPathDependencies
+} from './uipathDependencies';
+import {
+  createProjectManifest,
+  stringifyWorkflow,
+  WorkflowDocument
+} from '../models/workflow';
 
 export const STUDIO_WEB_LOCAL_URL = 'https://studio.uipath.com';
 /** Kept under the LCS project — overwritten .lcs.json / .xaml copies before sync. */
@@ -174,9 +186,395 @@ function ensureProjectInUipx(
   data.Projects = projects;
 }
 
+export interface StudioWebRpaProjectRef {
+  projectDir: string;
+  projectFolder: string;
+  solutionId: string;
+  projectId: string;
+  projectName: string;
+  mainXaml: string;
+}
+
+/** Resolve the RPA project folder inside a Studio Web .uipx solution. */
+export function resolveStudioWebRpaProject(
+  solutionDir: string
+): StudioWebRpaProjectRef | undefined {
+  if (!fs.existsSync(solutionDir)) {
+    return undefined;
+  }
+  const uipxPath = findUipx(solutionDir);
+  let solutionId = '';
+  let projectId = '';
+  let projectFolder = '';
+  if (uipxPath) {
+    try {
+      const data = JSON.parse(fs.readFileSync(uipxPath, 'utf8')) as {
+        SolutionId?: string;
+        Projects?: Array<{ Id?: string; ProjectRelativePath?: string }>;
+      };
+      solutionId = String(data.SolutionId || '');
+      const first = (data.Projects || []).find((p) => p.ProjectRelativePath);
+      if (first?.ProjectRelativePath) {
+        const rel = String(first.ProjectRelativePath).replace(/\\/g, '/');
+        projectFolder = rel.includes('/')
+          ? rel.split('/')[0]
+          : path.basename(path.dirname(path.join(solutionDir, rel)));
+        if (rel.endsWith('project.json') && !rel.includes('/')) {
+          projectFolder = '.';
+        }
+        projectId = String(first.Id || '');
+      }
+    } catch {
+      // fall through to scan
+    }
+  }
+
+  let projectDir =
+    projectFolder && projectFolder !== '.'
+      ? path.join(solutionDir, projectFolder)
+      : projectFolder === '.'
+        ? solutionDir
+        : '';
+
+  if (!projectDir || !isUiPathProjectDir(projectDir)) {
+    // Scan one level (and shallow nested) for a UiPath project with .xaml
+    const stack = [solutionDir];
+    let found: string | undefined;
+    while (stack.length && !found) {
+      const current = stack.pop()!;
+      let entries: fs.Dirent[];
+      try {
+        entries = fs.readdirSync(current, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        if (!entry.isDirectory()) {
+          continue;
+        }
+        if (
+          entry.name === 'node_modules' ||
+          entry.name === '.git' ||
+          entry.name === '.local' ||
+          entry.name === 'bin' ||
+          entry.name === 'obj'
+        ) {
+          continue;
+        }
+        const full = path.join(current, entry.name);
+        if (isUiPathProjectDir(full) && listStudioWebXamlRels(full).length) {
+          found = full;
+          break;
+        }
+        if (path.relative(solutionDir, full).split(path.sep).length < 3) {
+          stack.push(full);
+        }
+      }
+    }
+    if (!found && isUiPathProjectDir(solutionDir) && listStudioWebXamlRels(solutionDir).length) {
+      found = solutionDir;
+    }
+    if (!found) {
+      return undefined;
+    }
+    projectDir = found;
+    projectFolder =
+      path.resolve(projectDir) === path.resolve(solutionDir)
+        ? '.'
+        : path.relative(solutionDir, projectDir).replace(/\\/g, '/');
+  }
+
+  let mainXaml = 'Main.xaml';
+  let projectName = path.basename(projectDir === solutionDir ? solutionDir : projectDir);
+  try {
+    const pj = JSON.parse(
+      fs.readFileSync(path.join(projectDir, 'project.json'), 'utf8')
+    ) as { name?: string; main?: string };
+    if (pj.main) {
+      mainXaml = pj.main;
+    }
+    if (pj.name) {
+      projectName = sanitizeName(pj.name);
+    }
+  } catch {
+    // defaults
+  }
+  if (!projectId) {
+    projectId = crypto.randomUUID();
+  }
+  if (!solutionId) {
+    solutionId = crypto.randomUUID();
+  }
+
+  return {
+    projectDir,
+    projectFolder: projectFolder || path.basename(projectDir),
+    solutionId,
+    projectId,
+    projectName,
+    mainXaml
+  };
+}
+
+/** Find LCS projects already linked to this Studio Web solution. */
+export function findLcsProjectsForSolution(
+  solutionDir: string,
+  searchRoots: string[] = []
+): string[] {
+  const resolved = path.resolve(solutionDir);
+  const roots = [
+    ...searchRoots,
+    path.dirname(resolved),
+    resolved
+  ].filter((r, i, arr) => r && arr.indexOf(r) === i);
+  const hits: string[] = [];
+  for (const root of roots) {
+    for (const lcs of findAllLcsProjects([root])) {
+      const link = getStudioWebLocalLink(lcs);
+      if (link && path.resolve(link.solutionDir) === resolved && !hits.includes(lcs)) {
+        hits.push(lcs);
+      }
+    }
+  }
+  // Also: sibling folder named "<solution>.lcs" or "<projectName>"
+  const siblingLcs = path.join(path.dirname(resolved), `${path.basename(resolved)}.lcs`);
+  if (isLcsProjectDir(siblingLcs) && !hits.includes(siblingLcs)) {
+    hits.push(siblingLcs);
+  }
+  return hits;
+}
+
+export interface AdoptedStudioWebSolution {
+  lcsProjectDir: string;
+  solutionDir: string;
+  projectFolder: string;
+  mainWorkflow: string;
+  mainWorkflowAbs: string;
+  workflows: string[];
+  created: boolean;
+  imported: string[];
+  warnings: ImportWarning[];
+}
+
+/**
+ * Open a Studio Web .uipx solution as an LCS project:
+ * import all .xaml → .lcs.json, write the Local Workspace link, record fingerprints.
+ * Does **not** overwrite Studio Web files.
+ */
+export function adoptStudioWebSolutionAsLcsProject(
+  solutionDir: string,
+  options: {
+    /** Reuse this LCS folder when set */
+    lcsProjectDir?: string;
+    /** Parent for a new LCS folder (default: sibling of the solution) */
+    destinationParent?: string;
+    searchRoots?: string[];
+  } = {}
+): AdoptedStudioWebSolution {
+  if (!isStudioWebSolutionDir(solutionDir)) {
+    throw new Error(
+      'That folder is not a Studio Web Local Workspace (no .uipx found).'
+    );
+  }
+  const rpa = resolveStudioWebRpaProject(solutionDir);
+  if (!rpa) {
+    throw new Error(
+      'No RPA project (.xaml + project.json) found inside that Studio Web solution.'
+    );
+  }
+
+  let lcsProjectDir = options.lcsProjectDir;
+  let created = false;
+  if (lcsProjectDir && !isLcsProjectDir(lcsProjectDir)) {
+    throw new Error(`Not a LowCode Studio project: ${lcsProjectDir}`);
+  }
+  if (!lcsProjectDir) {
+    const existing = findLcsProjectsForSolution(solutionDir, options.searchRoots || []);
+    if (existing[0]) {
+      lcsProjectDir = existing[0];
+    }
+  }
+  if (!lcsProjectDir) {
+    const parent = options.destinationParent || path.dirname(solutionDir);
+    const baseName = `${sanitizeName(rpa.projectName)}.lcs`;
+    lcsProjectDir = path.join(parent, baseName);
+    if (fs.existsSync(lcsProjectDir) && !isLcsProjectDir(lcsProjectDir)) {
+      let i = 2;
+      while (fs.existsSync(`${lcsProjectDir}-${i}`)) {
+        i += 1;
+      }
+      lcsProjectDir = `${lcsProjectDir}-${i}`;
+    }
+    if (!fs.existsSync(lcsProjectDir)) {
+      fs.mkdirSync(lcsProjectDir, { recursive: true });
+      created = true;
+    }
+  }
+
+  const xamlRels = listStudioWebXamlRels(rpa.projectDir);
+  if (!xamlRels.length) {
+    throw new Error('No .xaml workflows found in the Studio Web project.');
+  }
+
+  const warnings: ImportWarning[] = [];
+  const imported: string[] = [];
+  const workflows: string[] = [];
+  const docs: WorkflowDocument[] = [];
+  const fingerprints: Record<string, StudioWebFileFingerprint> = {};
+  const now = new Date().toISOString();
+
+  for (const xamlRel of xamlRels) {
+    const lcsRel = xamlRel.replace(/\.xaml$/i, '.lcs.json');
+    const xamlAbs = path.join(rpa.projectDir, xamlRel);
+    const lcsAbs = path.join(lcsProjectDir, lcsRel);
+    const xamlText = fs.readFileSync(xamlAbs, 'utf8');
+    const name = path.basename(lcsRel, '.lcs.json');
+    const result = importXaml(xamlText, name);
+    docs.push(result.workflow);
+    warnings.push(
+      ...result.warnings.map((w) => ({ message: `${xamlRel}: ${w.message}` }))
+    );
+    const nextJson = stringifyWorkflow(result.workflow);
+    const existed = fs.existsSync(lcsAbs);
+    fs.mkdirSync(path.dirname(lcsAbs), { recursive: true });
+    // Prefer Studio Web on adopt (fresh open) — always write imported content
+    if (existed) {
+      const stamp = now.replace(/[:.]/g, '-');
+      backupToSyncTrash(lcsProjectDir, lcsAbs, stamp, lcsRel);
+    } else {
+      imported.push(lcsRel);
+    }
+    fs.writeFileSync(lcsAbs, nextJson, 'utf8');
+    workflows.push(lcsRel);
+    fingerprints[lcsRel] = {
+      lcsHash: contentHash(nextJson),
+      xamlHash: contentHash(xamlText),
+      syncedAt: now
+    };
+  }
+
+  // Helpful assets
+  for (const rel of ['Data/Config.xlsx', 'Data/Config.json', 'README.md', '.gitignore']) {
+    const src = path.join(rpa.projectDir, rel);
+    if (fs.existsSync(src) && fs.statSync(src).isFile()) {
+      const destRel = rel.replace(/Config\.xlsx$/i, 'Config.imported.xlsx');
+      const dest = path.join(lcsProjectDir, destRel);
+      if (!fs.existsSync(dest)) {
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.copyFileSync(src, dest);
+      }
+    }
+  }
+
+  let uipathDependencies: Record<string, string> = {};
+  try {
+    const swPj = JSON.parse(
+      fs.readFileSync(path.join(rpa.projectDir, 'project.json'), 'utf8')
+    ) as { dependencies?: Record<string, string> };
+    uipathDependencies = resolveUiPathDependencies({
+      activityTypes: collectActivityTypes(docs),
+      preserved: swPj.dependencies || {},
+      includeBaseline: true
+    });
+  } catch {
+    uipathDependencies = resolveUiPathDependencies({
+      activityTypes: collectActivityTypes(docs),
+      preserved: {},
+      includeBaseline: true
+    });
+  }
+
+  const mainWorkflow = (rpa.mainXaml || 'Main.xaml').replace(/\.xaml$/i, '.lcs.json');
+  const link: StudioWebLocalLink = {
+    solutionDir: path.resolve(solutionDir),
+    projectFolder: rpa.projectFolder,
+    solutionId: rpa.solutionId,
+    projectId: rpa.projectId,
+    lastSyncedAt: now,
+    files: fingerprints
+  };
+
+  const prevName = (() => {
+    try {
+      return readLcsManifest(lcsProjectDir).name;
+    } catch {
+      return undefined;
+    }
+  })();
+
+  const manifest = {
+    ...createProjectManifest(
+      sanitizeName(prevName || rpa.projectName),
+      mainWorkflow,
+      workflows,
+      'blank'
+    ),
+    description: `${rpa.projectName} — linked Studio Web Local Workspace`,
+    uipathDependencies,
+    studioWebLocal: link,
+    source: {
+      kind: 'studio-web-local',
+      solutionDir: link.solutionDir,
+      projectFolder: link.projectFolder
+    }
+  };
+  writeLcsManifest(lcsProjectDir, manifest);
+
+  // Keep .uipx registration pointing at the same RPA folder (no overwrite of .xaml)
+  const solutionName = sanitizeName(path.basename(solutionDir));
+  const { uipxPath, data } = readOrCreateUipx(solutionDir, solutionName, rpa.solutionId);
+  data.SolutionId = rpa.solutionId;
+  if (!data.name) {
+    data.name = solutionName;
+  }
+  if (rpa.projectFolder && rpa.projectFolder !== '.') {
+    ensureProjectInUipx(data, rpa.projectFolder, rpa.projectId);
+  }
+  fs.writeFileSync(uipxPath, JSON.stringify(data, null, 2) + '\n', 'utf8');
+
+  fs.writeFileSync(
+    path.join(solutionDir, 'OPEN_IN_STUDIO_WEB_LOCAL.md'),
+    `# Open in Studio Web Local Workspace
+
+This folder is a **UiPath solution** linked from LowCode Studio.
+
+1. Go to [${STUDIO_WEB_LOCAL_URL}](${STUDIO_WEB_LOCAL_URL})
+2. Open **Local Workspace**
+3. **Open solution** → select this folder (\`${path.basename(solutionDir)}\`)
+4. Allow the browser to edit files when prompted
+
+**Bidirectional sync on Save:**
+- Edits in LowCode Studio → push \`.xaml\` into this folder
+- Edits in Studio Web → pulled back into \`.lcs.json\` when you Save (or run **Pull from Studio Web Local**)
+- Overwritten copies land in the LCS project under \`.lcs-sync-trash/\`
+
+The linked project uses \`targetFramework: Portable\` so Studio Web can open it on Mac.
+
+No \`.uip\` export is required for this loop.
+`,
+    'utf8'
+  );
+
+  const mainWorkflowAbs = path.join(lcsProjectDir, mainWorkflow);
+  return {
+    lcsProjectDir,
+    solutionDir: link.solutionDir,
+    projectFolder: link.projectFolder,
+    mainWorkflow,
+    mainWorkflowAbs: fs.existsSync(mainWorkflowAbs)
+      ? mainWorkflowAbs
+      : path.join(lcsProjectDir, workflows[0]),
+    workflows,
+    created,
+    imported,
+    warnings
+  };
+}
+
 /**
  * Create or open a Studio Web Local Workspace solution and link the LCS project to it.
  * Writes the UiPath project under solutionDir/projectFolder and registers it in .uipx.
+ * When **opening** an existing solution that already has .xaml, imports into LCS instead of overwriting Studio Web.
  */
 export function linkStudioWebLocalWorkspace(
   lcsProjectDir: string,
@@ -185,6 +583,8 @@ export function linkStudioWebLocalWorkspace(
     targetDir: string;
     mode: 'create' | 'open';
     solutionName?: string;
+    /** Open mode: prefer existing Studio Web .xaml over LCS push (default true). */
+    preferStudioWeb?: boolean;
   }
 ): StudioWebLocalSyncResult {
   const manifest = readLcsManifest(lcsProjectDir);
@@ -208,17 +608,49 @@ export function linkStudioWebLocalWorkspace(
     }
   }
 
+  const preferStudioWeb =
+    options.mode === 'open' && options.preferStudioWeb !== false;
+  const existingRpa = preferStudioWeb ? resolveStudioWebRpaProject(solutionDir) : undefined;
+  const swHasXaml = Boolean(
+    existingRpa && listStudioWebXamlRels(existingRpa.projectDir).length
+  );
+
+  // Opening an existing Studio Web solution: adopt/import into LCS, never clobber .xaml
+  if (preferStudioWeb && swHasXaml && existingRpa) {
+    const adopted = adoptStudioWebSolutionAsLcsProject(solutionDir, {
+      lcsProjectDir
+    });
+    const projectDir = path.join(adopted.solutionDir, adopted.projectFolder);
+    const link = getStudioWebLocalLink(lcsProjectDir)!;
+    return {
+      targetDir: projectDir,
+      mainXaml: adopted.mainWorkflow.replace(/\.lcs\.json$/i, '.xaml'),
+      files: adopted.workflows.map((w) => w.replace(/\.lcs\.json$/i, '.xaml')),
+      dependencies: {},
+      link,
+      uipxPath: findUipx(solutionDir) || path.join(solutionDir, `${solutionName}.uipx`),
+      created: false,
+      pulled: adopted.imported.length ? adopted.imported : adopted.workflows
+    };
+  }
+
   const prev = manifest.studioWebLocal;
-  const projectFolder = sanitizeName(prev?.projectFolder || projectName);
-  const projectId = prev?.projectId || crypto.randomUUID();
+  const projectFolder = sanitizeName(
+    existingRpa?.projectFolder && existingRpa.projectFolder !== '.'
+      ? existingRpa.projectFolder
+      : prev?.projectFolder || projectName
+  );
+  const projectId = existingRpa?.projectId || prev?.projectId || crypto.randomUUID();
   const { uipxPath, data, created: uipxCreated } = readOrCreateUipx(
     solutionDir,
     solutionName,
-    prev?.solutionId
+    existingRpa?.solutionId || prev?.solutionId
   );
   created = created || uipxCreated;
 
-  const solutionId = String(data.SolutionId || prev?.solutionId || crypto.randomUUID());
+  const solutionId = String(
+    data.SolutionId || existingRpa?.solutionId || prev?.solutionId || crypto.randomUUID()
+  );
   data.SolutionId = solutionId;
   if (!data.name) {
     data.name = solutionName;
@@ -243,6 +675,7 @@ export function linkStudioWebLocalWorkspace(
   };
   manifest.studioWebLocal = link;
   writeLcsManifest(lcsProjectDir, manifest);
+  recordPushFingerprints(lcsProjectDir, projectDir);
 
   // Guide next to solution for first open
   fs.writeFileSync(
