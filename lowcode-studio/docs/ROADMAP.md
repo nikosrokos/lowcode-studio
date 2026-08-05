@@ -67,8 +67,8 @@ Highest leverage for *not opening Studio Web to finish work*.
 
 ### A4. Project explorer as the hub
 - Multi-file edit without friction (tabs already VS Code — deepen LCS project tree actions)
-- Diff / “out of sync with Local Workspace” badge
-- One-click Validate + Windows TODO + package check from explorer
+- Diff / “out of sync with Local Workspace” badge — **shipped in 0.6.28**
+- One-click Validate + Windows TODO + package check from explorer (Validate Packages + Manage Packages)
 
 ---
 
@@ -130,10 +130,10 @@ Highest leverage for *not opening Studio Web to finish work*.
 ### D2. Properties
 - Expression editor (larger, expand dialog — Maestro pattern)
 - Typed editors (DataTable columns, dictionary, secret-as-variable)
-- “Required for Studio Web” checklist per selected activity
+- “Required for Studio Web” checklist per selected activity — **shipped in 0.6.28**
 
 ### D3. Onboarding
-- First-run: Create REF → Dry Run scenario → Connect Local Workspace wizard
+- First-run: Create REF → Dry Run scenario → Connect Local Workspace wizard — **shipped in 0.6.28**
 - In-product tips tied to `WINDOWS_TODO` / Portable
 
 ### D4. Visual system
@@ -150,8 +150,8 @@ Highest leverage for *not opening Studio Web to finish work*.
 - Longer-term: Orchestrator publish API if UiPath exposes a Mac-friendly path (explore; don’t promise)
 
 ### E2. Packages
-- UI to add/remove NuGet deps with Studio Web–compatible versions (today: mostly auto from activity map)
-- Warn on default `[1.0.0]` pins and unknown custom packages
+- UI to add/remove NuGet deps with Studio Web–compatible versions — **Manage Packages in 0.6.28**
+- Warn on default `[1.0.0]` pins and unknown custom packages — **shipped in 0.6.28**
 
 ### E3. Dual target clarity
 - Portable (Studio Web Mac) vs Windows (Desktop robot) switcher with consequences explained

@@ -297,6 +297,141 @@ export function trySyncToStudioWebLocal(
   return syncToStudioWebLocal(lcsProjectDir, options);
 }
 
+export interface StudioWebLocalStaleFile {
+  workflowRel: string;
+  xamlRel: string;
+  reason: 'missing-xaml' | 'lcs-newer';
+}
+
+export interface StudioWebLocalSyncStatus {
+  linked: boolean;
+  inSync: boolean;
+  link?: StudioWebLocalLink;
+  projectDir?: string;
+  stale: StudioWebLocalStaleFile[];
+  summary: string;
+}
+
+/**
+ * Compare LCS .lcs.json mtimes vs linked Studio Web .xaml files.
+ * Used for Project Explorer out-of-sync badges.
+ */
+export function getStudioWebLocalSyncStatus(
+  lcsProjectDir: string
+): StudioWebLocalSyncStatus {
+  const link = getStudioWebLocalLink(lcsProjectDir);
+  if (!link) {
+    return {
+      linked: false,
+      inSync: true,
+      stale: [],
+      summary: 'Not linked to Studio Web Local Workspace'
+    };
+  }
+  const projectDir = path.join(link.solutionDir, link.projectFolder);
+  if (!fs.existsSync(link.solutionDir) || !fs.existsSync(projectDir)) {
+    return {
+      linked: true,
+      inSync: false,
+      link,
+      projectDir,
+      stale: [
+        {
+          workflowRel: '(solution)',
+          xamlRel: projectDir,
+          reason: 'missing-xaml'
+        }
+      ],
+      summary: 'Linked solution folder missing — re-run Connect'
+    };
+  }
+
+  const workflowRels = listLcsWorkflowRels(lcsProjectDir);
+  const stale: StudioWebLocalStaleFile[] = [];
+  for (const rel of workflowRels) {
+    const lcsAbs = path.join(lcsProjectDir, rel);
+    const xamlRel = rel.replace(/\.lcs\.json$/i, '.xaml');
+    const xamlAbs = path.join(projectDir, xamlRel);
+    if (!fs.existsSync(lcsAbs)) {
+      continue;
+    }
+    if (!fs.existsSync(xamlAbs)) {
+      stale.push({ workflowRel: rel, xamlRel, reason: 'missing-xaml' });
+      continue;
+    }
+    try {
+      const lcsStat = fs.statSync(lcsAbs);
+      const xamlStat = fs.statSync(xamlAbs);
+      // Allow a small clock/fs skew window after sync
+      if (lcsStat.mtimeMs > xamlStat.mtimeMs + 1500) {
+        stale.push({ workflowRel: rel, xamlRel, reason: 'lcs-newer' });
+      }
+    } catch {
+      stale.push({ workflowRel: rel, xamlRel, reason: 'missing-xaml' });
+    }
+  }
+
+  const inSync = stale.length === 0;
+  return {
+    linked: true,
+    inSync,
+    link,
+    projectDir,
+    stale,
+    summary: inSync
+      ? 'Synced with Studio Web Local Workspace'
+      : `Out of sync — ${stale.length} workflow(s) need Save sync`
+  };
+}
+
+function listLcsWorkflowRels(lcsProjectDir: string): string[] {
+  const results: string[] = [];
+  const stack = [lcsProjectDir];
+  while (stack.length) {
+    const current = stack.pop()!;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (
+        entry.name === 'node_modules' ||
+        entry.name === '.git' ||
+        entry.name === 'bin' ||
+        entry.name === 'obj' ||
+        entry.name === 'out'
+      ) {
+        continue;
+      }
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        if (findUipx(full)) {
+          continue;
+        }
+        stack.push(full);
+      } else if (entry.isFile() && entry.name.endsWith('.lcs.json')) {
+        results.push(path.relative(lcsProjectDir, full).replace(/\\/g, '/'));
+      }
+    }
+  }
+  try {
+    const manifest = readLcsManifest(lcsProjectDir);
+    const listed = Array.isArray(manifest.workflows)
+      ? (manifest.workflows as string[])
+      : [];
+    for (const rel of listed) {
+      if (rel.endsWith('.lcs.json') && !results.includes(rel)) {
+        results.push(rel);
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return results.sort();
+}
+
 /** Remove studioWebLocal link from LCS project.json (does not delete solution files). */
 export function unlinkStudioWebLocalWorkspace(lcsProjectDir: string): boolean {
   if (!isLcsProjectDir(lcsProjectDir)) {

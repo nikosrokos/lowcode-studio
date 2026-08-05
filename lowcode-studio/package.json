@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Mac-first low-code RPA for VS Code/Cursor: REFramework design, scenario dry-runs (Shift+F5), and the easiest Connect to Studio Web handoff for Orchestrator publish.",
-  "version": "0.6.27",
+  "version": "0.6.28",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -261,6 +261,20 @@
         "title": "What's New (changelog)",
         "shortTitle": "What's New",
         "category": "LowCode Studio"
+      },
+      {
+        "command": "lowcodeStudio.managePackages",
+        "title": "Manage Packages (NuGet pins)",
+        "icon": "$(package)",
+        "shortTitle": "Packages",
+        "category": "LowCode Studio"
+      },
+      {
+        "command": "lowcodeStudio.firstRunWizard",
+        "title": "First-run wizard (REF → Scenario → Connect)",
+        "icon": "$(rocket)",
+        "shortTitle": "Wizard",
+        "category": "LowCode Studio"
       }
     ],
     "menus": {
@@ -372,6 +386,11 @@
           "when": "view == lowcodeStudio.activities",
           "group": "navigation",
           "tooltip": "Manage custom activities"
+        },
+        {
+          "command": "lowcodeStudio.managePackages",
+          "when": "view == lowcodeStudio.projects",
+          "group": "navigation@4"
         }
       ],
       "view/item/context": [
@@ -549,7 +568,7 @@
     "package": "npm run bundle && vsce package --no-dependencies",
     "lint": "tsc --noEmit",
     "docs:activities": "npm run compile && node scripts/generate-activities-md.js",
-    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && node out/test/windowsTarget.test.js && node out/test/extractTableData.test.js && node out/test/selectorBuilder.test.js && node out/test/windowsTodo.test.js && node out/test/strongDryRun.test.js && node out/test/blueprints.test.js && node out/test/activityPaletteSmartProps.test.js && node out/test/inputMethod.test.js && node out/test/projectResolve.test.js && node out/test/studioWebLocal.test.js && node out/test/useAppBrowserUx.test.js && node out/test/workflowArguments.test.js && node out/test/phaseBActivities.test.js && node out/test/dryRun2.test.js && node out/test/whatsNew.test.js && npm run docs:activities"
+    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && node out/test/windowsTarget.test.js && node out/test/extractTableData.test.js && node out/test/selectorBuilder.test.js && node out/test/windowsTodo.test.js && node out/test/strongDryRun.test.js && node out/test/blueprints.test.js && node out/test/activityPaletteSmartProps.test.js && node out/test/inputMethod.test.js && node out/test/projectResolve.test.js && node out/test/studioWebLocal.test.js && node out/test/useAppBrowserUx.test.js && node out/test/workflowArguments.test.js && node out/test/phaseBActivities.test.js && node out/test/dryRun2.test.js && node out/test/whatsNew.test.js && node out/test/studioWebLocalSync.test.js && node out/test/packageManager.test.js && npm run docs:activities"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",

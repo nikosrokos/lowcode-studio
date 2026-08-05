@@ -49,6 +49,10 @@ import {
   validateProjectPackages
 } from './interop/packageValidation';
 import {
+  loadPackageInventory,
+  writeManifestPackagePins
+} from './interop/packageManager';
+import {
   buildWindowsTodoChecklist,
   formatWindowsTodoReport,
   writeWindowsTodoFile
@@ -437,7 +441,13 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand('lowcodeStudio.showWhatsNew', () => {
       void showWhatsNewCommand(context, packageVersion);
-    })
+    }),
+    vscode.commands.registerCommand('lowcodeStudio.managePackages', () =>
+      managePackagesCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.firstRunWizard', () =>
+      firstRunWizardCommand()
+    )
   );
 
   context.subscriptions.push(
@@ -490,8 +500,20 @@ export function activate(context: vscode.ExtensionContext): void {
     .getConfiguration('lowcodeStudio')
     .get<boolean>('autoOpenDesigner', true);
   if (showWelcome && !context.globalState.get('lowcodeStudio.welcomeShown')) {
-    showGettingStarted();
     void context.globalState.update('lowcodeStudio.welcomeShown', true);
+    void (async () => {
+      const pick = await vscode.window.showInformationMessage(
+        'Welcome to LowCode Studio — run the first-run wizard (REF → Scenario → Connect)?',
+        'Start wizard',
+        'Getting Started',
+        'Later'
+      );
+      if (pick === 'Start wizard') {
+        await firstRunWizardCommand();
+      } else if (pick === 'Getting Started') {
+        showGettingStarted();
+      }
+    })();
   }
 }
 
@@ -806,10 +828,13 @@ async function validatePackagesCommand(): Promise<void> {
     }
     const open = await vscode.window.showWarningMessage(
       `Package validation: ${warnCount} warning(s), ${infoCount} info · ${todo.summary}`,
+      'Manage Packages',
       'Open Output',
       'Open WINDOWS_TODO'
     );
-    if (open === 'Open Output') {
+    if (open === 'Manage Packages') {
+      await managePackagesCommand(projectDir);
+    } else if (open === 'Open Output') {
       channel.show(true);
     } else if (open === 'Open WINDOWS_TODO') {
       const todoUri = vscode.Uri.file(path.join(projectDir, 'WINDOWS_TODO.md'));
@@ -819,6 +844,222 @@ async function validatePackagesCommand(): Promise<void> {
     vscode.window.showErrorMessage(
       err instanceof Error ? err.message : 'Package validation failed'
     );
+  }
+}
+
+async function managePackagesCommand(forcedProjectDir?: string): Promise<void> {
+  const projectDir = forcedProjectDir || (await resolveLcsProjectDir());
+  if (!projectDir) {
+    return;
+  }
+  try {
+    let inventory = loadPackageInventory(projectDir);
+    const channel = getOutput();
+    const printInventory = () => {
+      channel.appendLine('');
+      channel.appendLine(`Packages — ${inventory.projectName}`);
+      channel.appendLine('─'.repeat(48));
+      for (const pin of inventory.pins) {
+        const flag = pin.isDefaultPin ? ' ⚠ [1.0.0]' : '';
+        const src = pin.source === 'manifest' ? 'manifest' : 'resolved';
+        channel.appendLine(`  ${pin.name}: ${pin.version}${flag} (${src})`);
+      }
+      if (inventory.defaultPinCount) {
+        channel.appendLine('');
+        channel.appendLine(
+          `${inventory.defaultPinCount} placeholder [1.0.0] pin(s) — set Studio Web–compatible versions.`
+        );
+      }
+    };
+    printInventory();
+    channel.show(true);
+
+    for (;;) {
+      const picks: Array<vscode.QuickPickItem & { id: string; pkg?: string }> = [
+        {
+          id: 'fix-defaults',
+          label: '$(sparkle) Apply catalog defaults for [1.0.0] pins',
+          description:
+            inventory.defaultPinCount > 0
+              ? `${inventory.defaultPinCount} pin(s)`
+              : 'none to fix'
+        },
+        {
+          id: 'add',
+          label: '$(add) Add / override package pin',
+          description: 'Write into project.json → uipathDependencies'
+        },
+        {
+          id: 'refresh',
+          label: '$(refresh) Refresh list',
+          description: 'Re-read project.json'
+        },
+        {
+          id: 'done',
+          label: '$(check) Done',
+          description: 'Close package UI'
+        },
+        ...inventory.pins.map((p) => ({
+          id: 'edit',
+          pkg: p.name,
+          label: `${p.isDefaultPin ? '$(warning) ' : ''}${p.name}`,
+          description: p.version,
+          detail: p.hasCatalogDefault
+            ? `Catalog default ${p.catalogDefault} · ${p.source}`
+            : `No catalog default · ${p.source}`
+        }))
+      ];
+      const picked = await vscode.window.showQuickPick(picks, {
+        title: `Manage Packages — ${inventory.projectName}`,
+        matchOnDescription: true,
+        matchOnDetail: true,
+        placeHolder: 'Edit NuGet pins used on Connect / Export'
+      });
+      if (!picked || picked.id === 'done') {
+        break;
+      }
+      if (picked.id === 'refresh') {
+        inventory = loadPackageInventory(projectDir);
+        printInventory();
+        continue;
+      }
+      if (picked.id === 'fix-defaults') {
+        const pins = { ...inventory.manifestPins };
+        const changed: string[] = [];
+        for (const pin of inventory.pins) {
+          if (!pin.isDefaultPin || !pin.catalogDefault) {
+            continue;
+          }
+          pins[pin.name] = pin.catalogDefault;
+          changed.push(pin.name);
+        }
+        if (!changed.length) {
+          void vscode.window.showInformationMessage(
+            'No [1.0.0] pins have a catalog default. Edit custom packages manually.'
+          );
+          continue;
+        }
+        writeManifestPackagePins(projectDir, pins);
+        inventory = loadPackageInventory(projectDir);
+        printInventory();
+        void vscode.window.showInformationMessage(
+          `Updated ${changed.length} package pin(s) from catalog defaults.`
+        );
+        continue;
+      }
+      if (picked.id === 'add') {
+        const name = await vscode.window.showInputBox({
+          prompt: 'NuGet package id',
+          placeHolder: 'UiPath.System.Activities'
+        });
+        if (!name?.trim()) {
+          continue;
+        }
+        const ver = await vscode.window.showInputBox({
+          prompt: `Version for ${name.trim()}`,
+          value: inventory.resolved[name.trim()] || '[25.4.1]',
+          placeHolder: '[25.4.1]'
+        });
+        if (!ver?.trim()) {
+          continue;
+        }
+        const next = {
+          ...inventory.manifestPins,
+          [name.trim()]: ver.trim()
+        };
+        writeManifestPackagePins(projectDir, next);
+        inventory = loadPackageInventory(projectDir);
+        printInventory();
+        continue;
+      }
+      if (picked.id === 'edit' && picked.pkg) {
+        const current = inventory.pins.find((p) => p.name === picked.pkg);
+        const ver = await vscode.window.showInputBox({
+          prompt: `Version for ${picked.pkg}`,
+          value: current?.version || '[1.0.0]',
+          placeHolder: current?.catalogDefault || '[25.4.1]',
+          validateInput: (v) => (String(v || '').trim() ? undefined : 'Version required')
+        });
+        if (!ver?.trim()) {
+          continue;
+        }
+        const next = {
+          ...inventory.manifestPins,
+          [picked.pkg]: ver.trim()
+        };
+        writeManifestPackagePins(projectDir, next);
+        inventory = loadPackageInventory(projectDir);
+        printInventory();
+      }
+    }
+  } catch (err) {
+    vscode.window.showErrorMessage(
+      err instanceof Error ? err.message : 'Manage Packages failed'
+    );
+  }
+}
+
+async function firstRunWizardCommand(): Promise<void> {
+  const step = (extensionContext.globalState.get<number>('lowcodeStudio.firstRunStep') || 0) as number;
+  const steps = [
+    {
+      id: 'ref',
+      label: '$(new-folder) 1 · Create REFramework project',
+      detail: 'Scaffold Main + Framework + Config + scenarios.json',
+      command: 'lowcodeStudio.newREFramework'
+    },
+    {
+      id: 'scenario',
+      label: '$(play) 2 · Run a dry-run scenario',
+      detail: 'Shift+F5 — prove the Mac loop before Studio Web',
+      command: 'lowcodeStudio.dryRunScenario'
+    },
+    {
+      id: 'connect',
+      label: '$(cloud-upload) 3 · Connect Local Workspace',
+      detail: 'Link a Studio Web folder and sync .xaml on Save',
+      command: 'lowcodeStudio.connectStudioWeb'
+    },
+    {
+      id: 'guide',
+      label: '$(book) Read Getting Started',
+      detail: 'Markdown overview (optional)',
+      command: 'lowcodeStudio.showGettingStarted'
+    }
+  ];
+
+  const picked = await vscode.window.showQuickPick(
+    steps.map((s, i) => ({
+      ...s,
+      description: i < step ? 'done' : i === step ? 'next' : ''
+    })),
+    {
+      title: 'LowCode Studio — First-run wizard',
+      placeHolder: 'REF → Scenario → Connect (pick a step)'
+    }
+  );
+  if (!picked) {
+    return;
+  }
+  const index = steps.findIndex((s) => s.id === picked.id);
+  await vscode.commands.executeCommand(picked.command);
+  if (index >= 0 && index < 3) {
+    const next = Math.max(step, index + 1);
+    await extensionContext.globalState.update('lowcodeStudio.firstRunStep', next);
+    if (next >= 3) {
+      void vscode.window.showInformationMessage(
+        'First-run loop complete — design in LCS, Save to sync, publish in Studio Web.'
+      );
+    } else {
+      const cont = await vscode.window.showInformationMessage(
+        `Step ${index + 1} started. Continue the wizard?`,
+        'Next step',
+        'Later'
+      );
+      if (cont === 'Next step') {
+        await firstRunWizardCommand();
+      }
+    }
   }
 }
 

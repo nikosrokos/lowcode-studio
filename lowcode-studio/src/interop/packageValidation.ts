@@ -138,11 +138,27 @@ export function validateProjectPackages(projectDir: string): PackageValidationRe
 
   // Flag default placeholder version pins (often means unmapped custom package)
   for (const [name, ver] of Object.entries(dependencies)) {
-    if (ver === '[1.0.0]' && !name.startsWith('UiPath.')) {
+    if (ver === '[1.0.0]' || ver === '1.0.0') {
       warnings.push({
-        severity: 'info',
+        severity: name.startsWith('UiPath.') ? 'warning' : 'warning',
         code: 'default-package-version',
-        message: `Package "${name}" uses default version ${ver} — confirm the version Studio Web expects.`
+        message: `Package "${name}" uses placeholder version ${ver} — open Manage Packages to set a Studio Web–compatible pin.`
+      });
+    }
+  }
+
+  // Also flag explicit manifest pins stuck on [1.0.0]
+  for (const [name, ver] of Object.entries(manifest.uipathDependencies || {})) {
+    if (
+      (ver === '[1.0.0]' || ver === '1.0.0') &&
+      !warnings.some(
+        (w) => w.code === 'default-package-version' && w.message.includes(`"${name}"`)
+      )
+    ) {
+      warnings.push({
+        severity: 'warning',
+        code: 'default-package-version',
+        message: `Manifest pin "${name}" is ${ver} — set a real version before Connect.`
       });
     }
   }

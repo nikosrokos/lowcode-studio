@@ -1,12 +1,12 @@
 # LowCode Studio
 
-**Version 0.6.27** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.6.28** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.6.27-0ea5e9)
+![version](https://img.shields.io/badge/version-0.6.28-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
@@ -42,21 +42,22 @@ Design on Mac (REFramework)
 1. **Designer** — framed toolbox + properties, sequence board, macOS-style bottom dock  
 2. **Floating frames** — traffic-light controls to float / dock / collapse either side panel  
 
-## What’s in 0.6.27
+## What’s in 0.6.28
 
-- **A3 Selectors** — specificity score, Decode paste, Copy sibling; Windows TODO messages on canvas cards
-- Validate / Packages / Connect surface selector + Windows TODO reports in Output
-- **CHANGELOG.md** + command **What's New** (auto-notifies after version upgrades)
+- **Out-of-sync badge** on linked Studio Web Local Workspace in Project Explorer
+- **Required for Studio Web** checklist on the selected activity
+- **Manage Packages** — fix silent `[1.0.0]` NuGet pins
+- **First-run wizard** — REF → Scenario → Connect
 
 Full history: [CHANGELOG.md](CHANGELOG.md)
 
 ### Also recent
 
-- **0.6.26** — Settings popup (canvas + defaults); 6 activity color presets
-- **0.6.25** — Accordion left rail, BP top-right, context menu, args/vars fix
+- **0.6.27** — A3 selectors + CHANGELOG / What's New
+- **0.6.26** — Settings popup; 6 activity color presets
+- **0.6.25** — Accordion left rail, BP, context menu, args/vars fix
 - **0.6.24** — Dry-run 2.0 + Output channel
-- **0.6.23** — Phase B activities (Orchestrator / Excel / Parallel / HTTP)
-- **0.6.22** — Arguments, expression expand, search, tidy
+
 
 ## Install
 
@@ -68,7 +69,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.27.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.28.vsix` → reload.
 
 ## Easy path
 
