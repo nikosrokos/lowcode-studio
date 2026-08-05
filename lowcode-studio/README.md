@@ -1,12 +1,12 @@
 # LowCode Studio
 
-**Version 0.6.19** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.6.20** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.6.19-0ea5e9)
+![version](https://img.shields.io/badge/version-0.6.20-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
@@ -32,24 +32,31 @@ Design on Mac (REFramework)
 ## In action
 
 <p>
-  <img src="docs/images/designer-overview.png" alt="Designer with floating properties panel" width="640" />
+  <img src="docs/images/designer-overview.png" alt="Maestro-style canvas with framed toolbox, properties, and macOS dock" width="720" />
 </p>
 
 <p>
-  <img src="docs/images/project-explorer.png" alt="Project Explorer title actions with tooltips" width="360" />
-  &nbsp;
-  <img src="docs/images/extract-table.png" alt="Extract Table Data smart extraction" width="420" />
+  <img src="docs/images/project-explorer.png" alt="Floating toolbox and properties frames over the canvas" width="720" />
 </p>
 
-1. **Designer** — sequence canvas, activities toolbox, floating/resizable properties  
-2. **Project Explorer** — title actions with tooltips (Open, Scenarios, Connect, Validate…)  
-3. **Extract Table Data** — smart page → DataTable extraction for Windows UI automation
+1. **Designer** — framed toolbox + properties, sequence board, macOS-style bottom dock  
+2. **Floating frames** — traffic-light controls to float / dock / collapse either side panel  
 
-## What’s in 0.6.19
+## What’s in 0.6.20
+
+- **Maestro-inspired canvas chrome**
+  - Framed, resizable left Toolbox and right Properties panels
+  - macOS traffic lights: collapse · float · dock
+  - Floating frames with drag + height resize; docked frames with width resize
+  - Bottom-center dock (zoom, insert, validate, dry-run, step, panel toggles, Save)
+  - Slim top bar (brand · workflow · mode · Save)
+- README screenshots refreshed (2 images)
+
+### Also in 0.6.19
 
 - **Selectors & UI automation**
-  - Use Application/Browser imports as a real container (`NApplicationCard`) with nested Click/Type/Get Text children
-  - Get Text / Element Exists / Get Attribute export `Result=` + timeouts; Get Text supports Input Method
+  - Use Application/Browser imports as a real container (`NApplicationCard`) with nested Click/Type/GetText children
+  - Get Text / Element Exists / Get Attribute export `Result=` + timeouts; GetText supports Input Method
   - Empty defaults (no fake “done” selectors); stronger placeholder detection; Selector Builder applies live
   - Mode-aware Use Application/Browser props (Browser vs Application); Modern Selector collapsed when empty
 - **Canvas UX**
@@ -180,7 +187,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.19.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.20.vsix` → reload.
 
 ## Easy path
 
