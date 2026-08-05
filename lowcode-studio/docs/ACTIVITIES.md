@@ -1,12 +1,12 @@
 # LowCode Studio — Activity coverage
 
-Generated for **v0.6.28** from the extension activity catalog.
+Generated for **v0.6.29** from the extension activity catalog.
 
 This list is what you can design in VS Code / Cursor, dry-run locally, and best-effort import/export with UiPath Studio / Studio Web.
 
 > Not every property of every UiPath activity is modeled. Selectors for UI activities round-trip via `selector` / `selectorModern` / `selectorXml`.
 
-**Total activities:** 73
+**Total activities:** 81
 
 ## By category
 
@@ -69,6 +69,7 @@ UiPath package (typical): `UiPath.System.Activities`
 |---|---|---|---|
 | End | `Flowchart.End` | No | — |
 | Flow Decision | `Flowchart.FlowDecision` | No | condition |
+| Flow Switch | `Flowchart.FlowSwitch` | No | expression, cases |
 | Start | `Flowchart.Start` | No | — |
 
 ### Messaging
@@ -132,13 +133,20 @@ UiPath package (typical): `UiPath.System.Activities`
 
 | Activity | Type id | Container | Key properties |
 |---|---|---|---|
+| Append Line | `System.AppendLine` | No | fileName, text |
 | Comment | `System.Comment` | No | text |
+| Copy File | `System.CopyFile` | No | path, destination, overwrite |
+| Create Directory | `System.CreateDirectory` | No | path |
 | Delay | `System.Delay` | No | durationMs |
+| Delete File | `System.DeleteFile` | No | path |
 | Log Message | `System.LogMessage` | No | message, level |
 | Message Box | `System.MessageBox` | No | text, title |
+| Path Exists | `System.PathExists` | No | path, pathType, result |
+| Read Text File | `System.ReadTextFile` | No | fileName, result |
 | Terminate Workflow | `System.TerminateWorkflow` | No | reason |
 | Throw | `System.Throw` | No | exceptionType, message |
 | Write Line | `System.WriteLine` | No | text |
+| Write Text File | `System.WriteTextFile` | No | fileName, text |
 
 ### UI Automation
 
