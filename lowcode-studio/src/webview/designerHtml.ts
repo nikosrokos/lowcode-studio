@@ -152,6 +152,14 @@ export function getDesignerHtml(
       font-size: 10px; color: var(--accent-fg); background: var(--accent);
       border-radius: 4px; padding: 1px 5px; font-weight: 700;
     }
+    .project-node .project-remove {
+      border: none; background: transparent; color: var(--muted);
+      cursor: pointer; font-size: 14px; line-height: 1; padding: 0 4px;
+      border-radius: 4px;
+    }
+    .project-node .project-remove:hover {
+      color: #ef4444; background: color-mix(in srgb, #ef4444 12%, transparent);
+    }
     .project-children { margin-left: 12px; border-left: 1px solid var(--border); padding-left: 4px; }
     .project-empty { padding: 16px 12px; color: var(--muted); font-size: 12px; line-height: 1.45; }
     .panel.right {
@@ -708,17 +716,34 @@ export function getDesignerHtml(
         return;
       }
       function nodeHtml(node, depth) {
-        const icon = node.kind === 'project' ? 'P' : node.kind === 'folder' ? 'F' : node.kind === 'workflow' ? 'W' : '·';
+        const icon =
+          node.kind === 'project' ? 'P' :
+          node.kind === 'solution' || node.kind === 'workspace' ? 'S' :
+          node.kind === 'folder' ? 'F' :
+          node.kind === 'workflow' ? 'W' : '·';
         const active = node.active ? ' active' : '';
-        const badge = node.active ? '<span class="badge">active</span>' : '';
+        const badgeText = node.badge || (node.active ? 'active' : '');
+        const badge = badgeText ? '<span class="badge">' + escapeHtml(badgeText) + '</span>' : '';
+        const canRemove = node.kind === 'project' || node.kind === 'solution' || node.kind === 'workspace';
+        const removeBtn = canRemove && depth === 0
+          ? '<button type="button" class="project-remove" data-remove-kind="' + escapeAttr(node.kind) + '" data-path="' + escapeAttr(node.path) + '" title="Remove from explorer">×</button>'
+          : '';
         let html = '<div class="project-node' + active + '" data-kind="' + escapeAttr(node.kind) + '" data-path="' + escapeAttr(node.path) + '">' +
-          '<span class="ico">' + icon + '</span><span class="label">' + escapeHtml(node.name) + '</span>' + badge + '</div>';
+          '<span class="ico">' + icon + '</span><span class="label">' + escapeHtml(node.name) + '</span>' + badge + removeBtn + '</div>';
         if (node.children && node.children.length) {
           html += '<div class="project-children">' + node.children.map((c) => nodeHtml(c, depth + 1)).join('') + '</div>';
         }
         return html;
       }
       els.projectTree.innerHTML = projects.map((p) => nodeHtml(p, 0)).join('');
+      els.projectTree.querySelectorAll('.project-remove').forEach((btn) => {
+        btn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          const kind = btn.getAttribute('data-remove-kind') || '';
+          const p = btn.getAttribute('data-path') || '';
+          vscode.postMessage({ type: 'removeFromExplorer', kind, path: p });
+        });
+      });
       els.projectTree.querySelectorAll('.project-node').forEach((el) => {
         el.addEventListener('click', () => {
           const kind = el.getAttribute('data-kind');
@@ -726,6 +751,8 @@ export function getDesignerHtml(
           if (kind === 'project') {
             vscode.postMessage({ type: 'setActiveProject', path: p });
             toast('Active project → ' + (el.querySelector('.label')?.textContent || ''));
+          } else if (kind === 'solution' || kind === 'workspace') {
+            vscode.postMessage({ type: 'revealInOs', path: p });
           } else if (kind === 'workflow' || kind === 'file') {
             vscode.postMessage({ type: 'openProjectFile', path: p });
           }

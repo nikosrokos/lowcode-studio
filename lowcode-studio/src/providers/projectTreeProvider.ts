@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 
-type ItemKind = 'project' | 'folder' | 'workflow' | 'file' | 'info';
+type ItemKind = 'project' | 'folder' | 'workflow' | 'file' | 'info' | 'solution';
 
 export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeItem> {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
@@ -47,45 +47,84 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
     if (!element) {
       const projects = roots.flatMap((root) => this.findProjects(root));
       const unique = [...new Set(projects)].sort();
+      const items: ProjectTreeItem[] = [];
+
       if (!unique.length) {
-        return [
+        items.push(
           new ProjectTreeItem(
-            'No project yet — Open Local Project or New REFramework',
+            'No LCS project yet — Open Local Project or New REFramework',
             roots[0],
             vscode.TreeItemCollapsibleState.None,
             'info'
           )
-        ];
-      }
-      return unique.map((p) => {
-        const dir = path.dirname(p);
-        const item = new ProjectTreeItem(
-          path.basename(dir),
-          p,
-          vscode.TreeItemCollapsibleState.Expanded,
-          'project'
         );
-        if (
-          this.activeProjectDir &&
-          path.resolve(this.activeProjectDir) === path.resolve(dir)
-        ) {
-          item.description = 'active';
-          item.iconPath = new vscode.ThemeIcon('root-folder-opened');
+      } else {
+        for (const p of unique) {
+          const dir = path.dirname(p);
+          const item = new ProjectTreeItem(
+            path.basename(dir),
+            p,
+            vscode.TreeItemCollapsibleState.Expanded,
+            'project'
+          );
+          if (
+            this.activeProjectDir &&
+            path.resolve(this.activeProjectDir) === path.resolve(dir)
+          ) {
+            item.description = 'active';
+            item.iconPath = new vscode.ThemeIcon('root-folder-opened');
+          }
+          item.command = {
+            command: 'lowcodeStudio.setActiveProject',
+            title: 'Set Active Project',
+            arguments: [item]
+          };
+          items.push(item);
+
+          // Show linked Studio Web Local Workspace under the active/each project
+          const linked = readLinkedSolution(dir);
+          if (linked) {
+            const sol = new ProjectTreeItem(
+              `${path.basename(linked)} (Studio Web)`,
+              linked,
+              vscode.TreeItemCollapsibleState.Collapsed,
+              'solution'
+            );
+            sol.description = 'linked';
+            sol.iconPath = new vscode.ThemeIcon('cloud');
+            sol.tooltip = linked;
+            items.push(sol);
+          }
         }
-        item.command = {
-          command: 'lowcodeStudio.setActiveProject',
-          title: 'Set Active Project',
-          arguments: [item]
-        };
-        return item;
-      });
+      }
+
+      // Workspace folders that are Studio Web solutions (opened via Connect) but not LCS
+      for (const root of roots) {
+        if (findUipx(root) && !unique.some((p) => path.resolve(path.dirname(p)) === path.resolve(root))) {
+          const already = items.some(
+            (i) => i.contextValue === 'solution' && path.resolve(i.resourcePath) === path.resolve(root)
+          );
+          if (!already) {
+            const sol = new ProjectTreeItem(
+              `${path.basename(root)} (Studio Web)`,
+              root,
+              vscode.TreeItemCollapsibleState.Collapsed,
+              'solution'
+            );
+            sol.iconPath = new vscode.ThemeIcon('cloud');
+            sol.tooltip = root;
+            items.push(sol);
+          }
+        }
+      }
+
+      return items;
     }
 
     if (element.contextValue === 'project') {
       const dir = path.dirname(element.resourcePath);
       const items: ProjectTreeItem[] = [];
 
-      // Group workflows + known folders
       const folders = collectProjectFolders(dir);
       for (const folder of folders) {
         items.push(
@@ -98,11 +137,14 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
         );
       }
 
-      // Root-level workflows / files
       for (const file of listRootProjectFiles(dir)) {
         items.push(fileTreeItem(file.label, file.path, file.kind));
       }
       return items;
+    }
+
+    if (element.contextValue === 'solution') {
+      return listSolutionChildren(element.resourcePath);
     }
 
     if (element.contextValue === 'folder') {
@@ -163,7 +205,35 @@ export class ProjectTreeItem extends vscode.TreeItem {
     } else if (contextValue === 'folder') {
       this.iconPath = new vscode.ThemeIcon('folder');
       this.tooltip = resourcePath;
+    } else if (contextValue === 'solution') {
+      this.iconPath = new vscode.ThemeIcon('cloud');
+      this.tooltip = resourcePath;
     }
+  }
+}
+
+function readLinkedSolution(lcsProjectDir: string): string | undefined {
+  try {
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(lcsProjectDir, 'project.json'), 'utf8')
+    ) as { studioWebLocal?: { solutionDir?: string } };
+    const dir = manifest.studioWebLocal?.solutionDir;
+    return dir && fs.existsSync(dir) ? dir : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function findUipx(solutionDir: string): string | undefined {
+  try {
+    const named = path.join(solutionDir, `${path.basename(solutionDir)}.uipx`);
+    if (fs.existsSync(named)) {
+      return named;
+    }
+    const hit = fs.readdirSync(solutionDir).find((f) => f.endsWith('.uipx'));
+    return hit ? path.join(solutionDir, hit) : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -196,7 +266,11 @@ function fileTreeItem(
         ? 'file-binary'
         : fullPath.endsWith('scenarios.json')
           ? 'beaker'
-          : 'settings-gear'
+          : fullPath.endsWith('.uipx')
+            ? 'json'
+            : fullPath.endsWith('.xaml')
+              ? 'file-code'
+              : 'settings-gear'
     );
   }
   return item;
@@ -211,7 +285,6 @@ function collectProjectFolders(projectDir: string): Array<{ name: string; path: 
       found.push({ name, path: full });
     }
   }
-  // Any other first-level dirs with workflows/config
   try {
     for (const entry of fs.readdirSync(projectDir, { withFileTypes: true })) {
       if (!entry.isDirectory()) {
@@ -237,7 +310,7 @@ function collectProjectFolders(projectDir: string): Array<{ name: string; path: 
 function dirHasProjectContent(dir: string): boolean {
   try {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (entry.isFile() && (entry.name.endsWith('.lcs.json') || entry.name.endsWith('.json') || entry.name.endsWith('.xlsx'))) {
+      if (entry.isFile() && (entry.name.endsWith('.lcs.json') || entry.name.endsWith('.json') || entry.name.endsWith('.xlsx') || entry.name.endsWith('.xaml'))) {
         return true;
       }
       if (entry.isDirectory()) {
@@ -275,6 +348,36 @@ function listRootProjectFiles(
   return results.sort((a, b) => a.label.localeCompare(b.label));
 }
 
+function listSolutionChildren(solutionDir: string): ProjectTreeItem[] {
+  const items: ProjectTreeItem[] = [];
+  try {
+    for (const entry of fs.readdirSync(solutionDir, { withFileTypes: true })) {
+      const full = path.join(solutionDir, entry.name);
+      if (entry.isDirectory()) {
+        items.push(
+          new ProjectTreeItem(
+            entry.name,
+            full,
+            vscode.TreeItemCollapsibleState.Collapsed,
+            'folder'
+          )
+        );
+      } else if (
+        entry.isFile() &&
+        (entry.name.endsWith('.uipx') ||
+          entry.name.endsWith('.json') ||
+          entry.name.endsWith('.md') ||
+          entry.name.endsWith('.xaml'))
+      ) {
+        items.push(fileTreeItem(entry.name, full, entry.name.endsWith('.xaml') ? 'workflow' : 'file'));
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return items.sort((a, b) => String(a.label).localeCompare(String(b.label)));
+}
+
 function listFolderChildren(folderPath: string): ProjectTreeItem[] {
   const items: ProjectTreeItem[] = [];
   let entries: fs.Dirent[] = [];
@@ -302,13 +405,14 @@ function listFolderChildren(folderPath: string): ProjectTreeItem[] {
       continue;
     }
     const full = path.join(folderPath, f.name);
-    if (f.name.endsWith('.lcs.json')) {
+    if (f.name.endsWith('.lcs.json') || f.name.endsWith('.xaml')) {
       items.push(fileTreeItem(f.name, full, 'workflow'));
     } else if (
       f.name.endsWith('.json') ||
       f.name.endsWith('.xlsx') ||
       f.name.endsWith('.md') ||
-      f.name.endsWith('.csv')
+      f.name.endsWith('.csv') ||
+      f.name.endsWith('.uipx')
     ) {
       items.push(fileTreeItem(f.name, full, 'file'));
     }

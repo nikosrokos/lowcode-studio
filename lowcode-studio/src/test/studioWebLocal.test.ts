@@ -7,13 +7,16 @@ import {
   getStudioWebLocalLink,
   linkStudioWebLocalWorkspace,
   syncToStudioWebLocal,
+  unlinkStudioWebLocalWorkspace,
   validateStudioWebLocalOpenability
 } from '../interop/studioWebLocal';
 import { connectToStudioWeb } from '../interop/studioWebConnect';
 import { parseWorkflow, stringifyWorkflow } from '../models/workflow';
+import { isValidGuid } from '../interop/xamlExport';
+import { buildCurrentProjectTree } from '../interop/projectResolve';
 
-function writeRef(dir: string): void {
-  for (const file of generateREFrameworkProject('LocalSyncDemo')) {
+function writeRef(dir: string, name = 'LocalSyncDemo'): void {
+  for (const file of generateREFrameworkProject(name)) {
     const full = path.join(dir, file.relativePath);
     fs.mkdirSync(path.dirname(full), { recursive: true });
     if (Buffer.isBuffer(file.content)) {
@@ -53,6 +56,18 @@ function run(): void {
     'Local Workspace project must be Portable (not Windows)'
   );
   assert.strictEqual(linkedPj.runtimeOptions?.netCore?.targetFramework, 'net8.0');
+  const entryId = (
+    linkedPj as { entryPoints?: Array<{ uniqueId?: string }> }
+  ).entryPoints?.[0]?.uniqueId;
+  assert.ok(isValidGuid(entryId), `Studio Web rejects invalid uniqueId: ${entryId}`);
+
+  // Designer Project tab must show LCS project + linked Studio Web solution
+  const tree = buildCurrentProjectTree(lcsDir);
+  assert.ok(tree.some((e) => e.kind === 'project' && e.path === lcsDir));
+  assert.ok(
+    tree.some((e) => e.kind === 'solution' && e.path === linked.link.solutionDir),
+    'linked Studio Web solution must appear in Project Explorer'
+  );
 
   const uipx = JSON.parse(fs.readFileSync(linked.uipxPath, 'utf8')) as {
     DocVersion?: string;
@@ -126,6 +141,51 @@ function run(): void {
   // No .uip beside solution
   const siblings = fs.readdirSync(linked.link.solutionDir);
   assert.ok(!siblings.some((f) => f.endsWith('.uip')));
+
+  // uniqueId stays stable across syncs
+  const idBefore = (
+    JSON.parse(fs.readFileSync(path.join(linked.targetDir, 'project.json'), 'utf8')) as {
+      entryPoints: Array<{ uniqueId: string }>;
+    }
+  ).entryPoints[0].uniqueId;
+  syncToStudioWebLocal(lcsDir);
+  const idAfter = (
+    JSON.parse(fs.readFileSync(path.join(linked.targetDir, 'project.json'), 'utf8')) as {
+      entryPoints: Array<{ uniqueId: string }>;
+    }
+  ).entryPoints[0].uniqueId;
+  assert.strictEqual(idBefore, idAfter);
+
+  // Unlink removes solution from designer tree
+  assert.ok(unlinkStudioWebLocalWorkspace(lcsDir));
+  assert.ok(!getStudioWebLocalLink(lcsDir));
+  assert.ok(!buildCurrentProjectTree(lcsDir).some((e) => e.kind === 'solution'));
+
+  // Names with spaces previously produced invalid Guids ("RPA Workflow")
+  const spaced = path.join(root, 'RPA Workflow');
+  writeRef(spaced, 'RPA Workflow');
+  // rewrite manifest name with space
+  const spacedManifest = JSON.parse(
+    fs.readFileSync(path.join(spaced, 'project.json'), 'utf8')
+  ) as { name?: string };
+  spacedManifest.name = 'RPA Workflow';
+  fs.writeFileSync(
+    path.join(spaced, 'project.json'),
+    JSON.stringify(spacedManifest, null, 2) + '\n',
+    'utf8'
+  );
+  const spacedLink = linkStudioWebLocalWorkspace(spaced, {
+    mode: 'create',
+    targetDir: parent,
+    solutionName: 'RPA_Workflow_Sol'
+  });
+  const spacedPj = JSON.parse(
+    fs.readFileSync(path.join(spacedLink.targetDir, 'project.json'), 'utf8')
+  ) as { entryPoints: Array<{ uniqueId: string }> };
+  assert.ok(
+    isValidGuid(spacedPj.entryPoints[0].uniqueId),
+    `RPA Workflow uniqueId invalid: ${spacedPj.entryPoints[0].uniqueId}`
+  );
 
   fs.rmSync(root, { recursive: true, force: true });
   console.log('studioWebLocal.test.ts: all assertions passed');

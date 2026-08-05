@@ -36,10 +36,18 @@ function run(): void {
   ) as {
     targetFramework: string;
     runtimeOptions: { netCore: { targetFramework: string }; requiresUserInteraction: boolean };
+    entryPoints: Array<{ uniqueId: string }>;
   };
   assert.strictEqual(projectJson.targetFramework, 'Windows');
   assert.strictEqual(projectJson.runtimeOptions.netCore.targetFramework, 'net8.0-windows');
   assert.strictEqual(projectJson.runtimeOptions.requiresUserInteraction, true);
+  // Studio Web requires a real Guid — the old pseudoUuid broke names like "RPA Workflow"
+  const guidRe =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  assert.ok(
+    guidRe.test(projectJson.entryPoints[0].uniqueId),
+    `invalid entryPoints uniqueId: ${projectJson.entryPoints[0].uniqueId}`
+  );
 
   const portable = JSON.parse(
     exportUiPathProjectJson({
