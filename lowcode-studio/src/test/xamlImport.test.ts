@@ -2,7 +2,7 @@ import assert from 'assert';
 import * as fs from 'fs';
 import * as path from 'path';
 import { importXaml } from '../interop/xamlImport';
-import { exportWorkflowToXaml, exportUiPathProjectJson, normalizeLogLevel } from '../interop/xamlExport';
+import { exportWorkflowToXaml, exportUiPathProjectJson, normalizeLogLevel, toVbStringArgument, fromVbStringArgument, shouldSkipActivityOnExport, exportDisplayName } from '../interop/xamlExport';
 import { validateWorkflow, dryRunWorkflow } from '../commands/simulator';
 import {
   collectActivityTypes,
@@ -53,12 +53,62 @@ function run(): void {
     'Studio Web rejects Level="TraceLevel.Info" — emit bare enum name'
   );
   assert.ok(!/TraceLevel\./.test(exported), 'TraceLevel. prefix must not appear in Level');
+  // LogMessage Message must be a VB string literal ["Starting"], not [Starting] or [["Starting"]]
+  assert.ok(
+    /Message="\[&quot;Starting&quot;\]"/.test(exported) ||
+      /Message="\["Starting"\]"/.test(exported),
+    `LogMessage Message should be quoted string, got snippet: ${exported.match(/Message="[^"]*"/)?.[0]}`
+  );
 
   assert.strictEqual(normalizeLogLevel('Info'), 'Info');
   assert.strictEqual(normalizeLogLevel('TraceLevel.Info'), 'Info');
   assert.strictEqual(normalizeLogLevel('TraceLevel.Warn'), 'Warn');
   assert.strictEqual(normalizeLogLevel('warning'), 'Warn');
   assert.strictEqual(normalizeLogLevel(''), 'Info');
+
+  assert.strictEqual(toVbStringArgument('12'), '"12"');
+  assert.strictEqual(toVbStringArgument('"12"'), '"12"');
+  assert.strictEqual(toVbStringArgument('["12"]'), '"12"');
+  assert.strictEqual(toVbStringArgument('[["12"]]'), '"12"');
+  assert.strictEqual(toVbStringArgument('Starting'), '"Starting"');
+  assert.strictEqual(toVbStringArgument('[message]'), 'message');
+  assert.strictEqual(fromVbStringArgument('["12"]'), '12');
+  assert.strictEqual(fromVbStringArgument('&quot;12&quot;'), '12');
+  assert.strictEqual(exportDisplayName('Manual Trigger (imported)'), 'Manual Trigger');
+  assert.ok(
+    shouldSkipActivityOnExport({
+      id: 't1',
+      type: 'Imported.ManualTrigger',
+      displayName: 'Manual Trigger (imported)',
+      properties: {}
+    })
+  );
+
+  // Round-trip: plain designer text 12 → XAML ["12"] → plain 12
+  const logOnly = exportWorkflowToXaml({
+    schemaVersion: '1.0',
+    name: 'LogProbe',
+    type: 'Sequence',
+    variables: [],
+    arguments: [],
+    activities: [
+      {
+        id: 'l1',
+        type: 'System.LogMessage',
+        displayName: 'Log',
+        properties: { message: '12', level: 'Info' }
+      },
+      {
+        id: 't1',
+        type: 'Imported.ManualTrigger',
+        displayName: 'Manual Trigger (imported)',
+        properties: { hint: 'skip me' }
+      }
+    ]
+  });
+  assert.ok(logOnly.includes('Message="[&quot;12&quot;]"'), logOnly);
+  assert.ok(!/Manual\s*Trigger/i.test(logOnly), 'Manual Trigger must be skipped on export');
+  assert.ok(!/\(imported\)/i.test(logOnly), '(imported) must not appear in exported XAML');
 
   const deps = resolveUiPathDependencies({
     activityTypes: collectActivityTypes([workflow]),

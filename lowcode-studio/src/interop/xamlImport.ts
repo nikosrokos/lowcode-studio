@@ -9,6 +9,7 @@ import {
 import { lcsTypeFromXamlName, unknownActivityType } from './activityMap';
 import { applySelectorProps, extractSelectorProps } from './selectorRoundTrip';
 import { fromXamlInteractionMode } from './inputMethod';
+import { fromVbStringArgument } from './xamlExport';
 
 export interface ImportWarning {
   message: string;
@@ -251,6 +252,15 @@ function mapActivity(
   warnings: ImportWarning[]
 ): ActivityNode | undefined {
   const displayName = String(raw['@_DisplayName'] || localName);
+
+  // Studio Web start triggers — keep out of LCS canvas (re-exporting them as Comments breaks Main.xaml)
+  if (isStudioWebTriggerLocalName(localName, displayName)) {
+    warnings.push({
+      message: `Skipped Studio Web trigger "${displayName}" (${localName}) — not needed in LowCode Studio.`
+    });
+    return undefined;
+  }
+
   const mapped = lcsTypeFromXamlName(localName);
 
   if (localName === 'Sequence') {
@@ -380,7 +390,9 @@ function mapActivity(
       type: 'System.LogMessage',
       displayName,
       properties: {
-        message: cleanExpr(raw['@_Message'] ?? extractArgument(raw, 'Message') ?? '"Message"'),
+        message: fromVbStringArgument(
+          cleanExpr(raw['@_Message'] ?? extractArgument(raw, 'Message') ?? '')
+        ),
         level: String(raw['@_Level'] || 'Info').replace('TraceLevel.', '')
       }
     };
@@ -1154,6 +1166,20 @@ function cleanExpr(value: unknown): string {
   let text = String(value).trim();
   text = text.replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
   return text;
+}
+
+/** Studio Web / Integration trigger activities that should not enter LCS workflows. */
+function isStudioWebTriggerLocalName(localName: string, displayName: string): boolean {
+  if (/Trigger$/i.test(localName)) {
+    return true;
+  }
+  if (/ManualTrigger|TimeTrigger|FormTrigger|HotkeyTrigger|ClickImageTrigger|KeyPressTrigger/i.test(localName)) {
+    return true;
+  }
+  if (/^Manual\s*Trigger$/i.test(displayName.trim())) {
+    return true;
+  }
+  return false;
 }
 
 function cleanLiteral(value: unknown): unknown {
