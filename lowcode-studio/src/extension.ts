@@ -19,6 +19,7 @@ import {
   validateWorkflow
 } from './commands/simulator';
 import { getLowCodeOutput } from './util/outputChannel';
+import { maybeShowWhatsNew, showWhatsNewCommand } from './util/whatsNew';
 import {
   createQuickScenario,
   duplicateScenario,
@@ -144,6 +145,12 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Finish a quiet open after workspace reload (no auto-open Main / dialog cascade)
   void consumePendingQuietOpen();
+
+  const packageJson = JSON.parse(
+    fs.readFileSync(path.join(context.extensionPath, 'package.json'), 'utf8')
+  ) as { version?: string };
+  const packageVersion = packageJson.version || '0.0.0';
+  void maybeShowWhatsNew(context, packageVersion);
 
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider(
@@ -427,6 +434,9 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand('lowcodeStudio.showGettingStarted', () => {
       showGettingStarted();
+    }),
+    vscode.commands.registerCommand('lowcodeStudio.showWhatsNew', () => {
+      void showWhatsNewCommand(context, packageVersion);
     })
   );
 
@@ -772,7 +782,13 @@ async function validatePackagesCommand(): Promise<void> {
   }
   try {
     const result = validateProjectPackages(projectDir);
-    const report = formatPackageValidationReport(result);
+    const todo = buildWindowsTodoChecklist(projectDir);
+    writeWindowsTodoFile(projectDir, todo);
+    const report = [
+      formatPackageValidationReport(result),
+      '',
+      formatWindowsTodoReport(todo)
+    ].join('\n');
     const channel = getOutput();
     channel.clear();
     channel.appendLine(report);
@@ -780,18 +796,24 @@ async function validatePackagesCommand(): Promise<void> {
 
     const warnCount = result.warnings.filter((w) => w.severity === 'warning').length;
     const infoCount = result.warnings.filter((w) => w.severity === 'info').length;
-    if (!result.warnings.length) {
+    if (!result.warnings.length || todo.readyForWindows) {
       void vscode.window.showInformationMessage(
-        `Packages OK — ${Object.keys(result.dependencies).length} NuGet deps for Studio Web.`
+        todo.readyForWindows
+          ? `Packages OK — Windows TODO clean · ${Object.keys(result.dependencies).length} NuGet deps.`
+          : `Packages: ${warnCount} warning(s). See Output + WINDOWS_TODO.md.`
       );
       return;
     }
     const open = await vscode.window.showWarningMessage(
-      `Package validation: ${warnCount} warning(s), ${infoCount} info. See LowCode Studio output.`,
-      'Open Output'
+      `Package validation: ${warnCount} warning(s), ${infoCount} info · ${todo.summary}`,
+      'Open Output',
+      'Open WINDOWS_TODO'
     );
     if (open === 'Open Output') {
       channel.show(true);
+    } else if (open === 'Open WINDOWS_TODO') {
+      const todoUri = vscode.Uri.file(path.join(projectDir, 'WINDOWS_TODO.md'));
+      await vscode.window.showTextDocument(todoUri, { preview: true });
     }
   } catch (err) {
     vscode.window.showErrorMessage(
@@ -1730,6 +1752,12 @@ async function connectStudioWebCommand(treeItem?: ProjectTreeItem): Promise<void
       const todo = buildWindowsTodoChecklist(projectDir);
       writeWindowsTodoFile(result.local?.link.solutionDir || result.targetDir, todo);
       writeWindowsTodoFile(projectDir, todo);
+      const channel = getOutput();
+      channel.appendLine('');
+      channel.appendLine(formatWindowsTodoReport(todo));
+      if (!todo.readyForWindows) {
+        channel.show(true);
+      }
     } catch {
       // ignore
     }

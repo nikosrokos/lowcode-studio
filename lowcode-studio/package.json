@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Mac-first low-code RPA for VS Code/Cursor: REFramework design, scenario dry-runs (Shift+F5), and the easiest Connect to Studio Web handoff for Orchestrator publish.",
-  "version": "0.6.26",
+  "version": "0.6.27",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -69,7 +69,7 @@
     "commands": [
       {
         "command": "lowcodeStudio.openLocalProject",
-        "title": "Open Local Project \u2014 LCS project or Studio Web solution (.uipx)",
+        "title": "Open Local Project — LCS project or Studio Web solution (.uipx)",
         "icon": "$(folder-opened)",
         "shortTitle": "Open",
         "category": "LowCode Studio"
@@ -83,21 +83,21 @@
       },
       {
         "command": "lowcodeStudio.newREFramework",
-        "title": "New REFramework Project \u2014 Init \u2192 Get Data \u2192 Process template",
+        "title": "New REFramework Project — Init → Get Data → Process template",
         "icon": "$(type-hierarchy)",
         "shortTitle": "REFramework",
         "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.newBlueprint",
-        "title": "New Robot Blueprint \u2014 scrape\u2192Excel, login\u2192email, API\u2192table",
+        "title": "New Robot Blueprint — scrape→Excel, login→email, API→table",
         "icon": "$(symbol-misc)",
         "shortTitle": "Blueprint",
         "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.newWorkflow",
-        "title": "New Workflow \u2014 Sequence or Flowchart",
+        "title": "New Workflow — Sequence or Flowchart",
         "icon": "$(new-file)",
         "shortTitle": "Workflow",
         "category": "LowCode Studio"
@@ -108,35 +108,35 @@
       },
       {
         "command": "lowcodeStudio.validatePackages",
-        "title": "Validate Packages \u2014 NuGet deps and Windows selector warnings",
+        "title": "Validate Packages — NuGet deps and Windows selector warnings",
         "icon": "$(warning)",
         "shortTitle": "Validate",
         "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.validateWorkflow",
-        "title": "Validate Workflow \u2014 required fields and structure",
+        "title": "Validate Workflow — required fields and structure",
         "icon": "$(check)",
         "shortTitle": "Validate",
         "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.dryRun",
-        "title": "Dry Run \u2014 simulate the open workflow (F5)",
+        "title": "Dry Run — simulate the open workflow (F5)",
         "icon": "$(play)",
         "shortTitle": "Dry Run",
         "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.dryRunScenario",
-        "title": "Dry Run Scenarios \u2014 run REFramework test scenarios (Shift+F5)",
+        "title": "Dry Run Scenarios — run REFramework test scenarios (Shift+F5)",
         "icon": "$(beaker)",
         "shortTitle": "Scenarios",
         "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.manageScenarios",
-        "title": "Manage Scenarios \u2014 add, duplicate, or open scenarios.json",
+        "title": "Manage Scenarios — add, duplicate, or open scenarios.json",
         "icon": "$(checklist)",
         "shortTitle": "Manage",
         "category": "LowCode Studio"
@@ -170,13 +170,13 @@
       },
       {
         "command": "lowcodeStudio.insertActivity",
-        "title": "Insert Activity \u2014 Cmd+K palette (favorites + recent)",
+        "title": "Insert Activity — Cmd+K palette (favorites + recent)",
         "shortTitle": "Insert",
         "category": "LowCode Studio"
       },
       {
         "command": "lowcodeStudio.activityPalette",
-        "title": "Activity Palette \u2014 search, favorites, recent (Cmd+K in designer)",
+        "title": "Activity Palette — search, favorites, recent (Cmd+K in designer)",
         "icon": "$(search)",
         "shortTitle": "Palette",
         "category": "LowCode Studio"
@@ -255,6 +255,12 @@
       {
         "command": "lowcodeStudio.showGettingStarted",
         "title": "LowCode Studio: Getting Started"
+      },
+      {
+        "command": "lowcodeStudio.showWhatsNew",
+        "title": "What's New (changelog)",
+        "shortTitle": "What's New",
+        "category": "LowCode Studio"
       }
     ],
     "menus": {
@@ -263,31 +269,31 @@
           "command": "lowcodeStudio.openLocalProject",
           "when": "view == lowcodeStudio.projects",
           "group": "navigation@0",
-          "tooltip": "Open Local Project \u2014 LCS project or Studio Web solution (.uipx)"
+          "tooltip": "Open Local Project — LCS project or Studio Web solution (.uipx)"
         },
         {
           "command": "lowcodeStudio.dryRunScenario",
           "when": "view == lowcodeStudio.projects",
           "group": "navigation@1",
-          "tooltip": "Dry Run Scenarios \u2014 run REFramework test scenarios (Shift+F5)"
+          "tooltip": "Dry Run Scenarios — run REFramework test scenarios (Shift+F5)"
         },
         {
           "command": "lowcodeStudio.manageScenarios",
           "when": "view == lowcodeStudio.projects",
           "group": "navigation@2",
-          "tooltip": "Manage Scenarios \u2014 add, duplicate, or open scenarios.json"
+          "tooltip": "Manage Scenarios — add, duplicate, or open scenarios.json"
         },
         {
           "command": "lowcodeStudio.connectStudioWeb",
           "when": "view == lowcodeStudio.projects",
           "group": "navigation@3",
-          "tooltip": "Open/create Studio Web Local Workspace \u2014 Save syncs .xaml"
+          "tooltip": "Open/create Studio Web Local Workspace — Save syncs .xaml"
         },
         {
           "command": "lowcodeStudio.validatePackages",
           "when": "view == lowcodeStudio.projects",
           "group": "navigation@4",
-          "tooltip": "Validate Packages \u2014 NuGet deps and Windows selector warnings"
+          "tooltip": "Validate Packages — NuGet deps and Windows selector warnings"
         },
         {
           "command": "lowcodeStudio.refreshExplorer",
@@ -299,13 +305,13 @@
           "command": "lowcodeStudio.newBlueprint",
           "when": "view == lowcodeStudio.projects",
           "group": "1_create@1",
-          "tooltip": "New Robot Blueprint \u2014 scrape\u2192Excel, login\u2192email, API\u2192table"
+          "tooltip": "New Robot Blueprint — scrape→Excel, login→email, API→table"
         },
         {
           "command": "lowcodeStudio.newREFramework",
           "when": "view == lowcodeStudio.projects",
           "group": "1_create@2",
-          "tooltip": "New REFramework Project \u2014 Init \u2192 Get Data \u2192 Process template"
+          "tooltip": "New REFramework Project — Init → Get Data → Process template"
         },
         {
           "command": "lowcodeStudio.newProject",
@@ -317,7 +323,7 @@
           "command": "lowcodeStudio.newWorkflow",
           "when": "view == lowcodeStudio.projects",
           "group": "1_create@4",
-          "tooltip": "New Workflow \u2014 Sequence or Flowchart"
+          "tooltip": "New Workflow — Sequence or Flowchart"
         },
         {
           "command": "lowcodeStudio.importUiPathProject",
@@ -543,7 +549,7 @@
     "package": "npm run bundle && vsce package --no-dependencies",
     "lint": "tsc --noEmit",
     "docs:activities": "npm run compile && node scripts/generate-activities-md.js",
-    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && node out/test/windowsTarget.test.js && node out/test/extractTableData.test.js && node out/test/selectorBuilder.test.js && node out/test/windowsTodo.test.js && node out/test/strongDryRun.test.js && node out/test/blueprints.test.js && node out/test/activityPaletteSmartProps.test.js && node out/test/inputMethod.test.js && node out/test/projectResolve.test.js && node out/test/studioWebLocal.test.js && node out/test/useAppBrowserUx.test.js && node out/test/workflowArguments.test.js && node out/test/phaseBActivities.test.js && node out/test/dryRun2.test.js && npm run docs:activities"
+    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && node out/test/windowsTarget.test.js && node out/test/extractTableData.test.js && node out/test/selectorBuilder.test.js && node out/test/windowsTodo.test.js && node out/test/strongDryRun.test.js && node out/test/blueprints.test.js && node out/test/activityPaletteSmartProps.test.js && node out/test/inputMethod.test.js && node out/test/projectResolve.test.js && node out/test/studioWebLocal.test.js && node out/test/useAppBrowserUx.test.js && node out/test/workflowArguments.test.js && node out/test/phaseBActivities.test.js && node out/test/dryRun2.test.js && node out/test/whatsNew.test.js && npm run docs:activities"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",

@@ -5,6 +5,8 @@ import {
 } from '../models/workflow';
 import { getActivityDefinition } from '../models/activities';
 import { CustomActivityDefinition } from '../models/customActivities';
+import { scoreSelector } from '../interop/selectorBuilder';
+import { isPlaceholderSelector } from '../interop/windowsTarget';
 
 export interface ValidationIssue {
   severity: 'error' | 'warning';
@@ -110,6 +112,30 @@ export function validateWorkflow(doc: WorkflowDocument): ValidationIssue[] {
           severity: 'warning',
           activityId: activity.id,
           message: `Assign target "${target}" does not look like a variable name.`
+        });
+      }
+    }
+
+    if (
+      activity.type.startsWith('UI.') &&
+      activity.type !== 'UI.OpenApplication' &&
+      activity.type !== 'UI.TakeScreenshot'
+    ) {
+      const selector = String(activity.properties?.selector || '').trim();
+      const quality = scoreSelector(selector);
+      if (!selector || isPlaceholderSelector(selector) || quality.level === 'empty') {
+        issues.push({
+          severity: 'warning',
+          activityId: activity.id,
+          message:
+            quality.cardMessage ||
+            `${activity.displayName}: selector missing or still a starter (Windows TODO).`
+        });
+      } else if (quality.level === 'weak') {
+        issues.push({
+          severity: 'warning',
+          activityId: activity.id,
+          message: `${activity.displayName}: weak selector (score ${quality.score}) — ${quality.hints[0] || 'add Id / aaname'}.`
         });
       }
     }

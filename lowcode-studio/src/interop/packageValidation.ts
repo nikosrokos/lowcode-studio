@@ -16,6 +16,7 @@ import {
   isWindowsClassicSelector,
   resolveUiPathTarget
 } from './windowsTarget';
+import { scoreSelector } from './selectorBuilder';
 
 export interface PackageWarning {
   severity: 'warning' | 'info';
@@ -281,15 +282,25 @@ function classifyActivity(
         ...base,
         severity: 'warning',
         code: 'ui-placeholder-selector',
-        message: `${activity.displayName}: selector is still a <target> placeholder — replace with a Windows <html>/<webctrl> or <wnd> selector.`
+        message: `${activity.displayName}: selector is still a starter / placeholder — replace with a captured Windows <html>/<webctrl> or <wnd> selector.`
       });
-    } else if (!isWindowsClassicSelector(selector)) {
-      warnings.push({
-        ...base,
-        severity: 'info',
-        code: 'ui-nonclassic-selector',
-        message: `${activity.displayName}: selector may not be classic Windows format (expected <html>/<webctrl>/<wnd>).`
-      });
+    } else {
+      const quality = scoreSelector(selector);
+      if (quality.level === 'weak') {
+        warnings.push({
+          ...base,
+          severity: 'warning',
+          code: 'ui-weak-selector',
+          message: `${activity.displayName}: weak selector (score ${quality.score}/100) — ${quality.hints[0] || 'add Id or aaname'}.`
+        });
+      } else if (!isWindowsClassicSelector(selector)) {
+        warnings.push({
+          ...base,
+          severity: 'info',
+          code: 'ui-nonclassic-selector',
+          message: `${activity.displayName}: selector may not be classic Windows format (expected <html>/<webctrl>/<wnd>).`
+        });
+      }
     }
   }
 
