@@ -1224,8 +1224,9 @@ export function getDesignerHtml(
           <h3>Repair VB expressions (F4)</h3>
           <span class="cmd">LowCode Studio: Repair VB expressions (Assist)</span>
           <p>
-            Scans expression fields for UiPath Visual Basic typos / JS-style calls and proposes fixes
-            (confirm before apply). Examples:
+            Also shown automatically in the Properties panel under expression fields
+            (<span style="color:#ef4444;font-weight:600">red hint + Apply</span>).
+            Right-click an activity → <em>Apply VB repairs</em>. Examples:
           </p>
           <ul>
             <li><code>TRim(name)</code> → <code>name.Trim()</code></li>
@@ -1233,6 +1234,7 @@ export function getDesignerHtml(
             <li><code>x == null</code> → <code>x Is Nothing</code> · <code>&amp;&amp;</code> → <code>AndAlso</code></li>
             <li><code>Len(s)</code> → <code>s.Length</code> · <code>Left(s, 3)</code> → <code>s.Substring(0, 3)</code></li>
           </ul>
+          <p>Activity actions (move, duplicate, breakpoint, run-to-here) are on the <strong>right-click</strong> menu — card icon buttons were removed.</p>
 
           <h3>Related dry-run settings (not Assist)</h3>
           <p>
@@ -2845,6 +2847,18 @@ export function getDesignerHtml(
         items.push({
           ok: false,
           text: 'Imported.* type — map to a real LCS activity before Studio Web round-trip'
+        });
+      }
+      if (node.type === 'Data.BuildDataTable') {
+        items.push({
+          ok: true,
+          text: 'Build Data Table is Windows-only — Save→Studio Web rewrites to New DataTable + Add Data Column'
+        });
+      }
+      if (node.type === 'UI.UseApplicationBrowser') {
+        items.push({
+          ok: true,
+          text: 'Use Browser exports as NApplicationCard + TargetApp (Url/BrowserType on TargetApp, not the card)'
         });
       }
       if (!def) {

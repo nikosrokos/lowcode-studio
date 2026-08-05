@@ -17,6 +17,7 @@ import {
   resolveUiPathTarget
 } from './windowsTarget';
 import { scoreSelector } from './selectorBuilder';
+import { isWindowsOnlyActivityType, windowsOnlyReason } from './studioWebCompat';
 
 export interface PackageWarning {
   severity: 'warning' | 'info';
@@ -228,6 +229,15 @@ function classifyActivity(
       severity: 'warning',
       code: 'imported-placeholder',
       message: `${activity.displayName}: "${type}" exports as a Comment placeholder in Studio Web — replace after import.`
+    });
+  }
+
+  if (isWindowsOnlyActivityType(type)) {
+    warnings.push({
+      ...base,
+      severity: 'warning',
+      code: 'windows-only-activity',
+      message: `${activity.displayName}: ${windowsOnlyReason(type)}`
     });
   }
 

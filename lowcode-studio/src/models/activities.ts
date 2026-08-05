@@ -693,7 +693,7 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     displayName: 'Use Application/Browser',
     category: 'UI Automation',
     description:
-      'Modern UI scope: attach/open a Windows app or browser, then run nested UI activities (Click, Type Into, Extract Table…).',
+      'Modern UI scope (Studio Web: Use Browser). Opens/attaches a browser or app; nested UI activities run inside. Exports as NApplicationCard + TargetApp.',
     icon: '$(browser)',
     color: '#059669',
     container: true,
@@ -1213,7 +1213,8 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     type: 'Data.BuildDataTable',
     displayName: 'Build Data Table',
     category: 'Data',
-    description: 'Creates an in-memory table structure.',
+    description:
+      'Creates an in-memory table structure. Windows-only in UiPath — Studio Web (Portable) Save rewrites to New DataTable + Add Data Column.',
     icon: '$(table)',
     color: '#06B6D4',
     properties: [
