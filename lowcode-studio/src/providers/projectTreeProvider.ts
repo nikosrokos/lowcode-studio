@@ -4,12 +4,15 @@ import * as fs from 'fs';
 
 type ItemKind = 'project' | 'folder' | 'workflow' | 'file' | 'info' | 'solution';
 
+export const HIDDEN_EXPLORER_PATHS_KEY = 'lowcodeStudio.hiddenExplorerPaths';
+
 export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeItem> {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
     ProjectTreeItem | undefined | null | void
   >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
   private activeProjectDir: string | undefined;
+  private hiddenPaths = new Set<string>();
 
   constructor(_workspaceRoot?: string) {
     // workspace roots are read live so Open Local Project refreshes correctly
@@ -19,12 +22,42 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
     this.activeProjectDir = projectDir;
   }
 
+  setHiddenPaths(paths: string[]): void {
+    this.hiddenPaths = new Set(
+      (paths || []).map((p) => path.resolve(p)).filter(Boolean)
+    );
+  }
+
+  getHiddenPaths(): string[] {
+    return [...this.hiddenPaths];
+  }
+
+  hidePath(targetPath: string): void {
+    this.hiddenPaths.add(path.resolve(targetPath));
+  }
+
+  unhidePath(targetPath: string): void {
+    this.hiddenPaths.delete(path.resolve(targetPath));
+  }
+
+  private isHidden(targetPath: string): boolean {
+    const resolved = path.resolve(targetPath);
+    for (const h of this.hiddenPaths) {
+      if (resolved === h || resolved.startsWith(h + path.sep)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   refresh(): void {
     this._onDidChangeTreeData.fire();
   }
 
   private workspaceRoots(): string[] {
-    return (vscode.workspace.workspaceFolders || []).map((f) => f.uri.fsPath);
+    return (vscode.workspace.workspaceFolders || [])
+      .map((f) => f.uri.fsPath)
+      .filter((p) => !this.isHidden(p));
   }
 
   getTreeItem(element: ProjectTreeItem): vscode.TreeItem {
@@ -53,8 +86,11 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
 
     if (!element) {
       const projects = roots.flatMap((root) => this.findProjects(root));
-      const unique = [...new Set(projects)].sort();
+      const unique = [...new Set(projects)]
+        .filter((p) => !this.isHidden(path.dirname(p)))
+        .sort();
       const items: ProjectTreeItem[] = [];
+      const linkedSolutionDirs = new Set<string>();
 
       if (!unique.length) {
         items.push(
@@ -88,41 +124,35 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
           };
           items.push(item);
 
-          // Show linked Studio Web Local Workspace under the active/each project
           const linked = readLinkedSolution(dir);
           if (linked) {
-            const sol = new ProjectTreeItem(
-              `${path.basename(linked)} (Studio Web)`,
-              linked,
-              vscode.TreeItemCollapsibleState.Collapsed,
-              'solution'
-            );
-            sol.description = 'linked';
-            sol.iconPath = new vscode.ThemeIcon('cloud');
-            sol.tooltip = linked;
-            items.push(sol);
+            linkedSolutionDirs.add(path.resolve(linked));
           }
         }
       }
 
-      // Workspace folders that are Studio Web solutions (opened via Connect) but not LCS
+      // Standalone Studio Web solutions only (not already linked under an LCS project)
       for (const root of roots) {
-        if (findUipx(root) && !unique.some((p) => path.resolve(path.dirname(p)) === path.resolve(root))) {
-          const already = items.some(
-            (i) => i.contextValue === 'solution' && path.resolve(i.resourcePath) === path.resolve(root)
-          );
-          if (!already) {
-            const sol = new ProjectTreeItem(
-              `${path.basename(root)} (Studio Web)`,
-              root,
-              vscode.TreeItemCollapsibleState.Collapsed,
-              'solution'
-            );
-            sol.iconPath = new vscode.ThemeIcon('cloud');
-            sol.tooltip = root;
-            items.push(sol);
-          }
+        if (!findUipx(root) || this.isHidden(root)) {
+          continue;
         }
+        const resolved = path.resolve(root);
+        if (linkedSolutionDirs.has(resolved)) {
+          continue;
+        }
+        // Skip if this root is itself an LCS project folder
+        if (unique.some((p) => path.resolve(path.dirname(p)) === resolved)) {
+          continue;
+        }
+        const sol = new ProjectTreeItem(
+          `${path.basename(root)} (Studio Web)`,
+          root,
+          vscode.TreeItemCollapsibleState.Collapsed,
+          'solution'
+        );
+        sol.iconPath = new vscode.ThemeIcon('cloud');
+        sol.tooltip = root;
+        items.push(sol);
       }
 
       return items;
@@ -131,6 +161,21 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
     if (element.contextValue === 'project') {
       const dir = path.dirname(element.resourcePath);
       const items: ProjectTreeItem[] = [];
+
+      // Linked Studio Web solution nested under its LCS project (not a duplicate top-level root)
+      const linked = readLinkedSolution(dir);
+      if (linked && !this.isHidden(linked)) {
+        const sol = new ProjectTreeItem(
+          `${path.basename(linked)} (Studio Web)`,
+          linked,
+          vscode.TreeItemCollapsibleState.Collapsed,
+          'solution'
+        );
+        sol.description = 'linked';
+        sol.iconPath = new vscode.ThemeIcon('cloud');
+        sol.tooltip = linked;
+        items.push(sol);
+      }
 
       const folders = collectProjectFolders(dir);
       for (const folder of folders) {
@@ -162,6 +207,10 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
   }
 
   private findProjects(root: string): string[] {
+    // Do not treat Studio Web Local Workspace solution trees as LCS projects
+    if (findUipx(root)) {
+      return [];
+    }
     const results: string[] = [];
     const stack = [root];
     while (stack.length) {
@@ -178,6 +227,10 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
         }
         const full = path.join(current, entry.name);
         if (entry.isDirectory()) {
+          // Skip nested Studio Web solutions (avoids picking up synced Portable projects)
+          if (findUipx(full)) {
+            continue;
+          }
           stack.push(full);
         } else if (entry.isFile() && entry.name === 'project.json') {
           try {
