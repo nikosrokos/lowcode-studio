@@ -302,26 +302,34 @@ export function writeUiPathProjectToDir(
     (t) => t.startsWith('UI.') || t.startsWith('Imported.')
   );
 
+  const projectJsonPath = path.join(outDir, 'project.json');
   fs.writeFileSync(
-    path.join(outDir, 'project.json'),
+    projectJsonPath,
     exportUiPathProjectJson({
       name: projectName,
       description: manifest.description,
       main: mainXaml,
       dependencies,
       targetFramework,
-      requiresUserInteraction
+      requiresUserInteraction,
+      // Reuse a valid Guid across syncs; never emit the old broken pseudo-uuid
+      existingProjectJsonPath: projectJsonPath
     }),
     'utf8'
   );
   written.push('project.json');
 
-  for (const rel of [
-    'Data/Config.json',
-    'Data/Config.xlsx',
-    'Data/Test/scenarios.json',
-    'activities.custom.json'
-  ]) {
+  // Only copy assets Studio Web understands. Skip LCS-only artifacts that can confuse import.
+  const copyRels =
+    targetFramework === 'Portable'
+      ? ['Data/Config.json', 'Data/Config.xlsx']
+      : [
+          'Data/Config.json',
+          'Data/Config.xlsx',
+          'Data/Test/scenarios.json',
+          'activities.custom.json'
+        ];
+  for (const rel of copyRels) {
     const abs = path.join(lcsProjectDir, rel);
     if (!fs.existsSync(abs)) {
       continue;

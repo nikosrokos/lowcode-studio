@@ -38,6 +38,7 @@ import {
 import {
   getStudioWebLocalLink,
   trySyncToStudioWebLocal,
+  unlinkStudioWebLocalWorkspace,
   validateStudioWebLocalOpenability
 } from './interop/studioWebLocal';
 import {
@@ -366,6 +367,39 @@ export function activate(context: vscode.ExtensionContext): void {
             2500
           );
         }
+      }
+    ),
+    vscode.commands.registerCommand(
+      'lowcodeStudio.removeFromExplorer',
+      async (itemOrPath?: ProjectTreeItem | string, kindHint?: string) => {
+        await removeFromExplorerCommand(itemOrPath, kindHint);
+      }
+    ),
+    vscode.commands.registerCommand(
+      'lowcodeStudio.unlinkStudioWebLocal',
+      async (item?: ProjectTreeItem) => {
+        const dir = projectDirFromTreeItem(item) || (await resolveLcsProjectDir());
+        if (!dir) {
+          return;
+        }
+        if (!getStudioWebLocalLink(dir)) {
+          void vscode.window.showInformationMessage(
+            'This project is not linked to a Studio Web Local Workspace.'
+          );
+          return;
+        }
+        const ok = await vscode.window.showWarningMessage(
+          `Unlink Studio Web Local Workspace from "${path.basename(dir)}"? Solution files on disk are kept.`,
+          { modal: true },
+          'Unlink'
+        );
+        if (ok !== 'Unlink') {
+          return;
+        }
+        unlinkStudioWebLocalWorkspace(dir);
+        projectProvider.refresh();
+        editorProvider?.refreshProjectTree?.();
+        void vscode.window.showInformationMessage('Studio Web Local Workspace unlinked.');
       }
     ),
     vscode.commands.registerCommand('lowcodeStudio.exportConfigXlsx', () =>
@@ -1022,6 +1056,109 @@ async function setActiveProjectDir(projectDir: string): Promise<void> {
   editorProvider?.refreshProjectTree?.();
 }
 
+async function ensureFolderInWorkspace(folderPath: string, name?: string): Promise<void> {
+  if (!folderPath || !fs.existsSync(folderPath)) {
+    return;
+  }
+  const resolved = path.resolve(folderPath);
+  const folders = vscode.workspace.workspaceFolders || [];
+  const already = folders.some(
+    (f) =>
+      path.resolve(f.uri.fsPath) === resolved ||
+      resolved.startsWith(path.resolve(f.uri.fsPath) + path.sep)
+  );
+  if (already) {
+    return;
+  }
+  const added = vscode.workspace.updateWorkspaceFolders(folders.length, 0, {
+    uri: vscode.Uri.file(resolved),
+    name: name || path.basename(resolved)
+  });
+  if (!added) {
+    // Multi-root may be unavailable; ignore quietly
+  }
+}
+
+async function removeFromExplorerCommand(
+  itemOrPath?: ProjectTreeItem | string,
+  kindHint?: string
+): Promise<void> {
+  const targetPath =
+    typeof itemOrPath === 'string'
+      ? itemOrPath
+      : itemOrPath?.resourcePath
+        ? itemOrPath.contextValue === 'project' || itemOrPath.contextValue === 'solution'
+          ? itemOrPath.contextValue === 'project'
+            ? path.dirname(itemOrPath.resourcePath)
+            : itemOrPath.resourcePath
+          : projectDirFromTreeItem(itemOrPath)
+        : undefined;
+  const kind =
+    kindHint ||
+    (typeof itemOrPath === 'object' && itemOrPath?.contextValue) ||
+    (targetPath && getStudioWebLocalLink(
+      (await resolveLcsProjectDir()) || ''
+    )?.solutionDir === targetPath
+      ? 'solution'
+      : 'project');
+
+  if (!targetPath) {
+    void vscode.window.showWarningMessage('Nothing selected to remove.');
+    return;
+  }
+
+  // Unlink Studio Web solution from active LCS project
+  if (kind === 'solution' || kind === 'workspace') {
+    const lcsDir =
+      (await resolveLcsProjectDir()) ||
+      extensionContext.workspaceState.get<string>('lowcodeStudio.activeProjectDir');
+    const link = lcsDir ? getStudioWebLocalLink(lcsDir) : undefined;
+    if (link && path.resolve(link.solutionDir) === path.resolve(targetPath)) {
+      const ok = await vscode.window.showWarningMessage(
+        `Remove Studio Web solution "${path.basename(targetPath)}" from explorer and unlink it? Files on disk are kept.`,
+        { modal: true },
+        'Remove'
+      );
+      if (ok !== 'Remove') {
+        return;
+      }
+      if (lcsDir) {
+        unlinkStudioWebLocalWorkspace(lcsDir);
+      }
+    }
+  } else {
+    const ok = await vscode.window.showWarningMessage(
+      `Remove "${path.basename(targetPath)}" from the explorer? Files on disk are kept.`,
+      { modal: true },
+      'Remove'
+    );
+    if (ok !== 'Remove') {
+      return;
+    }
+    if (
+      extensionContext.workspaceState.get<string>('lowcodeStudio.activeProjectDir') === targetPath
+    ) {
+      await extensionContext.workspaceState.update('lowcodeStudio.activeProjectDir', undefined);
+      projectProvider?.setActiveProject(undefined);
+    }
+  }
+
+  // Drop matching multi-root workspace folder
+  const folders = vscode.workspace.workspaceFolders || [];
+  const idx = folders.findIndex(
+    (f) =>
+      path.resolve(f.uri.fsPath) === path.resolve(targetPath) ||
+      path.resolve(targetPath).startsWith(path.resolve(f.uri.fsPath) + path.sep)
+  );
+  if (idx >= 0) {
+    vscode.workspace.updateWorkspaceFolders(idx, 1);
+  }
+
+  projectProvider.refresh();
+  editorProvider?.refreshProjectTree?.();
+  void vscode.window.showInformationMessage(`Removed ${path.basename(targetPath)} from explorer.`);
+}
+
 function projectDirFromTreeItem(item?: ProjectTreeItem): string | undefined {
   if (!item || !item.resourcePath) {
     return undefined;
@@ -1029,6 +1166,19 @@ function projectDirFromTreeItem(item?: ProjectTreeItem): string | undefined {
   if (item.contextValue === 'project') {
     // resourcePath is project.json
     return path.dirname(item.resourcePath);
+  }
+  if (item.contextValue === 'solution') {
+    // Find LCS project that links to this Studio Web solution
+    const roots = (vscode.workspace.workspaceFolders || []).map((f) => f.uri.fsPath);
+    for (const root of roots) {
+      for (const projectDir of findAllLcsProjects([root])) {
+        const link = getStudioWebLocalLink(projectDir);
+        if (link && path.resolve(link.solutionDir) === path.resolve(item.resourcePath)) {
+          return projectDir;
+        }
+      }
+    }
+    return extensionContext.workspaceState.get<string>('lowcodeStudio.activeProjectDir');
   }
   if (
     item.contextValue === 'folder' ||
@@ -1302,6 +1452,11 @@ async function connectStudioWebCommand(treeItem?: ProjectTreeItem): Promise<void
     }
 
     const solutionDir = result.local?.link.solutionDir || result.targetDir;
+    // Surface the solution in Project Explorer (workspace + designer rail)
+    await ensureFolderInWorkspace(solutionDir, path.basename(solutionDir) + ' (Studio Web)');
+    projectProvider.refresh();
+    editorProvider?.refreshProjectTree?.();
+
     const openability = validateStudioWebLocalOpenability(projectDir);
     const channel = getOutput();
     channel.clear();

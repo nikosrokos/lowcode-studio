@@ -379,6 +379,25 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           }
           break;
         }
+        case 'revealInOs': {
+          const revealPath = String(message.path || '');
+          if (revealPath && fs.existsSync(revealPath)) {
+            await vscode.commands.executeCommand(
+              'revealFileInOS',
+              vscode.Uri.file(revealPath)
+            );
+          }
+          break;
+        }
+        case 'removeFromExplorer': {
+          await vscode.commands.executeCommand(
+            'lowcodeStudio.removeFromExplorer',
+            String(message.path || ''),
+            String(message.kind || '')
+          );
+          this.refreshProjectTree();
+          break;
+        }
         case 'activityUsed': {
           await this.rememberActivityUse(String(message.activityType || ''));
           break;

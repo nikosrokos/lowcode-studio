@@ -97,8 +97,10 @@ export function isLcsProjectDir(dir: string | undefined): boolean {
 export interface DesignerProjectEntry {
   name: string;
   path: string;
-  kind: 'project' | 'folder' | 'workflow' | 'file';
+  kind: 'project' | 'folder' | 'workflow' | 'file' | 'solution' | 'workspace';
   active?: boolean;
+  /** Shown as a small badge (e.g. active, Studio Web) */
+  badge?: string;
   children?: DesignerProjectEntry[];
 }
 
@@ -117,14 +119,58 @@ function shouldSkipDir(name: string): boolean {
 }
 
 /**
- * Build designer Project Explorer entries for a single current LCS project
- * (folders + files of that RPA / solution only — not every workspace project).
+ * Build designer Project Explorer entries for the current LCS project
+ * plus its linked Studio Web Local Workspace solution (when present).
  */
 export function buildCurrentProjectTree(projectDir: string | undefined): DesignerProjectEntry[] {
   if (!projectDir || !isLcsProjectDir(projectDir)) {
     return [];
   }
-  return listProjectEntries(projectDir, 3);
+  const entries: DesignerProjectEntry[] = [
+    {
+      name: path.basename(projectDir),
+      path: projectDir,
+      kind: 'project',
+      active: true,
+      badge: 'LCS',
+      children: listProjectEntries(projectDir, 3)
+    }
+  ];
+
+  const linked = readLinkedStudioWebSolution(projectDir);
+  if (linked) {
+    entries.push({
+      name: path.basename(linked.solutionDir),
+      path: linked.solutionDir,
+      kind: 'solution',
+      badge: 'Studio Web',
+      children: listProjectEntries(linked.solutionDir, 3, {
+        includeXaml: true,
+        includeUipx: true
+      })
+    });
+  }
+  return entries;
+}
+
+function readLinkedStudioWebSolution(
+  lcsProjectDir: string
+): { solutionDir: string; projectFolder: string } | undefined {
+  try {
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(lcsProjectDir, 'project.json'), 'utf8')
+    ) as { studioWebLocal?: { solutionDir?: string; projectFolder?: string } };
+    const solutionDir = manifest.studioWebLocal?.solutionDir;
+    if (!solutionDir || !fs.existsSync(solutionDir)) {
+      return undefined;
+    }
+    return {
+      solutionDir,
+      projectFolder: manifest.studioWebLocal?.projectFolder || path.basename(solutionDir)
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -159,7 +205,11 @@ export function buildDesignerProjectTree(
   ];
 }
 
-function listProjectEntries(dir: string, depth: number): DesignerProjectEntry[] {
+function listProjectEntries(
+  dir: string,
+  depth: number,
+  opts: { includeXaml?: boolean; includeUipx?: boolean } = {}
+): DesignerProjectEntry[] {
   if (depth < 0) {
     return [];
   }
@@ -175,7 +225,8 @@ function listProjectEntries(dir: string, depth: number): DesignerProjectEntry[] 
           name: entry.name,
           path: full,
           kind: 'folder',
-          children: depth > 0 ? listProjectEntries(full, depth - 1) : undefined
+          children:
+            depth > 0 ? listProjectEntries(full, depth - 1, opts) : undefined
         });
       } else if (entry.isFile()) {
         if (entry.name.endsWith('.lcs.json')) {
@@ -184,8 +235,15 @@ function listProjectEntries(dir: string, depth: number): DesignerProjectEntry[] 
             path: full,
             kind: 'workflow'
           });
+        } else if (opts.includeXaml && entry.name.endsWith('.xaml')) {
+          items.push({
+            name: entry.name,
+            path: full,
+            kind: 'workflow'
+          });
         } else if (
           entry.name === 'project.json' ||
+          (opts.includeUipx && entry.name.endsWith('.uipx')) ||
           entry.name.endsWith('.json') ||
           entry.name.endsWith('.xlsx') ||
           entry.name.endsWith('.md') ||
@@ -204,7 +262,14 @@ function listProjectEntries(dir: string, depth: number): DesignerProjectEntry[] 
   }
   return items.sort((a, b) => {
     if (a.kind !== b.kind) {
-      const order = { folder: 0, project: 1, workflow: 2, file: 3 } as const;
+      const order = {
+        folder: 0,
+        project: 1,
+        solution: 1,
+        workspace: 1,
+        workflow: 2,
+        file: 3
+      } as const;
       return (order[a.kind] ?? 9) - (order[b.kind] ?? 9);
     }
     return a.name.localeCompare(b.name);

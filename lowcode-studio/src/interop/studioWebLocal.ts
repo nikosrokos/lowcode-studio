@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { writeUiPathProjectToDir, ExportedStudioWebProject } from './studioProject';
+import { isLcsProjectDir } from './projectResolve';
 
 export const STUDIO_WEB_LOCAL_URL = 'https://studio.uipath.com';
 
@@ -195,7 +196,8 @@ export function linkStudioWebLocalWorkspace(
   // Portable is required for Studio Web Local Workspace on Mac.
   // Windows-target projects show an error icon and cannot be opened/edited there.
   const exported = writeUiPathProjectToDir(lcsProjectDir, projectDir, {
-    writeReadme: true,
+    // Keep markdown guides at solution root only — avoid extra files in the RPA project
+    writeReadme: false,
     targetFramework: 'Portable'
   });
 
@@ -282,6 +284,20 @@ export function trySyncToStudioWebLocal(
     return undefined;
   }
   return syncToStudioWebLocal(lcsProjectDir);
+}
+
+/** Remove studioWebLocal link from LCS project.json (does not delete solution files). */
+export function unlinkStudioWebLocalWorkspace(lcsProjectDir: string): boolean {
+  if (!isLcsProjectDir(lcsProjectDir)) {
+    return false;
+  }
+  const manifest = readLcsManifest(lcsProjectDir);
+  if (!manifest.studioWebLocal) {
+    return false;
+  }
+  delete manifest.studioWebLocal;
+  writeLcsManifest(lcsProjectDir, manifest);
+  return true;
 }
 
 export interface StudioWebOpenabilityReport {

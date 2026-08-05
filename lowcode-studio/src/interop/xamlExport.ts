@@ -6,6 +6,8 @@ import {
 import { isUiActivity, xamlInfoForLcsType } from './activityMap';
 import { emitTargetXaml, selectorAttribute } from './selectorRoundTrip';
 import { interactionModeAttribute } from './inputMethod';
+import * as crypto from 'crypto';
+import * as fs from 'fs';
 import {
   applyWindowsSelectorsToActivityProps,
   netTfmForTarget,
@@ -32,6 +34,40 @@ ${body}
 `;
 }
 
+const GUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isValidGuid(value: string | undefined): boolean {
+  return Boolean(value && GUID_RE.test(value));
+}
+
+/**
+ * Prefer an existing valid entry-point GUID (stable across syncs); otherwise a real UUID.
+ * Never use the old pseudoUuid() — Studio Web fails to parse non-Guid uniqueId values.
+ */
+export function resolveEntryPointUniqueId(
+  preferred?: string,
+  existingProjectJsonPath?: string
+): string {
+  if (isValidGuid(preferred)) {
+    return preferred!;
+  }
+  if (existingProjectJsonPath && fs.existsSync(existingProjectJsonPath)) {
+    try {
+      const raw = JSON.parse(fs.readFileSync(existingProjectJsonPath, 'utf8')) as {
+        entryPoints?: Array<{ uniqueId?: string }>;
+      };
+      const existing = raw.entryPoints?.[0]?.uniqueId;
+      if (isValidGuid(existing)) {
+        return existing!;
+      }
+    } catch {
+      // generate below
+    }
+  }
+  return crypto.randomUUID();
+}
+
 export function exportUiPathProjectJson(options: {
   name: string;
   description?: string;
@@ -42,11 +78,19 @@ export function exportUiPathProjectJson(options: {
   targetFramework?: UiPathTargetFramework;
   /** When true, marks the process as needing a user session (UI automation). */
   requiresUserInteraction?: boolean;
+  /** Valid Guid for entryPoints[0].uniqueId — required by Studio Web. */
+  entryPointUniqueId?: string;
+  /** If set, reuse a valid uniqueId already present in this project.json. */
+  existingProjectJsonPath?: string;
 }): string {
   const main = options.main.endsWith('.xaml') ? options.main : `${options.main}.xaml`;
   const targetFramework = resolveUiPathTarget(options.targetFramework);
   const netTfm = netTfmForTarget(targetFramework);
   const requiresUserInteraction = options.requiresUserInteraction ?? true;
+  const uniqueId = resolveEntryPointUniqueId(
+    options.entryPointUniqueId,
+    options.existingProjectJsonPath
+  );
   const manifest = {
     name: options.name,
     description:
@@ -87,7 +131,7 @@ export function exportUiPathProjectJson(options: {
     entryPoints: [
       {
         filePath: main,
-        uniqueId: pseudoUuid(options.name),
+        uniqueId,
         input: [],
         output: []
       }
@@ -673,11 +717,3 @@ function escapeAttr(value: string): string {
     .replace(/>/g, '&gt;');
 }
 
-function pseudoUuid(seed: string): string {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  }
-  const hex = (n: number) => n.toString(16).padStart(8, '0');
-  return `${hex(hash)}-4${hex(hash ^ 0xabc).slice(1)}-8${hex(hash ^ 0xdef).slice(1)}-${hex(hash ^ 0x123)}`;
-}

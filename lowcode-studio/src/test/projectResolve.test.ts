@@ -69,15 +69,18 @@ function run(): void {
   assert.ok(isLcsProjectDir(project1));
   assert.ok(!isLcsProjectDir(root));
 
-  // Designer rail: only current project folders/files
+  // Designer rail: current project only (sibling project2 must not appear)
   const current = buildCurrentProjectTree(project1);
-  assert.ok(current.some((e) => e.kind === 'folder' && e.name === 'Framework'));
-  assert.ok(current.some((e) => e.kind === 'folder' && e.name === 'Data'));
-  assert.ok(current.some((e) => e.kind === 'workflow' && e.name === 'Main'));
-  assert.ok(current.some((e) => e.kind === 'file' && e.name === 'project.json'));
+  assert.ok(current.some((e) => e.kind === 'project' && e.path === project1));
   assert.ok(!current.some((e) => e.path === project2 || e.name === 'project2'));
+  const lcsNode = current.find((e) => e.kind === 'project' && e.path === project1);
+  const children = lcsNode?.children || [];
+  assert.ok(children.some((e) => e.kind === 'folder' && e.name === 'Framework'));
+  assert.ok(children.some((e) => e.kind === 'folder' && e.name === 'Data'));
+  assert.ok(children.some((e) => e.kind === 'workflow' && e.name === 'Main'));
+  assert.ok(children.some((e) => e.kind === 'file' && e.name === 'project.json'));
 
-  const framework = current.find((e) => e.name === 'Framework');
+  const framework = children.find((e) => e.name === 'Framework');
   assert.ok(framework?.children?.some((c) => c.kind === 'workflow' && c.name === 'Init'));
 
   // Active-focused wrapper still returns a single project

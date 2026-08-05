@@ -63,3 +63,11 @@ From the Connect picker choose **Legacy: export .uip package once** or **Export 
 - Review `WINDOWS_TODO.md` for Mac → Windows robot handoff items
 
 > Not an official UiPath product — community tooling for Mac-first REFramework design with Studio Web Local Workspace sync.
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `Failed to parse JSON` / `uniqueId` Guid error | Update to **0.6.13+** and **Save** or Connect → Sync (rewrites a valid Guid) |
+| "targets Windows" on Mac | Update to **0.6.12+** and Sync (rewrites Portable) |
+| Solution not in Project Explorer | Connect → Sync/Open again (adds the solution folder); use × / context menu to remove |

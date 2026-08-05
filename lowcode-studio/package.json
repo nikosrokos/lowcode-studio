@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Mac-first low-code RPA for VS Code/Cursor: REFramework design, scenario dry-runs (Shift+F5), and the easiest Connect to Studio Web handoff for Orchestrator publish.",
-  "version": "0.6.12",
+  "version": "0.6.13",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -212,6 +212,18 @@
         "category": "LowCode Studio"
       },
       {
+        "command": "lowcodeStudio.removeFromExplorer",
+        "title": "Remove from Project Explorer",
+        "icon": "$(close)",
+        "category": "LowCode Studio"
+      },
+      {
+        "command": "lowcodeStudio.unlinkStudioWebLocal",
+        "title": "Unlink Studio Web Local Workspace",
+        "icon": "$(debug-disconnect)",
+        "category": "LowCode Studio"
+      },
+      {
         "command": "lowcodeStudio.exportStudioWeb",
         "title": "Export for Studio Web (Windows project folder)",
         "icon": "$(export)",
@@ -361,6 +373,21 @@
           "command": "lowcodeStudio.insertActivity",
           "when": "view == lowcodeStudio.activities && viewItem == activity",
           "group": "inline"
+        },
+        {
+          "command": "lowcodeStudio.removeFromExplorer",
+          "when": "view == lowcodeStudio.projects && (viewItem == project || viewItem == solution)",
+          "group": "inline@1"
+        },
+        {
+          "command": "lowcodeStudio.removeFromExplorer",
+          "when": "view == lowcodeStudio.projects && (viewItem == project || viewItem == solution)",
+          "group": "1_modify@1"
+        },
+        {
+          "command": "lowcodeStudio.unlinkStudioWebLocal",
+          "when": "view == lowcodeStudio.projects && (viewItem == project || viewItem == solution)",
+          "group": "1_modify@2"
         }
       ],
       "editor/title": [
