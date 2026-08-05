@@ -38,6 +38,10 @@ export function findAllLcsProjects(roots: string[]): string[] {
     if (!root || !fs.existsSync(root)) {
       continue;
     }
+    // Studio Web Local Workspace solution roots are not LCS project trees
+    if (dirHasUipx(root)) {
+      continue;
+    }
     const stack = [root];
     while (stack.length) {
       const current = stack.pop()!;
@@ -66,7 +70,11 @@ export function findAllLcsProjects(roots: string[]): string[] {
           ) {
             continue;
           }
-          stack.push(path.join(current, entry.name));
+          const full = path.join(current, entry.name);
+          if (dirHasUipx(full)) {
+            continue; // skip nested Studio Web solutions
+          }
+          stack.push(full);
         }
       } catch {
         // ignore unreadable dirs
@@ -74,6 +82,18 @@ export function findAllLcsProjects(roots: string[]): string[] {
     }
   }
   return [...results].sort((a, b) => a.localeCompare(b));
+}
+
+function dirHasUipx(dir: string): boolean {
+  try {
+    const named = path.join(dir, `${path.basename(dir)}.uipx`);
+    if (fs.existsSync(named)) {
+      return true;
+    }
+    return fs.readdirSync(dir).some((f) => f.endsWith('.uipx'));
+  } catch {
+    return false;
+  }
 }
 
 export function isLcsProjectDir(dir: string | undefined): boolean {

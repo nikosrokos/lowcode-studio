@@ -89,7 +89,7 @@ import {
   findProjectRoot,
   isLcsProjectDir
 } from './interop/projectResolve';
-import { ProjectTreeItem } from './providers/projectTreeProvider';
+import { ProjectTreeItem, HIDDEN_EXPLORER_PATHS_KEY } from './providers/projectTreeProvider';
 
 let editorProvider: WorkflowEditorProvider;
 let variablesProvider: VariablesTreeProvider;
@@ -105,6 +105,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   variablesProvider = new VariablesTreeProvider();
   projectProvider = new ProjectTreeProvider(workspaceRoot);
+  projectProvider.setHiddenPaths(
+    context.workspaceState.get<string[]>(HIDDEN_EXPLORER_PATHS_KEY) || []
+  );
   activityProvider = new ActivityTreeProvider();
   refreshCustomActivityOverlay();
 
@@ -521,6 +524,8 @@ async function openLocalProjectCommand(): Promise<void> {
     return;
   }
 
+  projectProvider.unhidePath(projectDir);
+  await persistHiddenExplorerPaths();
   await setActiveProjectDir(projectDir);
   refreshCustomActivityOverlay();
   projectProvider.refresh();
@@ -544,22 +549,31 @@ async function openLocalProjectCommand(): Promise<void> {
 
 /** Open/add a Studio Web .uipx solution folder into Project Explorer without a prior workspace. */
 async function openStudioWebSolutionFolder(solutionDir: string): Promise<void> {
-  const label = `${path.basename(solutionDir)} (Studio Web)`;
-  const opened = await ensureFolderInWorkspace(solutionDir, label);
-  if (opened === 'reloading') {
-    return;
-  }
-  projectProvider.refresh();
-  editorProvider?.refreshProjectTree?.();
-
   const activeLcs =
     extensionContext.workspaceState.get<string>('lowcodeStudio.activeProjectDir') ||
     (await resolveLcsProjectDirQuiet());
-  if (activeLcs && isLcsProjectDir(activeLcs) && !getStudioWebLocalLink(activeLcs)) {
+
+  // If an LCS project is already open, link the solution under it — do not add a second workspace root
+  if (activeLcs && isLcsProjectDir(activeLcs)) {
+    const existing = getStudioWebLocalLink(activeLcs);
+    if (
+      existing &&
+      path.resolve(existing.solutionDir) === path.resolve(solutionDir)
+    ) {
+      projectProvider.unhidePath(solutionDir);
+      await persistHiddenExplorerPaths();
+      projectProvider.refresh();
+      editorProvider?.refreshProjectTree?.();
+      void vscode.window.showInformationMessage(
+        `Studio Web solution "${path.basename(solutionDir)}" is already linked.`
+      );
+      return;
+    }
+
     const linkNow = await vscode.window.showInformationMessage(
-      `Opened Studio Web solution "${path.basename(solutionDir)}". Link it to "${path.basename(activeLcs)}" for Save sync?`,
+      `Link Studio Web solution "${path.basename(solutionDir)}" to "${path.basename(activeLcs)}" for Save sync?`,
       'Link & Sync',
-      'Not now'
+      'Open solution only'
     );
     if (linkNow === 'Link & Sync') {
       try {
@@ -573,6 +587,8 @@ async function openStudioWebSolutionFolder(solutionDir: string): Promise<void> {
               local: { mode: 'open', targetDir: solutionDir }
             })
         );
+        projectProvider.unhidePath(solutionDir);
+        await persistHiddenExplorerPaths();
         projectProvider.refresh();
         editorProvider?.refreshProjectTree?.();
         void vscode.window.showInformationMessage(
@@ -585,10 +601,30 @@ async function openStudioWebSolutionFolder(solutionDir: string): Promise<void> {
       }
       return;
     }
+    if (linkNow !== 'Open solution only') {
+      return;
+    }
   }
 
+  // Standalone solution (no LCS to nest under) — add as the only explorer root when needed
+  const label = `${path.basename(solutionDir)} (Studio Web)`;
+  projectProvider.unhidePath(solutionDir);
+  await persistHiddenExplorerPaths();
+  const opened = await ensureFolderInWorkspace(solutionDir, label);
+  if (opened === 'reloading') {
+    return;
+  }
+  projectProvider.refresh();
+  editorProvider?.refreshProjectTree?.();
   void vscode.window.showInformationMessage(
     `Opened Studio Web Local Workspace "${path.basename(solutionDir)}" in Project Explorer.`
+  );
+}
+
+async function persistHiddenExplorerPaths(): Promise<void> {
+  await extensionContext.workspaceState.update(
+    HIDDEN_EXPLORER_PATHS_KEY,
+    projectProvider.getHiddenPaths()
   );
 }
 
@@ -1240,9 +1276,9 @@ async function removeFromExplorerCommand(
   const kind =
     kindHint ||
     (typeof itemOrPath === 'object' && itemOrPath?.contextValue) ||
-    (targetPath && getStudioWebLocalLink(
-      (await resolveLcsProjectDir()) || ''
-    )?.solutionDir === targetPath
+    (targetPath &&
+    getStudioWebLocalLink((await resolveLcsProjectDirQuiet()) || '')?.solutionDir ===
+      targetPath
       ? 'solution'
       : 'project');
 
@@ -1251,28 +1287,36 @@ async function removeFromExplorerCommand(
     return;
   }
 
-  // Unlink Studio Web solution from active LCS project
+  const label = path.basename(targetPath);
   if (kind === 'solution' || kind === 'workspace') {
-    const lcsDir =
-      (await resolveLcsProjectDir()) ||
-      extensionContext.workspaceState.get<string>('lowcodeStudio.activeProjectDir');
-    const link = lcsDir ? getStudioWebLocalLink(lcsDir) : undefined;
-    if (link && path.resolve(link.solutionDir) === path.resolve(targetPath)) {
-      const ok = await vscode.window.showWarningMessage(
-        `Remove Studio Web solution "${path.basename(targetPath)}" from explorer and unlink it? Files on disk are kept.`,
-        { modal: true },
-        'Remove'
-      );
-      if (ok !== 'Remove') {
-        return;
+    const ok = await vscode.window.showWarningMessage(
+      `Remove Studio Web solution "${label}" from explorer? Files on disk are kept.`,
+      { modal: true },
+      'Remove'
+    );
+    if (ok !== 'Remove') {
+      return;
+    }
+    // Unlink from any LCS project that points here
+    const roots = (vscode.workspace.workspaceFolders || []).map((f) => f.uri.fsPath);
+    for (const projectDir of findAllLcsProjects(roots)) {
+      const link = getStudioWebLocalLink(projectDir);
+      if (link && path.resolve(link.solutionDir) === path.resolve(targetPath)) {
+        unlinkStudioWebLocalWorkspace(projectDir);
       }
-      if (lcsDir) {
-        unlinkStudioWebLocalWorkspace(lcsDir);
+    }
+    const remembered = extensionContext.workspaceState.get<string>(
+      'lowcodeStudio.activeProjectDir'
+    );
+    if (remembered) {
+      const link = getStudioWebLocalLink(remembered);
+      if (link && path.resolve(link.solutionDir) === path.resolve(targetPath)) {
+        unlinkStudioWebLocalWorkspace(remembered);
       }
     }
   } else {
     const ok = await vscode.window.showWarningMessage(
-      `Remove "${path.basename(targetPath)}" from the explorer? Files on disk are kept.`,
+      `Remove "${label}" from the explorer? Files on disk are kept.`,
       { modal: true },
       'Remove'
     );
@@ -1280,27 +1324,38 @@ async function removeFromExplorerCommand(
       return;
     }
     if (
-      extensionContext.workspaceState.get<string>('lowcodeStudio.activeProjectDir') === targetPath
+      extensionContext.workspaceState.get<string>('lowcodeStudio.activeProjectDir') ===
+      targetPath
     ) {
-      await extensionContext.workspaceState.update('lowcodeStudio.activeProjectDir', undefined);
+      await extensionContext.workspaceState.update(
+        'lowcodeStudio.activeProjectDir',
+        undefined
+      );
       projectProvider?.setActiveProject(undefined);
     }
   }
 
-  // Drop matching multi-root workspace folder
+  // Soft-hide so it stays gone even if multi-root remove fails
+  projectProvider.hidePath(targetPath);
+  await persistHiddenExplorerPaths();
+
+  // Drop exact matching multi-root workspace folder only (never the parent of a nested path)
   const folders = vscode.workspace.workspaceFolders || [];
   const idx = folders.findIndex(
-    (f) =>
-      path.resolve(f.uri.fsPath) === path.resolve(targetPath) ||
-      path.resolve(targetPath).startsWith(path.resolve(f.uri.fsPath) + path.sep)
+    (f) => path.resolve(f.uri.fsPath) === path.resolve(targetPath)
   );
   if (idx >= 0) {
-    vscode.workspace.updateWorkspaceFolders(idx, 1);
+    const removed = vscode.workspace.updateWorkspaceFolders(idx, 1);
+    if (!removed && folders.length === 1) {
+      void vscode.window.showInformationMessage(
+        `Hidden "${label}" in LowCode Studio explorer. Use File → Close Folder to clear the VS Code workspace.`
+      );
+    }
   }
 
   projectProvider.refresh();
   editorProvider?.refreshProjectTree?.();
-  void vscode.window.showInformationMessage(`Removed ${path.basename(targetPath)} from explorer.`);
+  void vscode.window.showInformationMessage(`Removed ${label} from explorer.`);
 }
 
 function projectDirFromTreeItem(item?: ProjectTreeItem): string | undefined {
@@ -1596,14 +1651,9 @@ async function connectStudioWebCommand(treeItem?: ProjectTreeItem): Promise<void
     }
 
     const solutionDir = result.local?.link.solutionDir || result.targetDir;
-    // Surface the solution in Project Explorer (workspace + designer rail)
-    const opened = await ensureFolderInWorkspace(
-      solutionDir,
-      path.basename(solutionDir) + ' (Studio Web)'
-    );
-    if (opened === 'reloading') {
-      return;
-    }
+    // Show under the LCS project in Project Explorer (do not add a second workspace root)
+    projectProvider.unhidePath(solutionDir);
+    await persistHiddenExplorerPaths();
     projectProvider.refresh();
     editorProvider?.refreshProjectTree?.();
 

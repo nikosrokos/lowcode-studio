@@ -40,6 +40,14 @@ function run(): void {
   assert.ok(exported.includes('ui:LogMessage'));
   assert.ok(exported.includes('<Sequence'));
   assert.ok(exported.includes('Variable'));
+  // Studio Web rejects mc:Ignorable prefixes that are not xmlns-declared (e.g. bare "sapc")
+  assert.ok(
+    /mc:Ignorable="sap sap2010"/.test(exported),
+    'Ignorable must list declared sap/sap2010 prefixes only'
+  );
+  assert.ok(!/\bsapc\b/.test(exported), 'sapc must not appear without xmlns:sapc');
+  assert.ok(exported.includes('xmlns:sap='));
+  assert.ok(exported.includes('xmlns:sap2010='));
 
   const deps = resolveUiPathDependencies({
     activityTypes: collectActivityTypes([workflow]),
