@@ -53,6 +53,7 @@ Full history: [CHANGELOG.md](CHANGELOG.md)
 
 ### Also recent
 
+- **0.6.35** — Bidirectional Studio Web Local sync + `.lcs-sync-trash/` backups
 - **0.6.34** — Full Studio Web Portable activity audit (Multiple Assign, Message Box, Open App, Element Exists, Type Into, …)
 - **0.6.33** — Use Browser TargetApp + Build Data Table Portable rewrite
 - **0.6.32** — Inline VB repair hints; Variables/Args panel fix
@@ -69,7 +70,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.33.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.35.vsix` → reload.
 
 ## Easy path
 

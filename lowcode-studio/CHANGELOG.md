@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.35] — 2026-08-05
+
+### Added
+- **Bidirectional Studio Web Local sync** — Save pulls Studio Web `.xaml` edits into `.lcs.json` when LCS did not change, then pushes; command **Pull from Studio Web Local Workspace**
+- **`.lcs-sync-trash/`** — backups of overwritten `.lcs.json` / `.xaml` (last 10 sync generations)
+- Content fingerprints on the link so Studio Web–newer workflows show in Project Explorer
+
+### Fixed
+- Editing in Studio Web Local then Saving in LCS no longer silently restores the older LCS version
+
 ## [0.6.34] — 2026-08-05
 
 ### Fixed

@@ -187,13 +187,18 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
           ? '\n' +
             sync.stale
               .slice(0, 8)
-              .map(
-                (s) =>
-                  `• ${s.workflowRel} (${s.reason === 'missing-xaml' ? 'missing .xaml' : 'LCS newer'})`
-              )
+              .map((s) => {
+                const why =
+                  s.reason === 'missing-xaml'
+                    ? 'missing .xaml'
+                    : s.reason === 'xaml-newer'
+                      ? 'Studio Web newer — Pull or Save'
+                      : 'LCS newer — Save to push';
+                return `• ${s.workflowRel} (${why})`;
+              })
               .join('\n') +
             (sync.stale.length > 8 ? `\n… +${sync.stale.length - 8} more` : '') +
-            '\nSave a workflow or run Connect → Sync to refresh.'
+            '\nSave (bidirectional) or command: Pull from Studio Web Local.'
           : '';
         sol.tooltip = `${linked}\n${sync.summary}${staleHint}`;
         items.push(sol);

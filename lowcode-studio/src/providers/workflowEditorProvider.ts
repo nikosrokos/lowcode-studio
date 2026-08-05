@@ -35,7 +35,10 @@ import {
   buildCurrentProjectTree,
   findProjectRoot
 } from '../interop/projectResolve';
-import { trySyncToStudioWebLocal } from '../interop/studioWebLocal';
+import {
+  trySyncFromStudioWebLocal,
+  trySyncToStudioWebLocal
+} from '../interop/studioWebLocal';
 
 export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
   public static readonly viewType = 'lowcodeStudio.workflowEditor';
@@ -65,8 +68,8 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
   }
 
   /**
-   * After Save: rewrite linked Studio Web Local Workspace .xaml / project.json
-   * so Studio Web Local Workspace reads the latest files on disk.
+   * After Save: bidirectional sync with linked Studio Web Local Workspace
+   * (pull Studio Web edits into .lcs.json when LCS unchanged, then push .xaml).
    */
   private async syncLinkedStudioWebLocal(document: vscode.TextDocument): Promise<void> {
     this.lastSyncLabel = '';
@@ -87,14 +90,46 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           ? { [rel]: document.getText() }
           : undefined;
       const synced = trySyncToStudioWebLocal(projectRoot, {
-        contentOverrides: overrides
+        contentOverrides: overrides,
+        pullFirst: true
       });
       if (synced) {
         this.lastSyncLabel = path.basename(synced.link.solutionDir);
-        void vscode.window.setStatusBarMessage(
-          `Synced → Studio Web Local (${this.lastSyncLabel}) · ${synced.files.filter((f) => f.endsWith('.xaml')).length} xaml`,
-          3500
-        );
+        const pulled = synced.pulled?.length || 0;
+        const conflicts = synced.conflicts?.length || 0;
+        let status = `Synced ↔ Studio Web Local (${this.lastSyncLabel})`;
+        if (pulled) {
+          status += ` · pulled ${pulled}`;
+        }
+        if (conflicts) {
+          status += ` · ${conflicts} conflict(s)→trash`;
+        }
+        void vscode.window.setStatusBarMessage(status, 4500);
+
+        // If Save preferred Studio Web for this file, reload designer from disk
+        if (pulled && rel.endsWith('.lcs.json') && synced.pulled!.includes(rel)) {
+          const disk = await vscode.workspace.fs.readFile(document.uri);
+          const text = Buffer.from(disk).toString('utf8');
+          if (text !== document.getText()) {
+            const edit = new vscode.WorkspaceEdit();
+            edit.replace(
+              document.uri,
+              new vscode.Range(0, 0, document.lineCount, 0),
+              text
+            );
+            await vscode.workspace.applyEdit(edit);
+            this.activePanel?.webview.postMessage({
+              type: 'toast',
+              message: 'Reloaded from Studio Web Local edits',
+              logged: true
+            });
+          }
+        }
+        if (conflicts) {
+          void vscode.window.showWarningMessage(
+            `Studio Web and LowCode Studio both changed ${conflicts} workflow(s). LCS Save kept; Studio Web copies are in .lcs-sync-trash/.`
+          );
+        }
       }
     } catch (err) {
       void vscode.window.showWarningMessage(
@@ -102,6 +137,27 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           ? `Studio Web Local sync failed: ${err.message}`
           : 'Studio Web Local sync failed'
       );
+    }
+  }
+
+  /** Pull Studio Web Local edits into LCS before opening the designer when XAML is newer. */
+  async pullIfStudioWebNewer(document: vscode.TextDocument): Promise<boolean> {
+    const projectRoot = findProjectRoot(path.dirname(document.uri.fsPath));
+    if (!projectRoot) {
+      return false;
+    }
+    const rel = path.relative(projectRoot, document.uri.fsPath).replace(/\\/g, '/');
+    if (!rel.endsWith('.lcs.json') || rel.startsWith('..')) {
+      return false;
+    }
+    try {
+      const pulled = trySyncFromStudioWebLocal(projectRoot, {
+        workflowRels: [rel],
+        force: false
+      });
+      return Boolean(pulled?.updated.includes(rel));
+    } catch {
+      return false;
     }
   }
 
@@ -275,11 +331,34 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
       }
     };
 
+    // Receive Studio Web Local edits before painting the designer
+    try {
+      const pulled = await this.pullIfStudioWebNewer(document);
+      if (pulled) {
+        const disk = await vscode.workspace.fs.readFile(document.uri);
+        const text = Buffer.from(disk).toString('utf8');
+        if (text !== document.getText()) {
+          const edit = new vscode.WorkspaceEdit();
+          edit.replace(
+            document.uri,
+            new vscode.Range(0, 0, document.lineCount, 0),
+            text
+          );
+          await vscode.workspace.applyEdit(edit);
+        }
+      }
+    } catch {
+      // open with current LCS content
+    }
+
     updateWebview();
 
     const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument((e) => {
       if (e.document.uri.toString() === document.uri.toString() && e.contentChanges.length) {
-        // External edits only — ignore our own writes by checking focused webview edits via flag
+        // External pull / disk reload — refresh designer when we didn't originate the edit
+        if (this.activePanel === webviewPanel && !webviewPanel.active) {
+          updateWebview();
+        }
       }
     });
 
@@ -345,7 +424,7 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           await this.syncLinkedStudioWebLocal(document);
           const linked = Boolean(this.lastSyncLabel);
           const saveMsg = linked
-            ? `Saved · synced .xaml → ${this.lastSyncLabel}`
+            ? `Saved · synced ↔ ${this.lastSyncLabel}`
             : 'Saved · not linked — Connect to Studio Web to sync .xaml';
           logNotification(saveMsg, true);
           webviewPanel.webview.postMessage({
