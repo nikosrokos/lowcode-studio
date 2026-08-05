@@ -6,6 +6,11 @@ import {
 import { isUiActivity, xamlInfoForLcsType } from './activityMap';
 import { emitTargetXaml, selectorAttribute } from './selectorRoundTrip';
 import { interactionModeAttribute } from './inputMethod';
+import {
+  parseArgumentMappings,
+  renderInvokeArgumentsXml,
+  renderXamlMembers
+} from './workflowArguments';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import {
@@ -22,14 +27,15 @@ import {
  */
 export function exportWorkflowToXaml(doc: WorkflowDocument): string {
   const varsXml = renderVariables(doc.variables);
+  const membersXml = renderXamlMembers(doc.arguments || []);
   const body =
     doc.type === 'Flowchart'
       ? renderFlowchart(doc)
       : renderSequence(doc.activities, doc.name, varsXml);
 
   return `<?xml version="1.0" encoding="utf-8"?>
-<Activity mc:Ignorable="sap sap2010" x:Class="${escapeAttr(sanitizeClass(doc.name))}" sap:VirtualizedContainerService.HintSize="1200,800" sap2010:WorkflowViewState.IdRef="Activity1" xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation" xmlns:sap2010="http://schemas.microsoft.com/netfx/2010/xaml/activities/presentation" xmlns:scg="clr-namespace:System.Collections.Generic;assembly=System.Collections" xmlns:ui="http://schemas.uipath.com/workflow/activities" xmlns:uia="http://schemas.uipath.com/workflow/activities/uipath.uiautomation.next" xmlns:excel="http://schemas.uipath.com/workflow/activities/excel" xmlns:mail="http://schemas.uipath.com/workflow/activities/mail" xmlns:python="http://schemas.uipath.com/workflow/activities/python" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-${body}
+<Activity mc:Ignorable="sap sap2010" x:Class="${escapeAttr(sanitizeClass(doc.name))}" sap:VirtualizedContainerService.HintSize="1200,800" sap2010:WorkflowViewState.IdRef="Activity1" xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation" xmlns:sap2010="http://schemas.microsoft.com/netfx/2010/xaml/activities/presentation" xmlns:scg="clr-namespace:System.Collections.Generic;assembly=System.Collections" xmlns:sd="clr-namespace:System.Data;assembly=System.Data.Common" xmlns:ui="http://schemas.uipath.com/workflow/activities" xmlns:uia="http://schemas.uipath.com/workflow/activities/uipath.uiautomation.next" xmlns:excel="http://schemas.uipath.com/workflow/activities/excel" xmlns:mail="http://schemas.uipath.com/workflow/activities/mail" xmlns:python="http://schemas.uipath.com/workflow/activities/python" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+${membersXml}${body}
 </Activity>
 `;
 }
@@ -392,6 +398,12 @@ ${pad}</ui:ForEachRow>`;
       /\.lcs\.json$/i,
       '.xaml'
     );
+    const mappings = parseArgumentMappings(activity.properties.argumentMappings);
+    const argsXml = renderInvokeArgumentsXml(mappings, pad);
+    if (argsXml) {
+      return `${pad}<ui:InvokeWorkflowFile DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkflowFileName="${escapeAttr(path)}">
+${argsXml}${pad}</ui:InvokeWorkflowFile>`;
+    }
     return `${pad}<ui:InvokeWorkflowFile DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkflowFileName="${escapeAttr(path)}" />`;
   }
 

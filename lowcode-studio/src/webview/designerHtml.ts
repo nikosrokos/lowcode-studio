@@ -147,25 +147,32 @@ export function getDesignerHtml(
       border-right: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
       border-left: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
     }
-    .left-tabs {
-      display: flex; gap: 2px; padding: 6px 8px 0; flex: 0 0 auto;
+    .left-stack {
+      display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden;
+    }
+    .left-section {
+      display: flex; flex-direction: column; min-height: 72px;
       border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-      background: transparent;
     }
-    .left-tab {
-      flex: 1; border: none; background: transparent; color: var(--muted);
-      font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .04em;
-      text-transform: uppercase; padding: 8px 4px 10px; cursor: pointer;
-      border-bottom: 2px solid transparent; border-radius: 6px 6px 0 0;
+    .left-section[data-section="project"] { flex: 0 1 24%; }
+    .left-section[data-section="activities"] { flex: 1 1 40%; min-height: 140px; }
+    .left-section[data-section="variables"] { flex: 0 1 18%; }
+    .left-section[data-section="arguments"] { flex: 0 1 18%; border-bottom: none; }
+    .left-section.collapsed { flex: 0 0 auto; min-height: 0; }
+    .left-section.collapsed .left-section-body { display: none; }
+    .left-section-head {
+      display: flex; align-items: center; gap: 6px; width: 100%;
+      padding: 8px 10px; border: none; background: transparent; color: var(--text);
+      font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+      cursor: pointer; text-align: left; flex: 0 0 auto;
     }
-    .left-tab:hover { color: var(--text); background: var(--hover); }
-    .left-tab.active {
-      color: var(--text);
-      border-bottom-color: var(--accent);
-      background: color-mix(in srgb, var(--accent) 10%, transparent);
+    .left-section-head:hover { background: var(--hover); }
+    .left-section-head .grow { flex: 1; }
+    .left-section-head .count {
+      font-size: 10px; font-weight: 600; color: var(--muted); text-transform: none; letter-spacing: 0;
+      border: 1px solid var(--border); border-radius: 999px; padding: 1px 6px;
     }
-    .left-pane { display: none; flex: 1; min-height: 0; overflow: auto; flex-direction: column; }
-    .left-pane.active { display: flex; }
+    .left-section-body { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
     .project-tree { padding: 8px 6px 16px; font-size: 12px; }
     .project-node {
       display: flex; align-items: center; gap: 6px; padding: 5px 8px;
@@ -318,7 +325,69 @@ export function getDesignerHtml(
       padding: 6px 0; background: color-mix(in srgb, var(--bg) 88%, transparent);
       backdrop-filter: blur(8px);
     }
-    .canvas-help { color: var(--muted); font-size: 12px; flex: 1; min-width: 180px; }
+    .canvas-help { color: var(--muted); font-size: 12px; flex: 1; min-width: 120px; }
+    .workflow-search {
+      width: 180px; max-width: 40vw;
+      background: var(--input-bg); color: var(--text);
+      border: 1px solid var(--input-border); border-radius: 8px;
+      padding: 6px 10px; font-size: 12px;
+    }
+    .breadcrumbs {
+      display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+      margin: 0 0 10px; font-size: 11px; color: var(--muted);
+      min-height: 18px;
+    }
+    .breadcrumbs button {
+      appearance: none; border: none; background: transparent; color: var(--muted);
+      font: inherit; cursor: pointer; padding: 2px 4px; border-radius: 4px;
+    }
+    .breadcrumbs button:hover { color: var(--text); background: var(--hover); }
+    .breadcrumbs .crumb-sep { opacity: .45; }
+    .breadcrumbs .crumb-current { color: var(--text); font-weight: 650; }
+    .expr-overlay {
+      position: fixed; inset: 0; z-index: 50; display: none;
+      align-items: center; justify-content: center;
+      background: rgba(0,0,0,.45); backdrop-filter: blur(4px);
+    }
+    .expr-overlay.show { display: flex; }
+    .expr-dialog {
+      width: min(640px, 92vw); max-height: 80vh;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 14px; box-shadow: var(--shadow-frame);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .expr-dialog-head {
+      display: flex; align-items: center; gap: 8px; padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .expr-dialog-head .title { flex: 1; font-weight: 700; font-size: 13px; }
+    .expr-dialog textarea {
+      width: 100%; min-height: 220px; border: none; resize: vertical;
+      background: var(--input-bg); color: var(--text); padding: 14px;
+      font-family: var(--mono); font-size: 13px; line-height: 1.45;
+    }
+    .expr-dialog-foot {
+      display: flex; gap: 8px; justify-content: flex-end; padding: 10px 14px;
+      border-top: 1px solid var(--border);
+    }
+    .field-with-expand { display: flex; gap: 6px; align-items: flex-start; }
+    .field-with-expand > :first-child { flex: 1; min-width: 0; }
+    .btn-expand-expr {
+      flex: 0 0 auto; width: 28px; height: 32px; padding: 0;
+      border-radius: 8px; border: 1px solid var(--border);
+      background: var(--input-bg); color: var(--muted); cursor: pointer; font-size: 12px;
+    }
+    .btn-expand-expr:hover { color: var(--text); border-color: var(--focus); }
+    .card.search-hit, .flow-node.search-hit {
+      animation: search-flash .9s ease;
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    @keyframes search-flash {
+      0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+      70% { box-shadow: 0 0 0 10px transparent; }
+      100% { box-shadow: none; }
+    }
     .zoom-tools { display: none; }
     .zoom-label {
       min-width: 40px; text-align: center; font-size: 11px; font-family: var(--mono); color: var(--muted);
@@ -711,49 +780,69 @@ export function getDesignerHtml(
       <span class="mode-pill" id="workflowType">Sequence</span>
       <div class="spacer"></div>
       <button class="btn" id="btnLink" title="Connect two flowchart nodes" style="display:none">Link</button>
-      <button class="btn" id="btnAutoLayout" style="display:none">Auto Layout</button>
+      <button class="btn" id="btnAutoLayout" style="display:none" title="Tidy flowchart layout">Tidy</button>
       <button class="btn primary" id="btnSave">Save</button>
     </div>
 
     <aside class="panel left-rail frame-docked" id="toolbox">
       <div class="frame-resize-x" id="leftResizeX" title="Drag to resize width"></div>
       <div class="panel-chrome" id="leftChrome">
-        <div class="traffic" aria-label="Activities frame controls">
+        <div class="traffic" aria-label="Left frame controls">
           <button class="tl min" id="btnLeftFloat" type="button" title="Float frame"></button>
           <button class="tl max" id="btnLeftDock" type="button" title="Dock frame"></button>
         </div>
-        <h2><span class="grow">Toolbox</span></h2>
+        <h2><span class="grow">Workspace</span></h2>
       </div>
-      <div class="left-tabs" role="tablist" aria-label="Designer left panes">
-        <button class="left-tab" type="button" data-left-tab="project" role="tab">Project</button>
-        <button class="left-tab active" type="button" data-left-tab="activities" role="tab">Activities</button>
-        <button class="left-tab" type="button" data-left-tab="variables" role="tab">Variables</button>
-      </div>
-      <div class="left-pane" id="paneProject" data-left-pane="project">
-        <h2><span class="grow">Project Explorer</span></h2>
-        <div class="project-tree" id="projectTree"></div>
-      </div>
-      <div class="left-pane active" id="paneActivities" data-left-pane="activities">
-        <div class="panel-tools">
-          <button class="btn symbol" id="btnExpandCats" type="button" title="Expand all categories">▾▾</button>
-          <button class="btn symbol" id="btnCollapseCats" type="button" title="Collapse all categories">▸▸</button>
-        </div>
-        <input class="search" id="search" placeholder="Search activities..." />
-        <div id="catalog"></div>
-      </div>
-      <div class="left-pane" id="paneVariables" data-left-pane="variables">
-        <h2>
-          <span class="grow">Variables</span>
-          <span class="count" id="variablesCount" style="font-size:11px;color:var(--muted);normal-case;letter-spacing:0;text-transform:none;">0</span>
-        </h2>
-        <div class="props" id="variablesPanel" style="padding:0 10px;"></div>
-        <div style="padding:0 12px 16px;display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn" id="btnAddVar">Add Variable</button>
-        </div>
+      <div class="left-stack" id="leftStack">
+        <section class="left-section" data-section="project">
+          <button type="button" class="left-section-head" data-toggle-section="project">
+            <span class="chev">▾</span><span class="grow">Explorer</span>
+          </button>
+          <div class="left-section-body">
+            <div class="project-tree" id="projectTree"></div>
+          </div>
+        </section>
+        <section class="left-section" data-section="activities">
+          <button type="button" class="left-section-head" data-toggle-section="activities">
+            <span class="chev">▾</span><span class="grow">Activities</span>
+          </button>
+          <div class="left-section-body">
+            <div class="panel-tools">
+              <button class="btn symbol" id="btnExpandCats" type="button" title="Expand all categories">▾▾</button>
+              <button class="btn symbol" id="btnCollapseCats" type="button" title="Collapse all categories">▸▸</button>
+            </div>
+            <input class="search" id="search" placeholder="Search activities..." />
+            <div id="catalog"></div>
+          </div>
+        </section>
+        <section class="left-section" data-section="variables">
+          <button type="button" class="left-section-head" data-toggle-section="variables">
+            <span class="chev">▾</span><span class="grow">Variables</span>
+            <span class="count" id="variablesCount">0</span>
+          </button>
+          <div class="left-section-body">
+            <div class="props" id="variablesView" style="padding:0 10px;"></div>
+            <div style="padding:0 12px 12px;display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn" id="btnAddVar">Add Variable</button>
+            </div>
+          </div>
+        </section>
+        <section class="left-section" data-section="arguments">
+          <button type="button" class="left-section-head" data-toggle-section="arguments">
+            <span class="chev">▾</span><span class="grow">Arguments</span>
+            <span class="count" id="argumentsCount">0</span>
+          </button>
+          <div class="left-section-body">
+            <div class="props" id="argumentsView" style="padding:0 10px;"></div>
+            <div style="padding:0 12px 12px;display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn" id="btnAddArg">Add Argument</button>
+            </div>
+          </div>
+        </section>
       </div>
       <div class="frame-resize-y" id="leftResizeY" title="Drag to resize height (float mode)"></div>
       <div class="collapsed-only">
-        <button class="btn" id="btnLeftExpand" type="button" title="Expand toolbox">Toolbox</button>
+        <button class="btn" id="btnLeftExpand" type="button" title="Expand workspace">Workspace</button>
       </div>
     </aside>
 
@@ -767,6 +856,7 @@ export function getDesignerHtml(
       </div>
       <div class="canvas-bar">
         <div class="canvas-help" id="canvasHelp"></div>
+        <input class="workflow-search" id="workflowSearch" placeholder="Find in workflow…" title="Search activities in this workflow" />
         <div class="zoom-tools">
           <button class="btn" id="btnZoomOutLegacy" type="button" title="Zoom out">−</button>
           <span class="zoom-label" id="zoomLabelLegacy">100%</span>
@@ -774,6 +864,7 @@ export function getDesignerHtml(
           <button class="btn" id="btnZoomResetLegacy" type="button" title="Reset zoom">100%</button>
         </div>
       </div>
+      <div class="breadcrumbs" id="breadcrumbs"></div>
       <div class="canvas-zoom" id="canvasZoom">
         <div class="sequence" id="sequence"></div>
         <div class="flow-stage" id="flowStage" style="display:none"></div>
@@ -782,6 +873,21 @@ export function getDesignerHtml(
       <div class="hover-tip" id="hoverTip"></div>
     </main>
 
+    <div class="expr-overlay" id="exprOverlay">
+      <div class="expr-dialog" role="dialog" aria-label="Expression editor">
+        <div class="expr-dialog-head">
+          <div class="title" id="exprDialogTitle">Expression</div>
+          <button class="btn" type="button" id="exprDialogCancel">Close</button>
+        </div>
+        <textarea id="exprDialogValue" spellcheck="false"></textarea>
+        <div class="expr-dialog-foot">
+          <button class="btn" type="button" id="exprDialogDismiss">Cancel</button>
+          <button class="btn primary" type="button" id="exprDialogApply">Apply</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="palette-overlay" id="paletteOverlay">
     <div class="palette-overlay" id="paletteOverlay">
       <div class="palette" role="dialog" aria-label="Insert activity">
         <div class="palette-head">
@@ -856,7 +962,7 @@ export function getDesignerHtml(
       suggestions: ${suggestionsJson},
       palette: ${paletteJson},
       projects: ${projectsJson},
-      leftTab: 'activities',
+      collapsedLeftSections: {},
       selectedId: null,
       dragType: null,
       linkFrom: null,
@@ -865,18 +971,19 @@ export function getDesignerHtml(
       zoom: 1,
       collapsedCats: {},
       collapsedPropSections: {},
-      propsMode: 'docked', // docked | floating | collapsed
+      propsMode: 'docked',
       propsWidth: 300,
       propsHeight: Math.round(window.innerHeight * 0.7),
       propsFloatPos: { x: null, y: null },
-      leftMode: 'docked', // docked | floating | collapsed
-      leftWidth: 280,
+      leftMode: 'docked',
+      leftWidth: 300,
       leftHeight: Math.round(window.innerHeight * 0.72),
       leftFloatPos: { x: null, y: null },
-      playback: null, // { steps, index, timer, doneIds }
+      playback: null,
       paletteOpen: false,
       paletteQuery: '',
-      paletteActive: 0
+      paletteActive: 0,
+      exprEdit: null
     };
 
     const els = {
@@ -890,14 +997,18 @@ export function getDesignerHtml(
       flowStage: document.getElementById('flowStage'),
       canvasZoom: document.getElementById('canvasZoom'),
       props: document.getElementById('props'),
-      variablesPanel: document.getElementById('variablesPanel'),
+      variablesView: document.getElementById('variablesView'),
+      argumentsView: document.getElementById('argumentsView'),
       connectionsPanel: document.getElementById('connectionsPanel'),
       connectionsSection: document.getElementById('connectionsSection'),
       variablesCount: document.getElementById('variablesCount'),
+      argumentsCount: document.getElementById('argumentsCount'),
       connectionsCount: document.getElementById('connectionsCount'),
       workflowName: document.getElementById('workflowName'),
       workflowType: document.getElementById('workflowType'),
       canvasHelp: document.getElementById('canvasHelp'),
+      breadcrumbs: document.getElementById('breadcrumbs'),
+      workflowSearch: document.getElementById('workflowSearch'),
       search: document.getElementById('search'),
       toast: document.getElementById('toast'),
       hoverTip: document.getElementById('hoverTip'),
@@ -906,23 +1017,31 @@ export function getDesignerHtml(
       btnLink: document.getElementById('btnLink'),
       btnAutoLayout: document.getElementById('btnAutoLayout'),
       dockLeft: document.getElementById('dockLeft'),
-      dockProps: document.getElementById('dockProps')
+      dockProps: document.getElementById('dockProps'),
+      exprOverlay: document.getElementById('exprOverlay'),
+      exprDialogTitle: document.getElementById('exprDialogTitle'),
+      exprDialogValue: document.getElementById('exprDialogValue')
     };
 
-    function setLeftTab(tab) {
-      state.leftTab = tab || 'activities';
-      document.querySelectorAll('.left-tab').forEach((btn) => {
-        btn.classList.toggle('active', btn.getAttribute('data-left-tab') === state.leftTab);
-      });
-      document.querySelectorAll('.left-pane').forEach((pane) => {
-        pane.classList.toggle('active', pane.getAttribute('data-left-pane') === state.leftTab);
+    function applyLeftSections() {
+      document.querySelectorAll('.left-section').forEach((sec) => {
+        const id = sec.getAttribute('data-section');
+        const collapsed = !!state.collapsedLeftSections[id];
+        sec.classList.toggle('collapsed', collapsed);
+        const chev = sec.querySelector('.left-section-head .chev');
+        if (chev) chev.textContent = collapsed ? '▸' : '▾';
       });
     }
-    document.querySelectorAll('.left-tab').forEach((btn) => {
-      btn.addEventListener('click', () => setLeftTab(btn.getAttribute('data-left-tab')));
+    document.querySelectorAll('[data-toggle-section]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-toggle-section');
+        state.collapsedLeftSections[id] = !state.collapsedLeftSections[id];
+        applyLeftSections();
+      });
     });
+    applyLeftSections();
 
-    function renderProjectTree() {
+        function renderProjectTree() {
       if (!els.projectTree) return;
       const projects = state.projects || [];
       if (!projects.length) {
@@ -1018,6 +1137,35 @@ export function getDesignerHtml(
         }
       }
       return null;
+    }
+
+    /** Ancestor chain from root to the node (inclusive), for nested breadcrumbs. */
+    function walkAncestors(list, id, trail) {
+      const path = trail || [];
+      for (let i = 0; i < list.length; i++) {
+        const node = list[i];
+        const next = path.concat(node);
+        if (node.id === id) return next;
+        if (node.children) {
+          const hit = walkAncestors(node.children, id, next);
+          if (hit) return hit;
+        }
+        if (node.elseChildren) {
+          const hit = walkAncestors(node.elseChildren, id, next);
+          if (hit) return hit;
+        }
+      }
+      return null;
+    }
+
+    function walkCollect(list, out) {
+      const acc = out || [];
+      for (const node of list || []) {
+        acc.push(node);
+        if (node.children) walkCollect(node.children, acc);
+        if (node.elseChildren) walkCollect(node.elseChildren, acc);
+      }
+      return acc;
     }
 
     function summary(node) {
@@ -1787,13 +1935,16 @@ export function getDesignerHtml(
       if (node.type === 'REFramework.InvokeWorkflow' && name === 'workflowPath') {
         return s.workflowPaths || [];
       }
-      if (name === 'to' || name === 'result' || name === 'item' || name === 'row' || name === 'dataTable' || name === 'values') {
-        return s.variables || [];
+      if (name === 'to' || name === 'result' || name === 'item' || name === 'row' || name === 'dataTable' || name === 'values' || name === 'argumentMappings') {
+        const vars = s.variables || [];
+        const args = (state.workflow.arguments || []).map(a => a.name);
+        return [...vars, ...args];
       }
       if (type === 'expression' || name === 'condition' || name === 'message' || name === 'text' || name === 'url' || name === 'value' || name === 'jsonString' || name === 'arrayRow' || name === 'subject' || name === 'body') {
         const vars = s.variables || [];
+        const args = (state.workflow.arguments || []).map(a => a.name);
         const cfg = s.configExpressions || [];
-        return [...vars, ...cfg].slice(0, 40);
+        return [...vars, ...args, ...cfg].slice(0, 40);
       }
       if (name.toLowerCase().includes('config') || name === 'path' || name === 'workbookPath' || name === 'file') {
         return [...(s.configKeys || []), ...(s.workflowPaths || [])].slice(0, 40);
@@ -1825,10 +1976,15 @@ export function getDesignerHtml(
         return '<select data-prop="' + escapeAttr(p.name) + '"><option value="true"' + (val === true || val === 'true' ? ' selected' : '') + '>true</option><option value="false"' + (val === false || val === 'false' ? ' selected' : '') + '>false</option></select>';
       }
       if (p.type === 'multiline') {
-        return '<textarea data-prop="' + escapeAttr(p.name) + '">' + escapeHtml(String(val)) + '</textarea>' + suggestChipsHtml(node, p);
+        return '<div class="field-with-expand"><textarea data-prop="' + escapeAttr(p.name) + '">' + escapeHtml(String(val)) + '</textarea>' +
+          '<button type="button" class="btn-expand-expr" data-expand-prop="' + escapeAttr(p.name) + '" title="Expand editor">⛶</button></div>' + suggestChipsHtml(node, p);
       }
       if (p.type === 'number') {
         return '<input type="number" data-prop="' + escapeAttr(p.name) + '" value="' + escapeAttr(String(val)) + '" />';
+      }
+      if (p.type === 'expression') {
+        return '<div class="field-with-expand"><input data-prop="' + escapeAttr(p.name) + '" value="' + escapeAttr(String(val)) + '"' + listAttr + ' />' +
+          '<button type="button" class="btn-expand-expr" data-expand-prop="' + escapeAttr(p.name) + '" title="Expand editor">⛶</button></div>' + datalist + suggestChipsHtml(node, p);
       }
       return '<input data-prop="' + escapeAttr(p.name) + '" value="' + escapeAttr(String(val)) + '"' + listAttr + ' />' + datalist + suggestChipsHtml(node, p);
     }
@@ -1839,6 +1995,7 @@ export function getDesignerHtml(
       els.btnDelete.disabled = !hit;
       if (!hit) {
         els.props.innerHTML = '<div class="empty">Select a step to edit properties. In Flowchart mode, drag the blue port to connect nodes.</div>';
+        renderBreadcrumbs();
         return;
       }
       const node = hit.node;
@@ -1981,6 +2138,90 @@ export function getDesignerHtml(
           persist(true);
         });
       });
+      els.props.querySelectorAll('[data-expand-prop]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const prop = btn.getAttribute('data-expand-prop');
+          if (!prop) return;
+          openExprEditor(node, prop, def);
+        });
+      });
+      renderBreadcrumbs();
+    }
+
+    function openExprEditor(node, propName, def) {
+      const pdef = (def?.properties || []).find(p => p.name === propName);
+      const label = pdef?.label || propName;
+      state.exprEdit = { nodeId: node.id, prop: propName };
+      if (els.exprDialogTitle) els.exprDialogTitle.textContent = label + ' — ' + (node.displayName || node.type);
+      if (els.exprDialogValue) els.exprDialogValue.value = String(node.properties?.[propName] ?? '');
+      els.exprOverlay?.classList.add('show');
+      els.exprDialogValue?.focus();
+    }
+    function closeExprEditor() {
+      state.exprEdit = null;
+      els.exprOverlay?.classList.remove('show');
+    }
+    function applyExprEditor() {
+      if (!state.exprEdit) return;
+      const hit = walkFind(state.workflow.activities, state.exprEdit.nodeId);
+      if (!hit) { closeExprEditor(); return; }
+      const prop = state.exprEdit.prop;
+      hit.node.properties = hit.node.properties || {};
+      hit.node.properties[prop] = els.exprDialogValue?.value ?? '';
+      closeExprEditor();
+      persist(true);
+      toast('Expression updated');
+    }
+
+    function renderBreadcrumbs() {
+      if (!els.breadcrumbs) return;
+      const rootLabel = state.workflow.name || 'Root';
+      if (!state.selectedId) {
+        els.breadcrumbs.innerHTML = '<span class="crumb-current">' + escapeHtml(rootLabel) + '</span>';
+        return;
+      }
+      const chain = walkAncestors(state.workflow.activities, state.selectedId) || [];
+      if (!chain.length) {
+        els.breadcrumbs.innerHTML = '<span class="crumb-current">' + escapeHtml(rootLabel) + '</span>';
+        return;
+      }
+      let html = '<button type="button" data-crumb="">' + escapeHtml(rootLabel) + '</button>';
+      chain.forEach((n, i) => {
+        html += '<span class="crumb-sep">›</span>';
+        if (i === chain.length - 1) {
+          html += '<span class="crumb-current">' + escapeHtml(n.displayName || n.type) + '</span>';
+        } else {
+          html += '<button type="button" data-crumb="' + escapeAttr(n.id) + '">' + escapeHtml(n.displayName || n.type) + '</button>';
+        }
+      });
+      els.breadcrumbs.innerHTML = html;
+      els.breadcrumbs.querySelectorAll('[data-crumb]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-crumb');
+          state.selectedId = id || null;
+          persist(true);
+          if (id) highlightSearchHit(id);
+        });
+      });
+    }
+
+    function highlightSearchHit(id) {
+      const el = document.querySelector('[data-id="' + id + '"]');
+      if (!el) return;
+      el.classList.add('search-hit');
+      if (el.scrollIntoView) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      setTimeout(() => el.classList.remove('search-hit'), 900);
+    }
+
+    function findInWorkflow(query) {
+      const q = String(query || '').trim().toLowerCase();
+      if (!q) return null;
+      const all = walkCollect(state.workflow.activities);
+      return all.find(n =>
+        String(n.displayName || '').toLowerCase().includes(q) ||
+        String(n.type || '').toLowerCase().includes(q) ||
+        String(summary(n) || '').toLowerCase().includes(q)
+      ) || null;
     }
 
     function renderVariables() {
@@ -2022,6 +2263,57 @@ export function getDesignerHtml(
           state.workflow.variables.splice(Number(btn.getAttribute('data-del-var')), 1);
           persist(true);
           vscode.postMessage({ type: 'variablesChanged', variables: state.workflow.variables });
+        });
+      });
+    }
+
+    function renderArguments() {
+      if (!els.argumentsView) return;
+      state.workflow.arguments ||= [];
+      const args = state.workflow.arguments;
+      if (els.argumentsCount) els.argumentsCount.textContent = String(args.length);
+      if (!args.length) {
+        els.argumentsView.innerHTML = '<div class="empty">No arguments yet. Add In / Out / InOut for this workflow.</div>';
+        return;
+      }
+      const types = ['String','Int32','Boolean','Double','Object','DataTable','Array'];
+      const dirs = ['In','Out','InOut'];
+      els.argumentsView.innerHTML = args.map((a, i) => (
+        '<div class="field" style="display:grid;grid-template-columns:1fr 72px 72px 28px;gap:6px;align-items:end;">' +
+          '<div><label>Name</label><input data-arg="' + i + '" data-field="name" value="' + escapeAttr(a.name) + '" /></div>' +
+          '<div><label>Dir</label><select data-arg="' + i + '" data-field="direction">' +
+            dirs.map(d => '<option' + ((a.direction || 'In') === d ? ' selected' : '') + '>' + d + '</option>').join('') +
+          '</select></div>' +
+          '<div><label>Type</label><select data-arg="' + i + '" data-field="type">' +
+            types.map(t => '<option' + (a.type === t ? ' selected' : '') + '>' + t + '</option>').join('') +
+          '</select></div>' +
+          '<button class="icon-btn" data-del-arg="' + i + '" title="Remove">✕</button>' +
+        '</div>' +
+        '<div class="field"><label>Default</label><input data-arg="' + i + '" data-field="defaultValue" value="' + escapeAttr(a.defaultValue === undefined || a.defaultValue === null ? '' : String(a.defaultValue)) + '" /></div>'
+      )).join('');
+      els.argumentsView.querySelectorAll('[data-arg]').forEach(input => {
+        input.addEventListener('change', () => {
+          const i = Number(input.getAttribute('data-arg'));
+          const field = input.getAttribute('data-field');
+          if (!state.workflow.arguments[i]) return;
+          if (field === 'defaultValue') {
+            const t = state.workflow.arguments[i].type;
+            let val = input.value;
+            if (t === 'Int32' || t === 'Double') val = Number(val || 0);
+            if (t === 'Boolean') val = val === 'true';
+            state.workflow.arguments[i].defaultValue = val;
+          } else {
+            state.workflow.arguments[i][field] = input.value;
+          }
+          persist(false);
+          vscode.postMessage({ type: 'argumentsChanged', arguments: state.workflow.arguments });
+        });
+      });
+      els.argumentsView.querySelectorAll('[data-del-arg]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.workflow.arguments.splice(Number(btn.getAttribute('data-del-arg')), 1);
+          persist(true);
+          vscode.postMessage({ type: 'argumentsChanged', arguments: state.workflow.arguments });
         });
       });
     }
@@ -2068,10 +2360,19 @@ export function getDesignerHtml(
     }
 
     function autoLayout() {
-      const nodes = state.workflow.activities;
+      if (!isFlow()) {
+        toast('Tidy is for Flowchart workflows');
+        return;
+      }
+      const nodes = state.workflow.activities || [];
+      if (!nodes.length) return;
+      const COL_GAP = 240;
+      const ROW_GAP = 168;
+      const ORIGIN_X = 72;
+      const ORIGIN_Y = 48;
       nodes.forEach((n, i) => {
-        n.x = 80 + (i % 3) * 220;
-        n.y = 40 + Math.floor(i / 3) * 160;
+        n.x = ORIGIN_X + (i % 3) * COL_GAP;
+        n.y = ORIGIN_Y + Math.floor(i / 3) * ROW_GAP;
       });
       // Prefer layered layout by following edges from start
       const startId = state.workflow.startActivityId || nodes.find(n => n.type === 'Flowchart.Start')?.id;
@@ -2092,6 +2393,12 @@ export function getDesignerHtml(
             }
           }
         }
+        // Orphan nodes (unreachable) get a trailing depth bucket
+        let maxD = 0;
+        for (const d of depth.values()) maxD = Math.max(maxD, d);
+        for (const n of nodes) {
+          if (!depth.has(n.id)) depth.set(n.id, maxD + 1);
+        }
         const buckets = new Map();
         for (const n of nodes) {
           const d = depth.get(n.id) ?? 0;
@@ -2101,17 +2408,28 @@ export function getDesignerHtml(
         }
         [...buckets.keys()].sort((a,b)=>a-b).forEach((d) => {
           const list = buckets.get(d);
+          // Stable order: Start first, End last, then displayName
+          list.sort((a, b) => {
+            const rank = (n) => n.type === 'Flowchart.Start' ? -1 : n.type === 'Flowchart.End' ? 1 : 0;
+            const r = rank(a) - rank(b);
+            if (r) return r;
+            return String(a.displayName || '').localeCompare(String(b.displayName || ''));
+          });
+          const rowWidth = Math.max(0, (list.length - 1) * COL_GAP);
+          const startX = ORIGIN_X + Math.max(0, (COL_GAP * 2 - rowWidth) / 2);
           list.forEach((n, i) => {
-            n.x = 60 + i * 220;
-            n.y = 40 + d * 150;
+            n.x = Math.round(startX + i * COL_GAP);
+            n.y = ORIGIN_Y + d * ROW_GAP;
           });
         });
       }
       persist(true);
-      toast('Auto layout applied');
+      toast('Tidy applied');
     }
 
     function renderAll() {
+      state.workflow.variables ||= [];
+      state.workflow.arguments ||= [];
       els.workflowName.value = state.workflow.name || '';
       els.workflowType.textContent = state.workflow.type || 'Sequence';
       els.workflowType.classList.toggle('flow', isFlow());
@@ -2126,6 +2444,8 @@ export function getDesignerHtml(
       if (isFlow()) renderFlowchart(); else renderSequence();
       renderProps();
       renderVariables();
+      renderArguments();
+      renderBreadcrumbs();
       renderConnectionsPanel();
       syncDockActive();
     }
@@ -2403,6 +2723,57 @@ export function getDesignerHtml(
       persist(true);
       vscode.postMessage({ type: 'variablesChanged', variables: state.workflow.variables });
     });
+    document.getElementById('btnAddArg')?.addEventListener('click', () => {
+      state.workflow.arguments ||= [];
+      state.workflow.arguments.push({
+        name: 'in_Arg' + (state.workflow.arguments.length + 1),
+        type: 'String',
+        direction: 'In',
+        defaultValue: ''
+      });
+      persist(true);
+      vscode.postMessage({ type: 'argumentsChanged', arguments: state.workflow.arguments });
+    });
+    document.getElementById('exprDialogApply')?.addEventListener('click', () => applyExprEditor());
+    document.getElementById('exprDialogCancel')?.addEventListener('click', () => closeExprEditor());
+    document.getElementById('exprDialogDismiss')?.addEventListener('click', () => closeExprEditor());
+    els.exprOverlay?.addEventListener('click', (e) => {
+      if (e.target === els.exprOverlay) closeExprEditor();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && state.exprEdit) {
+        e.preventDefault();
+        closeExprEditor();
+      }
+    });
+    let searchTimer = null;
+    els.workflowSearch?.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        const q = els.workflowSearch.value;
+        if (!String(q || '').trim()) return;
+        const hit = findInWorkflow(q);
+        if (!hit) {
+          toast('No match for “' + q + '”');
+          return;
+        }
+        state.selectedId = hit.id;
+        persist(true);
+        highlightSearchHit(hit.id);
+      }, 220);
+    });
+    els.workflowSearch?.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const hit = findInWorkflow(els.workflowSearch.value);
+      if (!hit) {
+        toast('No match');
+        return;
+      }
+      state.selectedId = hit.id;
+      persist(true);
+      highlightSearchHit(hit.id);
+    });
     els.btnDelete.addEventListener('click', () => {
       if (!state.selectedId) return;
       const hit = walkFind(state.workflow.activities, state.selectedId);
@@ -2427,8 +2798,11 @@ export function getDesignerHtml(
     window.addEventListener('message', (event) => {
       const msg = event.data;
       if (msg.type === 'setWorkflow') {
-        state.workflow = msg.workflow;
+        state.workflow = msg.workflow || {};
+        state.workflow.variables ||= [];
+        state.workflow.arguments ||= [];
         state.selectedId = null;
+        closeExprEditor();
         renderAll();
       }
       if (msg.type === 'insertActivity' && msg.activityType) {

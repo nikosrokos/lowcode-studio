@@ -1,6 +1,6 @@
 # LowCode Studio — Activity coverage
 
-Generated for **v0.6.21** from the extension activity catalog.
+Generated for **v0.6.22** from the extension activity catalog.
 
 This list is what you can design in VS Code / Cursor, dry-run locally, and best-effort import/export with UiPath Studio / Studio Web.
 
@@ -102,7 +102,7 @@ UiPath package (typical): `UiPath.System.Activities`
 
 | Activity | Type id | Container | Key properties |
 |---|---|---|---|
-| Invoke Workflow | `REFramework.InvokeWorkflow` | No | workflowPath, description |
+| Invoke Workflow | `REFramework.InvokeWorkflow` | No | workflowPath, argumentMappings, description |
 | Set Transaction Status | `REFramework.SetTransactionStatus` | No | status, reason |
 
 ### System
