@@ -1,6 +1,6 @@
 # LowCode Studio — Activity coverage
 
-Generated for **v0.6.18** from the extension activity catalog.
+Generated for **v0.6.19** from the extension activity catalog.
 
 This list is what you can design in VS Code / Cursor, dry-run locally, and best-effort import/export with UiPath Studio / Studio Web.
 
@@ -125,17 +125,17 @@ UiPath package (typical): `UiPath.UIAutomation.Activities`
 
 | Activity | Type id | Container | Key properties |
 |---|---|---|---|
-| Check | `UI.Check` | No | selector, selectorModern, action, inputMethod |
-| Click | `UI.Click` | No | selector, selectorModern, clickType, inputMethod |
+| Check | `UI.Check` | No | selector, selectorModern, action, timeoutMs, inputMethod |
+| Click | `UI.Click` | No | selector, selectorModern, clickType, timeoutMs, inputMethod |
 | Element Exists | `UI.ElementExists` | No | selector, selectorModern, result, timeoutMs |
 | Extract Table Data | `UI.ExtractTableData` | No | selector, selectorModern, extractionMetadata, includeHeaders, maxResults, smartExtraction… |
 | Get Attribute | `UI.GetAttribute` | No | selector, selectorModern, attribute, result |
-| Get Text | `UI.GetText` | No | selector, selectorModern, result |
-| Hover | `UI.Hover` | No | selector, selectorModern, inputMethod |
+| Get Text | `UI.GetText` | No | selector, selectorModern, result, timeoutMs, inputMethod |
+| Hover | `UI.Hover` | No | selector, selectorModern, timeoutMs, inputMethod |
 | Open Application | `UI.OpenApplication` | No | pathOrUrl, arguments |
 | Select Item | `UI.SelectItem` | No | selector, selectorModern, item, inputMethod |
 | Take Screenshot | `UI.TakeScreenshot` | No | selector, filePath |
-| Type Into | `UI.TypeInto` | No | selector, selectorModern, text, emptyField, inputMethod |
+| Type Into | `UI.TypeInto` | No | selector, selectorModern, text, emptyField, timeoutMs, inputMethod |
 | Use Application/Browser | `UI.UseApplicationBrowser` | Yes | mode, urlOrPath, browserType, inputMethod, selector, open… |
 | Wait Element | `UI.WaitElement` | No | selector, selectorModern, action, timeoutMs |
 

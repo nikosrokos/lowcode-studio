@@ -17,7 +17,7 @@ function run(): void {
         <Sequence>
           <uia:NClick DisplayName="Buy" ClickType="Single"
             Selector="&lt;html app='chrome.exe' title='*' /&gt;&#xA;&lt;webctrl tag='BUTTON' id='buyNow' /&gt;" />
-          <ui:GetText DisplayName="Price" Result="[price]" TimeoutMS="15000"
+          <uia:NGetText DisplayName="Price" Result="[price]" TimeoutMS="15000"
             Selector="&lt;html app='chrome.exe' title='*' /&gt;&#xA;&lt;webctrl tag='SPAN' id='price' /&gt;" />
         </Sequence>
       </uia:NApplicationCard.Body>
@@ -45,7 +45,7 @@ function run(): void {
       displayName: 'Read',
       properties: {
         selector:
-          "<html app='chrome.exe' title='*' />\n<webctrl tag='SPAN' id='label' />",
+          "<html app='chrome.exe' title='*' />\n<webctrl tag='SPAN' id='priceLabel' />",
         result: 'extractedText',
         timeoutMs: 12000,
         inputMethod: 'Simulate'
