@@ -46,18 +46,19 @@ export function getDesignerHtml(
       --input-border: var(--vscode-input-border, #444);
       --hover: var(--vscode-list-hoverBackground);
       --focus: var(--vscode-focusBorder);
-      --card: color-mix(in srgb, var(--bg) 88%, var(--text) 12%);
-      --shadow: 0 8px 24px rgba(0,0,0,.18);
-      --radius: 10px;
+      --card: color-mix(in srgb, var(--bg) 92%, var(--text) 8%);
+      --board: color-mix(in srgb, var(--bg) 96%, var(--text) 4%);
+      --shadow: 0 1px 2px rgba(0,0,0,.12), 0 4px 12px rgba(0,0,0,.08);
+      --shadow-sm: 0 1px 2px rgba(0,0,0,.1);
+      --radius: 8px;
       --mono: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, Menlo, monospace);
       --sans: var(--vscode-font-family, "Segoe UI", sans-serif);
+      --spine: color-mix(in srgb, var(--muted) 40%, transparent);
     }
     * { box-sizing: border-box; }
     html, body {
       margin: 0; height: 100%;
-      background: radial-gradient(1200px 600px at 10% -10%, color-mix(in srgb, var(--accent) 18%, transparent), transparent),
-                  radial-gradient(900px 500px at 100% 0%, color-mix(in srgb, #22c55e 10%, transparent), transparent),
-                  var(--bg);
+      background: var(--bg);
       color: var(--text);
       font-family: var(--sans);
       overflow: hidden;
@@ -249,12 +250,16 @@ export function getDesignerHtml(
       font-size: 10px; color: var(--muted); font-family: var(--mono);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .canvas-wrap { position: relative; overflow: auto; padding: 12px 16px 80px; }
+    .canvas-wrap {
+      position: relative; overflow: auto; padding: 12px 16px 96px;
+      mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 28px), transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 28px), transparent 100%);
+    }
     .canvas-bar {
       display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-      margin-bottom: 10px; position: sticky; top: 0; z-index: 3;
-      padding: 6px 0; background: color-mix(in srgb, var(--bg) 88%, transparent);
-      backdrop-filter: blur(6px);
+      margin-bottom: 12px; position: sticky; top: 0; z-index: 3;
+      padding: 8px 0; background: color-mix(in srgb, var(--bg) 92%, transparent);
+      backdrop-filter: blur(8px);
     }
     .canvas-help { color: var(--muted); font-size: 12px; flex: 1; min-width: 180px; }
     .zoom-tools { display: flex; align-items: center; gap: 4px; }
@@ -266,34 +271,76 @@ export function getDesignerHtml(
       transition: transform .12s ease;
       width: max-content; min-width: 100%;
     }
-    .sequence { max-width: 720px; margin: 0 auto; }
+    .sequence {
+      max-width: 680px; margin: 0 auto;
+      background: var(--board);
+      border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+      border-radius: 12px;
+      padding: 18px 22px 28px;
+      box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 4%, transparent);
+    }
+    .canvas-empty {
+      text-align: center; padding: 48px 24px; color: var(--muted);
+      border: 1px dashed color-mix(in srgb, var(--muted) 45%, transparent);
+      border-radius: 12px; background: color-mix(in srgb, var(--board) 80%, transparent);
+    }
+    .canvas-empty h3 { margin: 0 0 8px; color: var(--text); font-size: 15px; font-weight: 650; }
+    .canvas-empty p { margin: 0; font-size: 12px; line-height: 1.5; }
     .drop-zone {
-      min-height: 18px; border-radius: 8px; border: 1px dashed transparent; margin: 2px 0;
+      min-height: 28px; border-radius: 8px;
+      border: 1px dashed color-mix(in srgb, var(--muted) 28%, transparent);
+      margin: 0 auto; width: 100%; max-width: 100%;
+      transition: min-height .14s ease, border-color .14s ease, background .14s ease, opacity .14s ease;
+      position: relative; opacity: .85;
+    }
+    .drop-zone::before {
+      content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px;
+      background: var(--spine); transform: translateX(-50%); pointer-events: none;
+    }
+    .drop-zone::after {
+      content: ''; position: absolute; left: 50%; top: 50%; width: 5px; height: 5px;
+      border-radius: 50%; background: color-mix(in srgb, var(--muted) 55%, transparent);
+      transform: translate(-50%, -50%); pointer-events: none; opacity: .7;
     }
     .drop-zone.active {
-      min-height: 42px; border-color: var(--focus);
+      min-height: 48px; opacity: 1;
+      border-color: color-mix(in srgb, var(--focus) 70%, var(--border));
       background: color-mix(in srgb, var(--accent) 12%, transparent);
+    }
+    .drop-zone.active::after {
+      width: 9px; height: 9px; opacity: 1; background: var(--focus);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--focus) 22%, transparent);
     }
     .card {
       position: relative; background: var(--card);
-      border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
-      border-radius: var(--radius); box-shadow: var(--shadow);
-      padding: 12px 14px 12px 16px; cursor: pointer; animation: rise .22s ease both;
-      transition: border-color .15s ease, box-shadow .15s ease, transform .12s ease;
+      border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+      border-radius: var(--radius); box-shadow: var(--shadow-sm);
+      padding: 10px 12px 10px 14px; cursor: pointer;
+      transition: border-color .14s ease, background .14s ease, box-shadow .14s ease, transform .14s ease;
+      animation: rise .22s ease both;
     }
     .card:hover {
-      border-color: color-mix(in srgb, var(--focus) 55%, var(--border));
-      box-shadow: 0 0 0 1px color-mix(in srgb, var(--focus) 35%, transparent), var(--shadow);
+      border-color: color-mix(in srgb, var(--focus) 40%, var(--border));
+      background: color-mix(in srgb, var(--card) 92%, var(--hover));
       transform: translateY(-1px);
     }
-    .card.selected { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus), var(--shadow); }
-    .card-accent { position: absolute; left: 0; top: 10px; bottom: 10px; width: 4px; border-radius: 0 3px 3px 0; }
-    .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-    .step { font-size: 10px; color: var(--muted); font-family: var(--mono); min-width: 28px; }
-    .card-title { font-size: 13px; font-weight: 700; }
+    .card.selected {
+      border-color: var(--focus);
+      box-shadow: inset 3px 0 0 var(--focus), 0 0 0 1px color-mix(in srgb, var(--focus) 35%, transparent), var(--shadow-sm);
+      background: color-mix(in srgb, var(--card) 88%, var(--focus) 12%);
+    }
+    .card-accent { position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 2px 2px 0; }
+    .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; padding-right: 56px; }
+    .step { font-size: 10px; color: var(--muted); font-family: var(--mono); min-width: 26px; opacity: .75; }
+    .card-title { font-size: 13px; font-weight: 650; }
     .card-summary {
-      font-size: 12px; color: var(--muted); font-family: var(--mono);
+      font-size: 11px; color: var(--muted);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .card-summary.mono { font-family: var(--mono); }
+    .card-warn {
+      margin-top: 6px; font-size: 10px; font-weight: 600; color: #d97706;
+      letter-spacing: .02em;
     }
     .card-actions { position: absolute; right: 8px; top: 8px; display: none; gap: 4px; }
     .card:hover .card-actions, .card.selected .card-actions { display: flex; }
@@ -301,44 +348,52 @@ export function getDesignerHtml(
       width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--border);
       background: var(--input-bg); color: var(--text); cursor: pointer; font-size: 12px;
     }
-    .connector { width: 2px; height: 16px; background: color-mix(in srgb, var(--muted) 45%, transparent); margin: 0 auto; }
+    .connector {
+      width: 2px; height: 14px; background: var(--spine); margin: 0 auto;
+    }
     .children, .else-children {
-      margin: 8px 0 0 18px; padding: 8px 0 8px 12px;
-      border-left: 2px solid color-mix(in srgb, var(--muted) 35%, transparent);
+      margin: 8px 0 0 10px; padding: 8px 0 8px 14px;
+      border-left: 2px solid color-mix(in srgb, var(--focus) 35%, var(--muted));
+      background: color-mix(in srgb, var(--board) 70%, transparent);
+      border-radius: 0 8px 8px 0;
     }
     .branch-label {
-      font-size: 10px; font-weight: 700; color: var(--muted);
-      text-transform: uppercase; letter-spacing: .08em; margin: 4px 0;
+      display: inline-block; font-size: 10px; font-weight: 700; color: var(--muted);
+      letter-spacing: .06em; text-transform: uppercase; margin: 2px 0 6px;
+      padding: 2px 7px; border-radius: 999px;
+      background: color-mix(in srgb, var(--muted) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
     }
     .flow-stage {
       position: relative; min-width: 900px; min-height: 720px;
       border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-      border-radius: 14px;
-      background-color: color-mix(in srgb, var(--bg) 94%, transparent);
-      background-image:
-        radial-gradient(circle, color-mix(in srgb, var(--muted) 28%, transparent) 1px, transparent 1.5px),
-        linear-gradient(color-mix(in srgb, var(--muted) 8%, transparent) 1px, transparent 1px),
-        linear-gradient(90deg, color-mix(in srgb, var(--muted) 8%, transparent) 1px, transparent 1px);
-      background-size: 20px 20px, 100px 100px, 100px 100px;
-      background-position: 0 0, 0 0, 0 0;
+      border-radius: 12px;
+      background-color: var(--board);
+      background-image: radial-gradient(circle, color-mix(in srgb, var(--muted) 22%, transparent) 1px, transparent 1.5px);
+      background-size: 22px 22px;
     }
-    .flow-stage.drop-target { outline: 2px solid var(--focus); }
+    .flow-stage.drop-target {
+      box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--focus) 55%, transparent);
+    }
     .flow-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
-    .flow-svg path { fill: none; stroke: color-mix(in srgb, var(--muted) 70%, #0ea5e9); stroke-width: 2; marker-end: url(#arrow); }
+    .flow-svg path { fill: none; stroke: color-mix(in srgb, var(--muted) 75%, var(--text)); stroke-width: 1.75; marker-end: url(#arrow); }
     .flow-svg text { fill: var(--muted); font-size: 11px; font-weight: 700; }
     .flow-node {
       position: absolute; width: 180px; min-height: 64px;
-      background: var(--card); border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
-      border-radius: 12px; box-shadow: var(--shadow); padding: 10px 12px 12px;
+      background: var(--card); border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+      border-radius: 10px; box-shadow: var(--shadow-sm); padding: 10px 12px 12px;
       cursor: grab; user-select: none;
-      transition: border-color .15s ease, box-shadow .15s ease;
+      transition: border-color .12s ease, box-shadow .12s ease, background .12s ease;
     }
     .flow-node:hover {
-      border-color: color-mix(in srgb, var(--focus) 55%, var(--border));
-      box-shadow: 0 0 0 1px color-mix(in srgb, var(--focus) 30%, transparent), var(--shadow);
+      border-color: color-mix(in srgb, var(--focus) 40%, var(--border));
       z-index: 2;
     }
-    .flow-node.selected { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus), var(--shadow); z-index: 3; }
+    .flow-node.selected {
+      border-color: var(--focus);
+      box-shadow: inset 3px 0 0 var(--focus), var(--shadow-sm);
+      z-index: 3;
+    }
     .flow-node.decision {
       width: 170px; height: 170px; border-radius: 16px;
       transform: rotate(45deg); display: flex; align-items: center; justify-content: center;
@@ -348,15 +403,38 @@ export function getDesignerHtml(
     .flow-node.start, .flow-node.end {
       width: 120px; border-radius: 999px; text-align: center; min-height: 48px;
       display: flex; align-items: center; justify-content: center;
+      border-width: 2px;
     }
-    .flow-node .title { font-size: 12px; font-weight: 700; }
-    .flow-node .summary { font-size: 10px; color: var(--muted); margin-top: 4px; font-family: var(--mono); }
+    .flow-node.start { border-color: color-mix(in srgb, #22c55e 55%, var(--border)); }
+    .flow-node.end { border-color: color-mix(in srgb, #ef4444 45%, var(--border)); }
+    .flow-node .title { font-size: 12px; font-weight: 650; }
+    .flow-node .summary { font-size: 10px; color: var(--muted); margin-top: 4px; }
     .port {
-      position: absolute; width: 12px; height: 12px; border-radius: 50%;
-      background: #0ea5e9; border: 2px solid var(--bg); right: -7px; top: 50%;
+      position: absolute; width: 11px; height: 11px; border-radius: 50%;
+      background: color-mix(in srgb, var(--accent) 85%, var(--text));
+      border: 2px solid var(--bg); right: -6px; top: 50%;
       transform: translateY(-50%); cursor: crosshair; pointer-events: auto;
     }
     .flow-node.decision .port { right: -8px; }
+    .selector-warn {
+      margin: 6px 0 0; font-size: 11px; color: #d97706;
+      line-height: 1.35;
+    }
+    .selector-warn.ok { color: color-mix(in srgb, #16a34a 80%, var(--muted)); }
+    .sb-actions { display: flex; gap: 6px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+    .sb-hint { font-size: 10px; color: var(--muted); flex: 1; min-width: 120px; }
+    .modern-sel {
+      margin: 0 0 12px; padding: 8px 10px; border-radius: 8px;
+      border: 1px dashed color-mix(in srgb, var(--border) 85%, transparent);
+      background: color-mix(in srgb, var(--bg) 55%, transparent);
+    }
+    .modern-sel > summary {
+      cursor: pointer; font-size: 11px; font-weight: 650; color: var(--muted);
+      list-style: none; user-select: none;
+    }
+    .modern-sel > summary::-webkit-details-marker { display: none; }
+    .modern-sel[open] > summary { margin-bottom: 8px; color: var(--text); }
+    .modern-sel .field { margin-bottom: 0; }
     .props { padding: 0 14px 12px; }
     .props .empty { color: var(--muted); font-size: 12px; line-height: 1.5; padding: 8px 0; }
     .prop-section {
@@ -842,9 +920,35 @@ export function getDesignerHtml(
     }
     function emptySelParts(kind) {
       if (kind === 'desktop') {
-        return { kind: 'desktop', app: 'notepad.exe', title: '*', tag: '', id: '', aaname: '', cls: 'Notepad', name: '', idx: '' };
+        return { kind: 'desktop', app: '', title: '', tag: '', id: '', aaname: '', cls: '', name: '', idx: '' };
       }
-      return { kind: 'browser', app: 'chrome.exe', title: '*', tag: 'BUTTON', id: '', aaname: '', cls: '', name: '', idx: '' };
+      return { kind: 'browser', app: 'chrome.exe', title: '*', tag: '', id: '', aaname: '', cls: '', name: '', idx: '' };
+    }
+    function isPlaceholderSel(raw) {
+      const s = String(raw || '').trim();
+      if (!s) return true;
+      if (/<target\\b/i.test(s) || s === '<target />') return true;
+      if (/id=['"]btnSubmit['"]/i.test(s)) return true;
+      if (/id=['"]input['"]/i.test(s)) return true;
+      if (/id=['"]label['"]/i.test(s)) return true;
+      if (/id=['"]popup['"]/i.test(s)) return true;
+      if (/id=['"]chkAgree['"]/i.test(s)) return true;
+      if (/id=['"]menu['"]/i.test(s)) return true;
+      if (/id=['"]cmbCountry['"]/i.test(s)) return true;
+      if (/id=['"]element['"]/i.test(s)) return true;
+      if (/<webctrl\\b/i.test(s)) {
+        const hasId = /\\bid\\s*=/i.test(s);
+        const hasName = /\\b(?:aaname|name)\\s*=/i.test(s);
+        const hasIdx = /\\bidx\\s*=/i.test(s);
+        if (!hasId && !hasName && !hasIdx) return true;
+      }
+      if (/<wnd\\b/i.test(s) && /app=['"]app\\.exe['"]/i.test(s)) {
+        const hasCls = /\\bcls\\s*=/i.test(s);
+        const hasTitle = /\\btitle\\s*=\\s*['"](?!\\*)/i.test(s);
+        const hasName = /\\bname\\s*=/i.test(s);
+        if (!hasCls && !hasTitle && !hasName) return true;
+      }
+      return false;
     }
     function buildWindowsSelector(parts) {
       const kind = parts.kind || 'browser';
@@ -863,7 +967,6 @@ export function getDesignerHtml(
       if (parts.name) web.push("name='" + escSel(parts.name) + "'");
       if (parts.cls) web.push("class='" + escSel(parts.cls) + "'");
       if (parts.idx) web.push("idx='" + escSel(parts.idx) + "'");
-      if (!parts.id && !parts.aaname && !parts.name && tag === '*') web.push("id='element'");
       return "<html app='" + escSel(parts.app || 'chrome.exe') + "' title='" + escSel(parts.title || '*') + "' />\\n<webctrl " + web.join(' ') + ' />';
     }
     function parseWindowsSelector(raw) {
@@ -872,7 +975,7 @@ export function getDesignerHtml(
       if (/<wnd\\b/i.test(text)) {
         const m = text.match(/<wnd\\b([^>]*)\\/?>/i);
         const attrs = parseSelAttrs(m && m[1] || '');
-        return { kind: 'desktop', app: attrs.app || 'app.exe', title: attrs.title || '*', tag: '', id: '', aaname: attrs.aaname || '', cls: attrs.cls || '', name: attrs.name || '', idx: attrs.idx || '' };
+        return { kind: 'desktop', app: attrs.app || '', title: attrs.title || '', tag: '', id: '', aaname: attrs.aaname || '', cls: attrs.cls || '', name: attrs.name || '', idx: attrs.idx || '' };
       }
       const html = text.match(/<html\\b([^>]*)\\/?>/i);
       const web = text.match(/<webctrl\\b([^>]*)\\/?>/i);
@@ -882,7 +985,7 @@ export function getDesignerHtml(
         kind: 'browser',
         app: htmlAttrs.app || 'chrome.exe',
         title: htmlAttrs.title || '*',
-        tag: String(webAttrs.tag || 'BUTTON').toUpperCase(),
+        tag: String(webAttrs.tag || '').toUpperCase(),
         id: webAttrs.id || '',
         aaname: webAttrs.aaname || '',
         cls: webAttrs.class || webAttrs.cls || '',
@@ -898,30 +1001,36 @@ export function getDesignerHtml(
       const kindOpts = ['browser', 'desktop'].map(k =>
         '<option value="' + k + '"' + (parts.kind === k ? ' selected' : '') + '>' + k + '</option>'
       ).join('');
+      const warn = isPlaceholderSel(currentValue)
+        ? '<div class="selector-warn" data-sb-warn>Selector is empty or still a starter — set Id / aaname / Name before Windows run.</div>'
+        : '<div class="selector-warn ok" data-sb-warn>Selector looks specific enough to try on Windows.</div>';
       return '<div class="selector-builder" data-sel-for="' + escapeAttr(propName) + '">' +
         '<div class="sb-title">Selector Builder</div>' +
         fieldHtml('Template', '<select data-sb="template"><option value="">— choose template —</option>' + tplOpts + '</select>') +
         '<div class="sb-grid" style="margin-top:8px">' +
           fieldHtml('Kind', '<select data-sb="kind">' + kindOpts + '</select>') +
-          fieldHtml('App', '<input data-sb="app" value="' + escapeAttr(parts.app) + '" />') +
-          fieldHtml('Title', '<input data-sb="title" value="' + escapeAttr(parts.title) + '" />') +
-          fieldHtml('Tag', '<input data-sb="tag" value="' + escapeAttr(parts.tag) + '" />') +
-          fieldHtml('Id', '<input data-sb="id" value="' + escapeAttr(parts.id) + '" />') +
-          fieldHtml('aaname', '<input data-sb="aaname" value="' + escapeAttr(parts.aaname) + '" />') +
+          fieldHtml('App', '<input data-sb="app" value="' + escapeAttr(parts.app) + '" placeholder="chrome.exe / notepad.exe" />') +
+          fieldHtml('Title', '<input data-sb="title" value="' + escapeAttr(parts.title) + '" placeholder="Window title *" />') +
+          fieldHtml('Tag', '<input data-sb="tag" value="' + escapeAttr(parts.tag) + '" placeholder="BUTTON / INPUT / A" />') +
+          fieldHtml('Id', '<input data-sb="id" value="' + escapeAttr(parts.id) + '" placeholder="element id" />') +
+          fieldHtml('aaname', '<input data-sb="aaname" value="' + escapeAttr(parts.aaname) + '" placeholder="accessible name" />') +
           fieldHtml('Class / cls', '<input data-sb="cls" value="' + escapeAttr(parts.cls) + '" />') +
           fieldHtml('Name', '<input data-sb="name" value="' + escapeAttr(parts.name) + '" />') +
-          fieldHtml('Index', '<input data-sb="idx" value="' + escapeAttr(parts.idx) + '" />') +
+          fieldHtml('Index', '<input data-sb="idx" value="' + escapeAttr(parts.idx) + '" placeholder="1" />') +
         '</div>' +
         '<div class="sb-actions">' +
-          '<button class="btn primary" type="button" data-sb-apply>Apply to selector</button>' +
+          '<button class="btn primary" type="button" data-sb-apply>Apply</button>' +
+          '<span class="sb-hint">Edits apply live to the selector field</span>' +
         '</div>' +
-        '<pre class="sb-preview" data-sb-preview>' + escapeHtml(buildWindowsSelector(parts)) + '</pre>' +
+        warn +
+        '<pre class="sb-preview" data-sb-preview>' + escapeHtml(String(currentValue || '').trim() ? String(currentValue) : buildWindowsSelector(parts)) + '</pre>' +
       '</div>';
     }
     function wireSelectorBuilder(root, node, propName) {
       const box = root.querySelector('.selector-builder[data-sel-for="' + propName + '"]');
       if (!box) return;
       const preview = box.querySelector('[data-sb-preview]');
+      const warnEl = box.querySelector('[data-sb-warn]');
       const readParts = () => ({
         kind: box.querySelector('[data-sb="kind"]').value || 'browser',
         app: box.querySelector('[data-sb="app"]').value || '',
@@ -933,11 +1042,39 @@ export function getDesignerHtml(
         name: box.querySelector('[data-sb="name"]').value || '',
         idx: box.querySelector('[data-sb="idx"]').value || ''
       });
+      const syncWarn = (built) => {
+        if (!warnEl) return;
+        const placeholder = isPlaceholderSel(built);
+        warnEl.classList.toggle('ok', !placeholder);
+        warnEl.textContent = placeholder
+          ? 'Selector is empty or still a starter — set Id / aaname / Name before Windows run.'
+          : 'Selector looks specific enough to try on Windows.';
+      };
+      const applyLive = (opts) => {
+        const built = buildWindowsSelector(readParts());
+        const target = root.querySelector('[data-prop="' + propName + '"]');
+        if (target) target.value = built;
+        node.properties[propName] = built;
+        if (preview) preview.textContent = built;
+        syncWarn(built);
+        const cardSum = document.querySelector('.card.selected .card-summary');
+        if (cardSum) cardSum.textContent = summary(node);
+        const cardWarn = document.querySelector('.card.selected .card-warn');
+        if (cardWarn) {
+          cardWarn.style.display = isPlaceholderSel(built) ? '' : 'none';
+          cardWarn.textContent = 'Needs a real selector';
+        }
+        vscode.postMessage({ type: 'edit', workflow: state.workflow });
+        if (opts && opts.toast) toast('Selector applied');
+      };
       const refreshPreview = () => {
         if (preview) preview.textContent = buildWindowsSelector(readParts());
       };
       box.querySelectorAll('[data-sb]').forEach(el => {
-        el.addEventListener('input', refreshPreview);
+        el.addEventListener('input', () => {
+          if (el.getAttribute('data-sb') === 'template') return;
+          applyLive();
+        });
         el.addEventListener('change', () => {
           if (el.getAttribute('data-sb') === 'template' && el.value) {
             const tpl = SELECTOR_TEMPLATES.find(t => t.id === el.value);
@@ -948,29 +1085,21 @@ export function getDesignerHtml(
                 const input = box.querySelector('[data-sb="' + k + '"]');
                 if (input) input.value = merged[k] == null ? '' : String(merged[k]);
               });
-              refreshPreview();
+              applyLive({ toast: true });
             }
-          } else if (el.getAttribute('data-sb') === 'kind') {
-            const next = emptySelParts(el.value);
-            Object.keys(next).forEach(k => {
-              const input = box.querySelector('[data-sb="' + k + '"]');
-              if (input && k !== 'kind') input.value = next[k];
-            });
-            refreshPreview();
-          } else {
-            refreshPreview();
+            return;
           }
+          if (el.getAttribute('data-sb') === 'kind') {
+            // Keep overlapping fields — switching Kind must not wipe Id / aaname / Title.
+            applyLive();
+            return;
+          }
+          applyLive();
         });
       });
-      box.querySelector('[data-sb-apply]')?.addEventListener('click', () => {
-        const built = buildWindowsSelector(readParts());
-        const target = root.querySelector('[data-prop="' + propName + '"]');
-        if (target) target.value = built;
-        node.properties[propName] = built;
-        refreshPreview();
-        toast('Selector applied');
-        persist(true);
-      });
+      box.querySelector('[data-sb-apply]')?.addEventListener('click', () => applyLive({ toast: true }));
+      syncWarn(node.properties[propName] || '');
+      refreshPreview();
     }
 
     function applyPropsPanelLayout() {
@@ -1172,6 +1301,8 @@ export function getDesignerHtml(
       const openBtn = node.type === 'REFramework.InvokeWorkflow'
         ? '<button class="icon-btn" data-act="open" title="Open workflow in new tab">↗</button>'
         : '';
+      const needsSelector = !!(def?.properties || []).some(p => p.name === 'selector' && p.required);
+      const selMissing = needsSelector && isPlaceholderSel(node.properties?.selector);
       card.innerHTML =
         '<div class="card-accent" style="background:' + color + '"></div>' +
         '<div class="card-actions">' +
@@ -1182,7 +1313,10 @@ export function getDesignerHtml(
         '</div>' +
         '<div class="card-head"><span class="step">#' + stepNo + '</span>' +
         '<div class="card-title">' + escapeHtml(node.displayName) + '</div></div>' +
-        '<div class="card-summary">' + escapeHtml(summary(node)) + '</div>';
+        '<div class="card-summary">' + escapeHtml(summary(node)) + '</div>' +
+        (needsSelector
+          ? '<div class="card-warn"' + (selMissing ? '' : ' style="display:none"') + '>Needs a real selector</div>'
+          : '');
       card.addEventListener('mouseenter', (e) => showTip(tipHtml(node), e.clientX, e.clientY));
       card.addEventListener('mousemove', (e) => showTip(tipHtml(node), e.clientX, e.clientY));
       card.addEventListener('mouseleave', hideTip);
@@ -1260,6 +1394,16 @@ export function getDesignerHtml(
       els.sequence.style.display = '';
       els.flowStage.style.display = 'none';
       els.sequence.innerHTML = '';
+      if (!state.workflow.activities.length) {
+        const empty = document.createElement('div');
+        empty.className = 'canvas-empty';
+        empty.innerHTML =
+          '<h3>Start your sequence</h3>' +
+          '<p>Drag an activity from the left palette onto this board — or double-click one to append.</p>';
+        els.sequence.appendChild(empty);
+        els.sequence.appendChild(dropZone('root'));
+        return;
+      }
       renderList(state.workflow.activities, els.sequence, 'root');
     }
 
@@ -1547,9 +1691,27 @@ export function getDesignerHtml(
 
       let activity = '';
       const selectorProps = [];
+      const mode = String(node.properties?.mode || 'Browser');
       for (const p of (def?.properties || [])) {
+        if (node.type === 'UI.UseApplicationBrowser') {
+          if (p.name === 'browserType' && mode !== 'Browser') continue;
+        }
         const val = node.properties?.[p.name] ?? '';
-        activity += fieldHtml(p.label, renderPropInput(p, val, node), p.required);
+        let label = p.label;
+        if (node.type === 'UI.UseApplicationBrowser' && p.name === 'urlOrPath') {
+          label = mode === 'Application' ? 'Application Path' : 'URL';
+        }
+        if (p.name === 'selectorModern') {
+          const hasModern = String(val || '').trim();
+          const body = fieldHtml(label, renderPropInput(p, val, node));
+          if (hasModern) {
+            activity += body;
+          } else {
+            activity += '<details class="modern-sel"><summary>Modern Selector (advanced) — usually leave blank</summary>' + body + '</details>';
+          }
+          continue;
+        }
+        activity += fieldHtml(label, renderPropInput(p, val, node), p.required);
         if (p.name === 'selector') {
           activity += selectorBuilderHtml(p.name, val);
           selectorProps.push(p.name);

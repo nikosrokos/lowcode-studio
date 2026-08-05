@@ -84,7 +84,41 @@ export function isPlaceholderSelector(selector: string): boolean {
   if (!s) {
     return true;
   }
-  return /<target\b/i.test(s) || s === '<target />';
+  if (/<target\b/i.test(s) || s === '<target />') {
+    return true;
+  }
+  // Stock LCS example selectors — look finished but are not captured targets
+  if (
+    /id=['"]btnSubmit['"]/i.test(s) ||
+    /id=['"]input['"]/i.test(s) ||
+    /id=['"]label['"]/i.test(s) ||
+    /id=['"]popup['"]/i.test(s) ||
+    /id=['"]chkAgree['"]/i.test(s) ||
+    /id=['"]menu['"]/i.test(s) ||
+    /id=['"]cmbCountry['"]/i.test(s) ||
+    /id=['"]element['"]/i.test(s)
+  ) {
+    return true;
+  }
+  // Browser selector with no identifying attribute
+  if (/<webctrl\b/i.test(s)) {
+    const hasId = /\bid\s*=/i.test(s);
+    const hasName = /\b(?:aaname|name)\s*=/i.test(s);
+    const hasIdx = /\bidx\s*=/i.test(s);
+    if (!hasId && !hasName && !hasIdx) {
+      return true;
+    }
+  }
+  // Desktop selector with only a generic app.exe and no title/cls/name
+  if (/<wnd\b/i.test(s) && /app=['"]app\.exe['"]/i.test(s)) {
+    const hasCls = /\bcls\s*=/i.test(s);
+    const hasTitle = /\btitle\s*=\s*['"](?!\*)['"]/i.test(s);
+    const hasName = /\bname\s*=/i.test(s);
+    if (!hasCls && !hasTitle && !hasName) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function netTfmForTarget(target: UiPathTargetFramework): string {

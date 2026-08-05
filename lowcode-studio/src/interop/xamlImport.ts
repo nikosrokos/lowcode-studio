@@ -743,33 +743,63 @@ function mapActivity(
     };
   }
 
-  // Use Application/Browser — treat as open + nested body
+  // Use Application/Browser — modern UI scope with nested body (must stay a container)
   if (
     localName === 'UseApplicationBrowser' ||
     localName === 'NApplicationCard' ||
-    localName === 'OpenBrowser'
+    localName === 'ApplicationCard' ||
+    localName === 'UseBrowser'
   ) {
     const kids = collectActivities(
-      raw['Body'] || raw['UseApplicationBrowser.Body'] || raw['NApplicationCard.Body'] || raw,
+      raw['Body'] ||
+        raw['UseApplicationBrowser.Body'] ||
+        raw['NApplicationCard.Body'] ||
+        raw['ApplicationCard.Body'] ||
+        raw,
       warnings
     );
+    const attachMode = String(
+      raw['@_AttachMode'] || raw['@_Mode'] || extractArgument(raw, 'AttachMode') || 'Browser'
+    );
+    const mode = /application/i.test(attachMode) ? 'Application' : 'Browser';
     return {
       id: newId(),
-      type: 'UI.OpenApplication',
+      type: 'UI.UseApplicationBrowser',
       displayName,
       properties: applySelectorProps(
         {
-          pathOrUrl: cleanExpr(
+          mode,
+          urlOrPath: cleanExpr(
             raw['@_Url'] ||
               raw['@_FilePath'] ||
               extractArgument(raw, 'Url') ||
               extractArgument(raw, 'FilePath') ||
-              'https://example.com'
+              (mode === 'Browser' ? 'https://example.com' : '')
+          ),
+          browserType: String(raw['@_BrowserType'] || extractArgument(raw, 'BrowserType') || 'Chrome'),
+          open: String(raw['@_OpenMode'] || raw['@_Open'] || 'IfNotOpen'),
+          close: String(raw['@_CloseMode'] || raw['@_Close'] || 'Never'),
+          inputMethod: fromXamlInteractionMode(
+            String(raw['@_InteractionMode'] || extractArgument(raw, 'InteractionMode') || '')
           )
         },
         extractSelectorProps(raw)
       ),
       children: kids.length ? kids : undefined
+    };
+  }
+
+  // Classic Open Browser (non-scope) — keep as Open Application stub
+  if (localName === 'OpenBrowser') {
+    return {
+      id: newId(),
+      type: 'UI.OpenApplication',
+      displayName,
+      properties: {
+        pathOrUrl: cleanExpr(
+          raw['@_Url'] || extractArgument(raw, 'Url') || 'https://example.com'
+        )
+      }
     };
   }
 
@@ -784,6 +814,7 @@ function mapActivity(
     // Containers that may carry body children
     if (
       mapped === 'ControlFlow.RetryScope' ||
+      mapped === 'UI.UseApplicationBrowser' ||
       mapped === 'UI.OpenApplication' ||
       mapped === 'Data.ForEachRow' ||
       mapped === 'ControlFlow.Switch' ||
