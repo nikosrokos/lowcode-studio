@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { getStudioWebLocalSyncStatus } from '../interop/studioWebLocal';
 
 type ItemKind = 'project' | 'folder' | 'workflow' | 'file' | 'info' | 'solution';
 
@@ -117,6 +118,13 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
             item.description = 'active';
             item.iconPath = new vscode.ThemeIcon('root-folder-opened');
           }
+          const syncTop = getStudioWebLocalSyncStatus(dir);
+          if (syncTop.linked && !syncTop.inSync) {
+            item.description = item.description
+              ? `${item.description} · out of sync`
+              : 'out of sync';
+            item.tooltip = `${dir}\n${syncTop.summary}`;
+          }
           item.command = {
             command: 'lowcodeStudio.setActiveProject',
             title: 'Set Active Project',
@@ -165,15 +173,29 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
       // Linked Studio Web solution nested under its LCS project (not a duplicate top-level root)
       const linked = readLinkedSolution(dir);
       if (linked && !this.isHidden(linked)) {
+        const sync = getStudioWebLocalSyncStatus(dir);
+        const outOfSync = sync.linked && !sync.inSync;
         const sol = new ProjectTreeItem(
           `${path.basename(linked)} (Studio Web)`,
           linked,
           vscode.TreeItemCollapsibleState.Collapsed,
           'solution'
         );
-        sol.description = 'linked';
-        sol.iconPath = new vscode.ThemeIcon('cloud');
-        sol.tooltip = linked;
+        sol.description = outOfSync ? 'linked · out of sync' : 'linked';
+        sol.iconPath = new vscode.ThemeIcon(outOfSync ? 'warning' : 'cloud');
+        const staleHint = outOfSync
+          ? '\n' +
+            sync.stale
+              .slice(0, 8)
+              .map(
+                (s) =>
+                  `• ${s.workflowRel} (${s.reason === 'missing-xaml' ? 'missing .xaml' : 'LCS newer'})`
+              )
+              .join('\n') +
+            (sync.stale.length > 8 ? `\n… +${sync.stale.length - 8} more` : '') +
+            '\nSave a workflow or run Connect → Sync to refresh.'
+          : '';
+        sol.tooltip = `${linked}\n${sync.summary}${staleHint}`;
         items.push(sol);
       }
 

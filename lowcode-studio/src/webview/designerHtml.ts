@@ -758,6 +758,31 @@ export function getDesignerHtml(
       border: 1px solid var(--input-border); border-radius: 8px; padding: 6px 8px;
       resize: vertical;
     }
+    .studio-web-check {
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .studio-web-check .swc-row {
+      display: flex; gap: 8px; align-items: flex-start;
+      font-size: 11px; line-height: 1.35;
+      padding: 6px 8px; border-radius: 8px;
+      background: color-mix(in srgb, var(--bg) 70%, transparent);
+      border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+    }
+    .studio-web-check .swc-row.ok {
+      border-color: color-mix(in srgb, #16a34a 35%, var(--border));
+    }
+    .studio-web-check .swc-row.bad {
+      border-color: color-mix(in srgb, #d97706 45%, var(--border));
+    }
+    .studio-web-check .swc-mark {
+      flex: 0 0 auto; font-weight: 700; min-width: 14px;
+    }
+    .studio-web-check .swc-row.ok .swc-mark { color: #16a34a; }
+    .studio-web-check .swc-row.bad .swc-mark { color: #d97706; }
+    .studio-web-check .swc-text { flex: 1; min-width: 0; }
+    .studio-web-check .swc-summary {
+      font-size: 11px; color: var(--muted); margin: 0 0 4px;
+    }
     .modern-sel {
       margin: 0 0 12px; padding: 8px 10px; border-radius: 8px;
       border: 1px dashed color-mix(in srgb, var(--border) 85%, transparent);
@@ -2667,6 +2692,70 @@ export function getDesignerHtml(
       return '<input data-prop="' + escapeAttr(p.name) + '" value="' + escapeAttr(String(val)) + '"' + listAttr + ' />' + datalist + suggestChipsHtml(node, p);
     }
 
+    function studioWebChecklistHtml(node, def) {
+      const items = [];
+      const props = def?.properties || [];
+      for (const p of props) {
+        if (!p.required) continue;
+        if (node.type === 'UI.UseApplicationBrowser' && p.name === 'browserType' && String(node.properties?.mode || 'Browser') !== 'Browser') {
+          continue;
+        }
+        const val = node.properties?.[p.name];
+        const ok = val !== undefined && val !== null && String(val).trim() !== '';
+        items.push({
+          ok: ok,
+          text: ok
+            ? 'Required “' + p.label + '” is set'
+            : 'Set required “' + p.label + '” before Studio Web publish'
+        });
+      }
+      const hasSelector = props.some(p => p.name === 'selector');
+      if (hasSelector && String(node.type || '').startsWith('UI.') && node.type !== 'UI.OpenApplication' && node.type !== 'UI.TakeScreenshot') {
+        const q = scoreSelector(node.properties?.selector);
+        const ok = q.level === 'ok' || q.level === 'strong';
+        items.push({
+          ok: ok,
+          text: ok
+            ? 'Selector looks ready for Windows (score ' + q.score + ')'
+            : (q.cardMessage || 'Fix selector for Studio Web / Windows robot')
+        });
+      }
+      if (node.type === 'REFramework.InvokeWorkflow') {
+        const wp = String(node.properties?.workflowPath || '').trim();
+        const known = (state.suggestions?.workflowPaths || []).map(String);
+        const ok = !!wp && (known.length === 0 || known.some(k => k === wp || k.endsWith('/' + wp) || k.endsWith('\\\\' + wp)));
+        items.push({
+          ok: !!wp,
+          text: wp
+            ? (ok ? 'Invoke path set: ' + wp : 'Invoke path set — confirm file exists in project')
+            : 'Invoke Workflow needs a workflow path'
+        });
+      }
+      if (String(node.type || '').startsWith('Imported.')) {
+        items.push({
+          ok: false,
+          text: 'Imported.* type — map to a real LCS activity before Studio Web round-trip'
+        });
+      }
+      if (!def) {
+        items.push({ ok: false, text: 'Unknown activity type — Studio Web may not restore it' });
+      }
+      if (!items.length) {
+        return '<div class="studio-web-check"><div class="swc-summary">No Studio Web blockers for this activity.</div>' +
+          '<div class="swc-row ok"><span class="swc-mark">✓</span><span class="swc-text">Ready to sync / publish</span></div></div>';
+      }
+      const bad = items.filter(i => !i.ok).length;
+      const summary = bad
+        ? bad + ' item(s) to fix before Studio Web is happy with this step'
+        : 'All checks passed for this activity';
+      return '<div class="studio-web-check"><div class="swc-summary">' + escapeHtml(summary) + '</div>' +
+        items.map(i =>
+          '<div class="swc-row ' + (i.ok ? 'ok' : 'bad') + '"><span class="swc-mark">' + (i.ok ? '✓' : '!') +
+          '</span><span class="swc-text">' + escapeHtml(i.text) + '</span></div>'
+        ).join('') +
+        '</div>';
+    }
+
     function renderProps() {
       syncSuggestionVariables();
       const hit = state.selectedId ? walkFind(state.workflow.activities, state.selectedId) : null;
@@ -2732,8 +2821,11 @@ export function getDesignerHtml(
         flow += '<div class="field"><button class="btn" id="btnSetStart" type="button">Use as flowchart start</button></div>';
       }
 
+      const studioWeb = studioWebChecklistHtml(node, def);
+
       let html = propSection('general', 'General', general);
       html += propSection('activity', 'Activity', activity);
+      html += propSection('studioWeb', 'Required for Studio Web', studioWeb);
       if (flow) html += propSection('flow', 'Flowchart', flow);
       els.props.innerHTML = html;
 
@@ -3181,7 +3273,7 @@ export function getDesignerHtml(
       renderProps();
     });
     document.getElementById('btnCollapseProps')?.addEventListener('click', () => {
-      state.collapsedPropSections = { general: true, activity: true, flow: true };
+      state.collapsedPropSections = { general: true, activity: true, studioWeb: true, flow: true };
       renderProps();
     });
     document.getElementById('btnToggleConnections')?.addEventListener('click', () => {

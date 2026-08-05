@@ -131,9 +131,15 @@ export function resolveUiPathDependencies(options: {
   versions?: Record<string, string>;
   /** Extra NuGet packages from custom activity registrations */
   extraPackages?: Record<string, string>;
+  /**
+   * When false, omit packages that have no catalog default instead of inventing
+   * a silent `[1.0.0]` pin. Default true for backward-compatible export.
+   */
+  allowDefaultPins?: boolean;
 }): Record<string, string> {
   const versions = { ...DEFAULT_PACKAGE_VERSIONS, ...(options.versions || {}) };
   const packages = new Set<string>();
+  const allowDefaultPins = options.allowDefaultPins !== false;
 
   if (options.includeBaseline !== false) {
     for (const p of BASELINE_PACKAGES) {
@@ -158,20 +164,36 @@ export function resolveUiPathDependencies(options: {
   // Preserve imported versions first (Studio already validated them)
   for (const [name, ver] of Object.entries(options.preserved || {})) {
     if (name.startsWith('UiPath.') || name.includes('Activities') || name.includes('.')) {
-      result[name] = normalizeVersion(ver);
+      const normalized = normalizeVersion(ver, {
+        allowDefaultPins,
+        fallback: versions[name]
+      });
+      if (normalized) {
+        result[name] = normalized;
+      }
     }
   }
 
   // Custom activity NuGet packages
   for (const [name, ver] of Object.entries(options.extraPackages || {})) {
-    result[name] = normalizeVersion(ver);
+    const normalized = normalizeVersion(ver, {
+      allowDefaultPins,
+      fallback: versions[name]
+    });
+    if (normalized) {
+      result[name] = normalized;
+    }
     packages.add(name);
   }
 
-  // Ensure required packages exist (fill defaults when missing)
+  // Ensure required packages exist (prefer catalog; avoid silent [1.0.0] when disabled)
   for (const name of packages) {
     if (!result[name]) {
-      result[name] = versions[name] || '[1.0.0]';
+      if (versions[name]) {
+        result[name] = versions[name];
+      } else if (allowDefaultPins) {
+        result[name] = '[1.0.0]';
+      }
     }
   }
 
@@ -179,10 +201,17 @@ export function resolveUiPathDependencies(options: {
   return Object.fromEntries(Object.entries(result).sort(([a], [b]) => a.localeCompare(b)));
 }
 
-function normalizeVersion(ver: string): string {
-  const v = String(ver).trim();
+function normalizeVersion(
+  ver: string,
+  opts: { allowDefaultPins?: boolean; fallback?: string } = {}
+): string {
+  const allowDefaultPins = opts.allowDefaultPins !== false;
+  const v = String(ver || '').trim();
   if (!v) {
-    return '[1.0.0]';
+    if (opts.fallback) {
+      return opts.fallback;
+    }
+    return allowDefaultPins ? '[1.0.0]' : '';
   }
   if (v.startsWith('[') || v.startsWith('(')) {
     return v;

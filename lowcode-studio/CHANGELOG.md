@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.28] — 2026-08-05
+
+### Added
+- **A4** Out-of-sync badge on linked Studio Web Local Workspace (Project Explorer)
+- **D2** “Required for Studio Web” checklist on the selected activity (Properties)
+- **E2** Manage Packages UI — edit NuGet pins; stop treating silent `[1.0.0]` as fine
+- **D3** First-run wizard: REF → Scenario → Connect (also offered on first activate)
+
 ## [0.6.27] — 2026-08-05
 
 ### Added
