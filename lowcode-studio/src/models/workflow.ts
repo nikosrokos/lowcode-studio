@@ -225,6 +225,16 @@ export function parseWorkflow(text: string): WorkflowDocument {
 
 function normalizeActivity(a: ActivityNode): ActivityNode {
   const id = String(a?.id || '').trim() || newId();
+  const children = Array.isArray(a.children)
+    ? a.children.map(normalizeActivity)
+    : a.children != null
+      ? [normalizeActivity(a.children as ActivityNode)]
+      : undefined;
+  const elseChildren = Array.isArray(a.elseChildren)
+    ? a.elseChildren.map(normalizeActivity)
+    : a.elseChildren != null
+      ? [normalizeActivity(a.elseChildren as ActivityNode)]
+      : undefined;
   return {
     ...a,
     id,
@@ -233,10 +243,8 @@ function normalizeActivity(a: ActivityNode): ActivityNode {
     color: typeof a.color === 'string' && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(a.color)
       ? a.color
       : undefined,
-    children: Array.isArray(a.children) ? a.children.map(normalizeActivity) : a.children,
-    elseChildren: Array.isArray(a.elseChildren)
-      ? a.elseChildren.map(normalizeActivity)
-      : a.elseChildren
+    children,
+    elseChildren
   };
 }
 

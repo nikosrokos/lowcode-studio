@@ -56,6 +56,10 @@ function run(): void {
   assert.ok(html.includes('function applySyncStatus'), 'applies syncStatus from host');
   assert.ok(html.includes("type: 'pullStudioWeb'"), 'Sync posts pullStudioWeb');
   assert.ok(html.includes('id="syncPill"'), 'sync status pill');
+  assert.ok(html.includes('function resolveSelectedNode'), 'props resolve via live selected node');
+  assert.ok(html.includes('showCtxMenu(x, y, activityId, nodeRef)'), 'ctx menu receives live node');
+  assert.ok(html.includes("showCtxMenu(e.clientX, e.clientY, node.id, node)"), 'card ctx passes node');
+  assert.ok(html.includes('selectedNode'), 'selectedNode kept for SW sync props paint');
 
   console.log('designerUxFixes.test.ts: ok');
 }

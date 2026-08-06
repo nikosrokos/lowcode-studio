@@ -299,8 +299,26 @@ function collectActivities(
   const obj = node as Record<string, unknown>;
   const results: ActivityNode[] = [];
 
-  // If this object is itself a Sequence wrapper, dive into children in document order
-  if (obj.Sequence) {
+  // Body wrappers are often a lone <Sequence> — dive in so container.children
+  // get the real activities. When Sequence is a sibling among other activities
+  // (Studio Web Main), keep every sibling (do not early-return).
+  const activityKeys = Object.keys(obj).filter((key) => {
+    if (key.startsWith('@_') || key === '#text' || key.endsWith('.Variables')) {
+      return false;
+    }
+    if (
+      key.endsWith('.ViewState') ||
+      key.endsWith('.HintSize') ||
+      key === 'WorkflowViewStateService.ViewState'
+    ) {
+      return false;
+    }
+    if (key.includes('.')) {
+      return false;
+    }
+    return true;
+  });
+  if (activityKeys.length === 1 && activityKeys[0] === 'Sequence') {
     return collectActivities(obj.Sequence, warnings, depth);
   }
 
@@ -1619,6 +1637,30 @@ function pickCommonProps(
       props.inputMethod = interaction;
     }
   }
+  if (mapped === 'Data.BuildDataTable') {
+    const cols =
+      raw['@_ColumnNames'] ||
+      raw['@_Columns'] ||
+      extractArgument(raw, 'ColumnNames') ||
+      extractArgument(raw, 'Columns');
+    if (cols) {
+      props.columns = String(cleanExpr(cols)).replace(/^"|"$/g, '');
+    } else if (!props.columns) {
+      props.columns = 'Name,Amount,Status';
+    }
+    const dtResult =
+      raw['@_DataTable'] ||
+      extractArgument(raw, 'DataTable') ||
+      raw['@_Result'] ||
+      extractArgument(raw, 'Result') ||
+      result;
+    if (dtResult) {
+      props.result = stripBrackets(cleanExpr(dtResult));
+    }
+    // Drop import-only note when we have real catalog props
+    delete props.note;
+  }
+
   if (mapped === 'Flowchart.FlowSwitch') {
     props.expression = cleanExpr(
       raw['@_Expression'] || extractArgument(raw, 'Expression') || 'key'

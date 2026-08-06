@@ -68,9 +68,23 @@ function run(): void {
         metadata: {}
       })
     );
-    const child = doc.activities[0].children![0];
-    assert.strictEqual(child.properties.message, 'x');
-    assert.strictEqual(child.properties.level, 'Info');
+    // Singleton Sequence unwraps so Log Message is a top-level click target
+    assert.strictEqual(doc.activities.length, 1);
+    assert.strictEqual(doc.activities[0].type, 'System.LogMessage');
+    assert.strictEqual(doc.activities[0].properties.message, 'x');
+    assert.strictEqual(doc.activities[0].properties.level, 'Info');
+  }
+
+  {
+    const node = normalizeActivityNode({
+      id: 'bdt',
+      type: 'Data.BuildDataTable',
+      displayName: 'Build Data Table',
+      properties: { Columns: 'A,B', Result: 'dtOrders', note: 'Imported from BuildDataTable' }
+    });
+    assert.strictEqual(node.properties.columns, 'A,B');
+    assert.strictEqual(node.properties.result, 'dtOrders');
+    assert.strictEqual(node.properties.Columns, undefined);
   }
 
   {
