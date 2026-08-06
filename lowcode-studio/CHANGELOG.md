@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.49] — 2026-08-06
+
+### Security
+- Replaced SheetJS **`xlsx`** (high: prototype pollution + ReDoS; no upstream fix) with a minimal Config.xlsx OOXML bridge on **adm-zip** + **fast-xml-parser** already used by the extension — `npm audit` no longer reports the xlsx advisories
+
 ## [0.6.48] — 2026-08-06
 
 ### Fixed

@@ -16,7 +16,7 @@ esbuild
   .then(() => {
     const fs = require('fs');
     fs.renameSync('out/extension.bundled.js', 'out/extension.js');
-    console.log('Bundled extension.js (includes adm-zip + fast-xml-parser + xlsx)');
+    console.log('Bundled extension.js (includes adm-zip + fast-xml-parser)');
   })
   .catch((err) => {
     console.error(err);

@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as XLSX from 'xlsx';
+import { readWorkbookRows, writeWorkbookAoa } from './configXlsxOoxml';
 
 export const CONFIG_JSON_REL = 'Data/Config.json';
 export const CONFIG_XLSX_REL = 'Data/Config.xlsx';
@@ -28,9 +28,10 @@ export interface SyncResult {
  * Convert LowCode Studio Config.json object → classic REFramework Config.xlsx buffer.
  * - Settings / Constants / other dict sheets → Name | Value
  * - Assets → Name | Asset | OrchestratorFolder
+ *
+ * Uses a minimal OOXML writer (adm-zip) — not SheetJS `xlsx` (GHSA-4r6h-8v6p-xvw6 / GHSA-5pgg-2g8v-p4x9).
  */
 export function configJsonToXlsxBuffer(config: Record<string, unknown>): Buffer {
-  const wb = XLSX.utils.book_new();
   const extraSheets = Object.keys(config).filter(
     (s) =>
       !CLASSIC_NAME_VALUE_SHEETS.includes(s as (typeof CLASSIC_NAME_VALUE_SHEETS)[number]) &&
@@ -38,6 +39,7 @@ export function configJsonToXlsxBuffer(config: Record<string, unknown>): Buffer 
   );
   // Classic order: Settings, Constants, Assets, then any extras (Endpoints, …)
   const uniqueSheets = [...CLASSIC_NAME_VALUE_SHEETS, ASSETS_SHEET, ...extraSheets];
+  const sheets: Array<{ name: string; aoa: Array<Array<string | number | boolean>> }> = [];
 
   for (const sheetName of uniqueSheets) {
     const section = config[sheetName];
@@ -47,8 +49,10 @@ export function configJsonToXlsxBuffer(config: Record<string, unknown>): Buffer 
           ? (section as Record<string, unknown>)
           : {}
       );
-      const aoa = [['Name', 'Asset', 'OrchestratorFolder'], ...rows];
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), sheetName);
+      sheets.push({
+        name: sheetName,
+        aoa: [['Name', 'Asset', 'OrchestratorFolder'], ...rows]
+      });
       continue;
     }
 
@@ -57,28 +61,21 @@ export function configJsonToXlsxBuffer(config: Record<string, unknown>): Buffer 
         ? (section as Record<string, unknown>)
         : {};
     const rows = objectToNameValueRows(obj);
-    const aoa = [['Name', 'Value'], ...rows];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), sheetName);
+    sheets.push({
+      name: sheetName,
+      aoa: [['Name', 'Value'], ...rows]
+    });
   }
 
-  const out = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
-  return Buffer.isBuffer(out) ? out : Buffer.from(out);
+  return writeWorkbookAoa(sheets);
 }
 
 /** Parse classic (or LCS-exported) Config.xlsx → Config.json object. */
 export function configXlsxBufferToJson(buffer: Buffer | Uint8Array): Record<string, unknown> {
-  const wb = XLSX.read(buffer, { type: 'buffer', cellDates: true });
+  const workbook = readWorkbookRows(buffer);
   const config: Record<string, unknown> = {};
 
-  for (const sheetName of wb.SheetNames) {
-    const sheet = wb.Sheets[sheetName];
-    if (!sheet) {
-      continue;
-    }
-    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
-      defval: '',
-      raw: false
-    });
+  for (const { name: sheetName, rows } of workbook) {
     if (sheetName === ASSETS_SHEET || looksLikeAssetsSheet(rows)) {
       config[sheetName === ASSETS_SHEET ? ASSETS_SHEET : sheetName] = rowsToAssetsObject(rows);
       continue;
