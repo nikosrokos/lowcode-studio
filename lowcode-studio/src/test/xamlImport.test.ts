@@ -179,6 +179,51 @@ function run(): void {
     'BuildDataTable has catalog props, not only note: ' + JSON.stringify(bdt!.properties)
   );
 
+  // Studio Web edited LogMessage uses VisualBasicValue ExpressionText (not @_Message)
+  const swEdited = importXaml(
+    `<?xml version="1.0" encoding="utf-8"?>
+<Activity xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities"
+ xmlns:ui="http://schemas.uipath.com/workflow/activities"
+ xmlns:mva="clr-namespace:Microsoft.VisualBasic.Activities;assembly=System.Activities"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Sequence DisplayName="Main">
+    <ui:LogMessage DisplayName="Log Message" Level="Info">
+      <ui:LogMessage.Message>
+        <InArgument x:TypeArguments="x:String">
+          <mva:VisualBasicValue x:TypeArguments="x:String" ExpressionText="&quot;from studio web&quot;" />
+        </InArgument>
+      </ui:LogMessage.Message>
+    </ui:LogMessage>
+    <Assign DisplayName="Assign">
+      <Assign.To>
+        <OutArgument x:TypeArguments="x:String">
+          <mva:VisualBasicReference x:TypeArguments="x:String" ExpressionText="result" />
+        </OutArgument>
+      </Assign.To>
+      <Assign.Value>
+        <InArgument x:TypeArguments="x:String">
+          <mva:VisualBasicValue x:TypeArguments="x:String" ExpressionText="&quot;hello&quot;" />
+        </InArgument>
+      </Assign.Value>
+    </Assign>
+  </Sequence>
+</Activity>`,
+    'SwEdited'
+  );
+  const swLog = swEdited.workflow.activities.find((a) => a.type === 'System.LogMessage');
+  assert.ok(swLog, 'SW LogMessage imported');
+  assert.ok(
+    String(swLog!.properties.message || '').includes('from studio web'),
+    'ExpressionText Message imported: ' + JSON.stringify(swLog!.properties)
+  );
+  const swAssign = swEdited.workflow.activities.find((a) => a.type === 'Programming.Assign');
+  assert.ok(swAssign, 'SW Assign imported');
+  assert.ok(
+    String(swAssign!.properties.value || '').includes('hello') ||
+      String(swAssign!.properties.to || '').includes('result'),
+    'Assign ExpressionText imported: ' + JSON.stringify(swAssign!.properties)
+  );
+
   console.log(
     `xamlImport.test.ts: ok (${workflow.activities.length} activities, ${warnings.length} warnings)`
   );

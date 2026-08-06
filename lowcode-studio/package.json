@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Mac-first low-code RPA for VS Code/Cursor: REFramework design, scenario dry-runs (Shift+F5), and the easiest Connect to Studio Web handoff for Orchestrator publish.",
-  "version": "0.6.47",
+  "version": "0.6.48",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -759,6 +759,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@vscode/codicons": "^0.0.46-24",
     "adm-zip": "^0.6.0",
     "fast-xml-parser": "^5.10.1",
     "xlsx": "^0.18.5"
