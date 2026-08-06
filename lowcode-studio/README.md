@@ -169,12 +169,14 @@ See [docs/ACTIVITIES.md](docs/ACTIVITIES.md). Invoke Code / UI steps are dry-run
 - **F0–F4** Assist: Explain, scenarios, **F2 scaffold + dry-run-trace repair**, selectors, VB repairs
 - Designer **Assist Live / Scaffold** tabs with propose → Apply
 
-### Next (5)
-1. Richer F2 scaffolds (containers/branches from description)
-2. Marketplace publish packaging
-3. Optional Orchestrator publish path (explore; don’t promise)
-4. Multi-file Assist scaffold + bulk VB pass across project
-5. More Studio Web aliases (Integration Service / Testing pack)
+### Next (5) — E2E UX, Local Workspace as-is
+1. **Invoke / Arguments mapping** — stop finishing contracts in Studio Web
+2. **Ready for Studio Web?** gate (project-wide Assist + packages + selectors)
+3. Multi-file Assist (bulk VB / required / selectors) + richer F2 scaffolds
+4. Sync conflict clarity when Studio Web edits the same solution
+5. Next import-map / Excel–Orchestrator parity (fewer `Imported.*`)
+
+Full plan: [docs/ROADMAP.md](docs/ROADMAP.md)
 
 ## License
 
