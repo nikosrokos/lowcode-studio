@@ -1,3 +1,5 @@
+import { normalizeWorkflowDocument } from '../interop/activityNormalize';
+
 export type WorkflowType = 'Sequence' | 'Flowchart';
 
 export type VariableType =
@@ -207,7 +209,7 @@ export function parseWorkflow(text: string): WorkflowDocument {
   if (!raw || raw.schemaVersion !== '1.0' || !Array.isArray(raw.activities)) {
     throw new Error('Invalid LowCode Studio workflow document.');
   }
-  return {
+  return normalizeWorkflowDocument({
     schemaVersion: '1.0',
     name: raw.name || 'Untitled',
     description: raw.description || '',
@@ -218,7 +220,7 @@ export function parseWorkflow(text: string): WorkflowDocument {
     connections: Array.isArray(raw.connections) ? raw.connections : [],
     startActivityId: raw.startActivityId,
     metadata: raw.metadata || {}
-  };
+  });
 }
 
 function normalizeActivity(a: ActivityNode): ActivityNode {

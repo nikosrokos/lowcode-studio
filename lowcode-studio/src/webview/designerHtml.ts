@@ -149,16 +149,33 @@ export function getDesignerHtml(
       min-width: 36px; min-height: 34px; padding: 6px 10px;
       font-size: 16px; line-height: 1;
     }
+    .var-block, .arg-block { margin-bottom: 8px; }
     .var-row, .arg-row {
       display: grid; grid-template-columns: 1fr 86px 28px; gap: 6px; align-items: center;
-      margin-bottom: 6px;
     }
     .arg-row { grid-template-columns: 1fr 64px 78px 28px; }
-    .var-row input, .var-row select, .arg-row input, .arg-row select {
+    .var-row input, .var-row select, .arg-row input, .arg-row select,
+    .var-default input, .arg-default input {
       width: 100%; font-size: 11px; padding: 5px 7px; border-radius: 6px;
       border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text);
       font-family: var(--mono);
     }
+    .var-default, .arg-default {
+      margin-top: 4px; border-radius: 6px;
+      border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+      background: color-mix(in srgb, var(--input-bg) 55%, transparent);
+      padding: 2px 8px 6px;
+    }
+    .var-default summary, .arg-default summary {
+      cursor: pointer; list-style: none; font-size: 10px; font-weight: 650;
+      color: var(--muted); padding: 4px 0; user-select: none;
+    }
+    .var-default summary::-webkit-details-marker,
+    .arg-default summary::-webkit-details-marker { display: none; }
+    .var-default summary::before, .arg-default summary::before {
+      content: '▸ '; font-size: 9px;
+    }
+    .var-default[open] summary::before, .arg-default[open] summary::before { content: '▾ '; }
     .app.hide-summaries .card-summary { display: none; }
     .app.compact-cards .card { padding: 7px 8px 7px 10px; }
     .app.compact-cards .card-title { font-size: 12px; }
@@ -678,11 +695,12 @@ export function getDesignerHtml(
       border: 1px solid transparent; background: transparent; color: var(--muted);
       font-size: 16px; line-height: 1; cursor: pointer; padding: 0;
     }
-    .card-menu:hover, .card.selected .card-menu {
+    .card-menu:hover, .card.selected .card-menu, .flow-node.selected .card-menu {
       color: var(--text);
       background: var(--hover);
       border-color: color-mix(in srgb, var(--border) 80%, transparent);
     }
+    .flow-node .card-menu { top: 4px; right: 4px; }
     .step { font-size: 10px; color: var(--muted); font-family: var(--mono); min-width: 26px; opacity: .75; }
     .card-title { font-size: 12.5px; font-weight: 650; }
     .card-summary {
@@ -736,6 +754,19 @@ export function getDesignerHtml(
       box-shadow: 0 0 0 2px color-mix(in srgb, #ef4444 25%, transparent);
       pointer-events: none;
     }
+    .vb-repair-banner {
+      margin: 0 0 10px; padding: 8px 10px; border-radius: 8px;
+      border: 1px solid color-mix(in srgb, #ef4444 55%, var(--border));
+      background: color-mix(in srgb, #ef4444 10%, transparent);
+      color: #ef4444; font-size: 11px; font-weight: 650; line-height: 1.4;
+    }
+    .vb-repair-banner .vb-apply-all {
+      margin-top: 6px; display: inline-block;
+      border: 1px solid color-mix(in srgb, #ef4444 55%, var(--border));
+      background: color-mix(in srgb, #ef4444 16%, transparent); color: #ef4444;
+      border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; cursor: pointer;
+    }
+    .vb-repair-banner .vb-apply-all:hover { background: color-mix(in srgb, #ef4444 26%, transparent); }
     .vb-repair-hint {
       margin-top: 5px; font-size: 11px; line-height: 1.4; color: #ef4444;
       font-weight: 600;
@@ -817,7 +848,7 @@ export function getDesignerHtml(
     }
     .flow-node.start { border-color: color-mix(in srgb, #22c55e 55%, var(--border)); }
     .flow-node.end { border-color: color-mix(in srgb, #ef4444 45%, var(--border)); }
-    .flow-node .title { font-size: 12px; font-weight: 650; }
+    .flow-node .title { font-size: 12px; font-weight: 650; padding-right: 28px; }
     .flow-node .summary { font-size: 10px; color: var(--muted); margin-top: 4px; }
     .port {
       position: absolute; width: 11px; height: 11px; border-radius: 50%;
@@ -2809,10 +2840,11 @@ export function getDesignerHtml(
         const bpOn = !!state.breakpoints[node.id];
         const bpDot = bpOn ? '<span class="card-bp-dot" title="Breakpoint set — right-click to toggle"></span>' : '';
         if (bpOn) el.classList.add('has-bp');
+        const menuBtn = '<button type="button" class="card-menu" data-card-menu title="Activity menu">⋯</button>';
         if (isDecision) {
-          el.innerHTML = bpDot + '<div class="inner"><div class="title">' + escapeHtml(node.displayName) + '</div><div class="summary">' + escapeHtml(summary(node)) + '</div></div><div class="port" title="Drag to connect"></div>';
+          el.innerHTML = bpDot + menuBtn + '<div class="inner"><div class="title">' + escapeHtml(node.displayName) + '</div><div class="summary">' + escapeHtml(summary(node)) + '</div></div><div class="port" title="Drag to connect"></div>';
         } else {
-          el.innerHTML = bpDot + '<div class="title">' + escapeHtml(node.displayName) + '</div>' +
+          el.innerHTML = bpDot + menuBtn + '<div class="title">' + escapeHtml(node.displayName) + '</div>' +
             (isStart || isEnd ? '' : '<div class="summary">' + escapeHtml(summary(node)) + '</div>') +
             warnHtml +
             (isEnd ? '' : '<div class="port" title="Drag to connect"></div>');
@@ -2821,11 +2853,25 @@ export function getDesignerHtml(
           e.preventDefault();
           e.stopPropagation();
           state.selectedId = node.id;
+          hideTip();
           showCtxMenu(e.clientX, e.clientY, node.id);
+          renderProps();
+        });
+        el.querySelector('[data-card-menu]')?.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        });
+        el.querySelector('[data-card-menu]')?.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          hideTip();
+          const rect = e.currentTarget.getBoundingClientRect();
+          showCtxMenu(rect.left, rect.bottom + 4, node.id);
+          renderProps();
         });
 
         el.addEventListener('mousedown', (e) => {
-          if (e.target.classList.contains('port')) return;
+          if (e.target.classList.contains('port') || e.target.closest('[data-card-menu]')) return;
           state.selectedId = node.id;
           state.draggingId = node.id;
           const pt = stagePoint(e);
@@ -3266,6 +3312,33 @@ export function getDesignerHtml(
       const selectorProps = [];
       const mode = String(node.properties?.mode || 'Browser');
       const catalogPropNames = new Set((def?.properties || []).map((p) => p.name));
+      // Studio Web PascalCase leftovers → catalog keys (in-memory, before paint)
+      node.properties = node.properties || {};
+      const pascalHints = {
+        Message: 'message', Text: 'message', Level: 'level',
+        Condition: 'condition', To: 'to', Value: 'value',
+        Selector: 'selector', Duration: 'durationMs', Url: 'url', URL: 'url'
+      };
+      for (const [from, to] of Object.entries(pascalHints)) {
+        if (
+          (node.properties[to] === undefined || node.properties[to] === null || String(node.properties[to]).trim() === '') &&
+          node.properties[from] != null && String(node.properties[from]).trim() !== ''
+        ) {
+          node.properties[to] = node.properties[from];
+        }
+        if (node.properties[to] !== undefined && from !== to) delete node.properties[from];
+      }
+      const pendingRepairs = vbRepairsForActivity(node);
+      if (pendingRepairs.length) {
+        state.collapsedPropSections.activity = false;
+        activity += '<div class="vb-repair-banner">' +
+          pendingRepairs.length + ' UiPath VB expression repair(s) available' +
+          '<div style="margin-top:4px;font-weight:500;opacity:.9">' +
+          escapeHtml(pendingRepairs.map((r) => r.label + ': ' + (r.labels[0] || 'fix')).join(' · ')) +
+          '</div>' +
+          '<button type="button" class="vb-apply-all" id="btnVbApplyAll">Apply all repairs</button>' +
+          '</div>';
+      }
       for (const p of (def?.properties || [])) {
         if (node.type === 'UI.UseApplicationBrowser') {
           if (p.name === 'browserType' && mode !== 'Browser') continue;
@@ -3302,8 +3375,18 @@ export function getDesignerHtml(
       const extraKeys = Object.keys(node.properties || {}).filter((k) => !catalogPropNames.has(k));
       for (const key of extraKeys) {
         const val = node.properties[key];
-        const synthetic = { name: key, label: key, type: typeof val === 'boolean' ? 'boolean' : (String(val).length > 80 ? 'multiline' : 'string') };
-        activity += fieldHtml(key, renderPropInput(synthetic, val ?? '', node));
+        const strVal = val === undefined || val === null ? '' : (typeof val === 'object' ? JSON.stringify(val) : String(val));
+        const expressionish = /^(condition|message|value|text|expression|url|jsonString|json|arrayRow|subject|body|assignments|argumentMappings|Text|Message|Value|Condition)$/i.test(key)
+          || (typeof val === 'string' && (val.includes('(') || /toUpperCase|toLowerCase|===|&&|\|\|/.test(val)));
+        const synthetic = {
+          name: key,
+          label: key,
+          type: typeof val === 'boolean' ? 'boolean' : (expressionish || strVal.length > 80 ? (expressionish ? 'expression' : 'multiline') : 'string')
+        };
+        activity += fieldHtml(key, renderPropInput(synthetic, typeof val === 'object' && val !== null ? strVal : (val ?? ''), node));
+        if (expressionish && key.toLowerCase() !== 'selector') {
+          activity += vbRepairHintHtml(key, typeof val === 'string' ? val : strVal);
+        }
         if (key === 'selector') {
           activity += selectorBuilderHtml(key, val ?? '');
           selectorProps.push(key);
@@ -3396,6 +3479,14 @@ export function getDesignerHtml(
           workflowPath: String(node.properties?.workflowPath || '')
         });
       });
+      document.getElementById('btnVbApplyAll')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const n = applyVbRepairsToActivity(node);
+        if (!n) { toast('No VB repairs for this activity'); return; }
+        persist(true);
+        toast('Applied ' + n + ' VB expression repair(s)');
+      });
       els.props.querySelectorAll('[data-vb-apply]').forEach((btn) => {
         btn.addEventListener('click', (e) => {
           e.preventDefault();
@@ -3403,7 +3494,10 @@ export function getDesignerHtml(
           const key = btn.getAttribute('data-vb-apply');
           const value = btn.getAttribute('data-vb-value');
           if (!key || value == null) return;
+          node.properties = node.properties || {};
           node.properties[key] = value;
+          const input = els.props.querySelector('[data-prop="' + key + '"]');
+          if (input) input.value = value;
           persist(true);
           toast('Applied VB repair → ' + key);
         });
@@ -3516,16 +3610,23 @@ export function getDesignerHtml(
         els.variablesView.innerHTML = '<div class="empty">No variables yet. Use Add Variable below.</div>';
         return;
       }
-      // Compact single row: name + type (+ delete). Default stays in Properties / watch.
-      els.variablesView.innerHTML = vars.map((v, i) => (
-        '<div class="var-row" title="Default: ' + escapeAttr(v.defaultValue === undefined || v.defaultValue === null ? '' : String(v.defaultValue)) + '">' +
-          '<input data-var="' + i + '" data-field="name" value="' + escapeAttr(v.name) + '" placeholder="Name" />' +
-          '<select data-var="' + i + '" data-field="type" title="Type">' +
-            ['String','Int32','Boolean','Double','Object','DataTable','Array'].map(t => '<option' + (v.type===t?' selected':'') + '>' + t + '</option>').join('') +
-          '</select>' +
-          '<button class="icon-btn" data-del-var="' + i + '" title="Remove">✕</button>' +
-        '</div>'
-      )).join('');
+      // Compact name + type row; default value collapsed under each item
+      els.variablesView.innerHTML = vars.map((v, i) => {
+        const defVal = v.defaultValue === undefined || v.defaultValue === null ? '' : String(v.defaultValue);
+        return '<div class="var-block">' +
+          '<div class="var-row">' +
+            '<input data-var="' + i + '" data-field="name" value="' + escapeAttr(v.name) + '" placeholder="Name" />' +
+            '<select data-var="' + i + '" data-field="type" title="Type">' +
+              ['String','Int32','Boolean','Double','Object','DataTable','Array'].map(t => '<option' + (v.type===t?' selected':'') + '>' + t + '</option>').join('') +
+            '</select>' +
+            '<button class="icon-btn" data-del-var="' + i + '" title="Remove">✕</button>' +
+          '</div>' +
+          '<details class="var-default">' +
+            '<summary>Default value' + (defVal ? ' · set' : '') + '</summary>' +
+            '<input data-var="' + i + '" data-field="defaultValue" value="' + escapeAttr(defVal) + '" placeholder="Default (optional)" />' +
+          '</details>' +
+        '</div>';
+      }).join('');
       els.variablesView.querySelectorAll('[data-var]').forEach(input => {
         input.addEventListener('change', () => {
           const i = Number(input.getAttribute('data-var'));
@@ -3555,19 +3656,26 @@ export function getDesignerHtml(
       }
       const types = ['String','Int32','Boolean','Double','Object','DataTable','Array'];
       const dirs = ['In','Out','InOut'];
-      // Compact single row: name + direction + type (+ delete)
-      els.argumentsView.innerHTML = args.map((a, i) => (
-        '<div class="arg-row" data-arg-card="' + i + '" title="Default: ' + escapeAttr(a.defaultValue === undefined || a.defaultValue === null ? '' : String(a.defaultValue)) + '">' +
-          '<input data-arg="' + i + '" data-field="name" value="' + escapeAttr(a.name || '') + '" placeholder="Name" />' +
-          '<select data-arg="' + i + '" data-field="direction" title="Direction">' +
-            dirs.map(d => '<option' + ((a.direction || 'In') === d ? ' selected' : '') + '>' + d + '</option>').join('') +
-          '</select>' +
-          '<select data-arg="' + i + '" data-field="type" title="Type">' +
-            types.map(t => '<option' + (a.type === t ? ' selected' : '') + '>' + t + '</option>').join('') +
-          '</select>' +
-          '<button class="icon-btn" data-del-arg="' + i + '" title="Remove">✕</button>' +
-        '</div>'
-      )).join('');
+      // Compact name + direction + type; default value collapsed under each item
+      els.argumentsView.innerHTML = args.map((a, i) => {
+        const defVal = a.defaultValue === undefined || a.defaultValue === null ? '' : String(a.defaultValue);
+        return '<div class="arg-block" data-arg-card="' + i + '">' +
+          '<div class="arg-row">' +
+            '<input data-arg="' + i + '" data-field="name" value="' + escapeAttr(a.name || '') + '" placeholder="Name" />' +
+            '<select data-arg="' + i + '" data-field="direction" title="Direction">' +
+              dirs.map(d => '<option' + ((a.direction || 'In') === d ? ' selected' : '') + '>' + d + '</option>').join('') +
+            '</select>' +
+            '<select data-arg="' + i + '" data-field="type" title="Type">' +
+              types.map(t => '<option' + (a.type === t ? ' selected' : '') + '>' + t + '</option>').join('') +
+            '</select>' +
+            '<button class="icon-btn" data-del-arg="' + i + '" title="Remove">✕</button>' +
+          '</div>' +
+          '<details class="arg-default">' +
+            '<summary>Default value' + (defVal ? ' · set' : '') + '</summary>' +
+            '<input data-arg="' + i + '" data-field="defaultValue" value="' + escapeAttr(defVal) + '" placeholder="Default (optional)" />' +
+          '</details>' +
+        '</div>';
+      }).join('');
       const applyArgField = (input) => {
         const i = Number(input.getAttribute('data-arg'));
         const field = input.getAttribute('data-field');
@@ -4184,10 +4292,12 @@ export function getDesignerHtml(
     window.addEventListener('message', (event) => {
       const msg = event.data;
       if (msg.type === 'setWorkflow') {
+        const keepId = state.selectedId;
         state.workflow = msg.workflow || {};
         state.workflow.variables ||= [];
         state.workflow.arguments ||= [];
-        state.selectedId = null;
+        state.selectedId =
+          keepId && walkFind(state.workflow.activities, keepId) ? keepId : null;
         closeExprEditor();
         renderAll();
       }

@@ -1,25 +1,39 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { getStudioWebLocalLink } from '../interop/studioWebLocal';
+import {
+  getStudioWebLocalLink,
+  getStudioWebLocalSyncStatus
+} from '../interop/studioWebLocal';
 import { isLcsProjectDir } from '../interop/projectResolve';
 import { parseChangelogSections } from '../util/changelogParse';
+import {
+  enrichRecentProjects,
+  pushRecentProject,
+  readRecentProjects,
+  RECENT_PROJECTS_KEY
+} from '../util/recentProjects';
 import { getHomeHtml, HOME_NEXT_STEPS, HomeScreenModel } from '../webview/homeHtml';
 
 /**
  * Activity-bar Home webview + optional editor-tab Home panel.
- * Clicking the LowCode Studio activity icon shows this view first.
  */
 export class HomeViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'lowcodeStudio.home';
   private view?: vscode.WebviewView;
   private panel?: vscode.WebviewPanel;
+  private visibilityListener?: (visible: boolean) => void;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly resolveProjectDir: () => string | undefined,
-    private readonly onCommand: (command: string) => void | Promise<void>
+    private readonly onCommand: (command: string) => void | Promise<void>,
+    private readonly onOpenRecent: (projectPath: string) => void | Promise<void>
   ) {}
+
+  setVisibilityListener(listener: (visible: boolean) => void): void {
+    this.visibilityListener = listener;
+  }
 
   resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -34,6 +48,7 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this.renderHtml(webviewView.webview);
     webviewView.webview.onDidReceiveMessage((msg) => this.handleMessage(msg));
     webviewView.onDidChangeVisibility(() => {
+      this.visibilityListener?.(webviewView.visible);
       if (webviewView.visible) {
         this.refresh();
       }
@@ -47,6 +62,26 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     if (this.panel) {
       this.panel.webview.html = this.renderHtml(this.panel.webview);
     }
+  }
+
+  /** Focus the sidebar Home webview (preferred when clicking the activity icon). */
+  async focusSidebar(): Promise<void> {
+    try {
+      await vscode.commands.executeCommand('workbench.view.extension.lowcodeStudio');
+    } catch {
+      // ignore
+    }
+    try {
+      await vscode.commands.executeCommand('lowcodeStudio.home.focus');
+    } catch {
+      // ignore
+    }
+    try {
+      this.view?.show?.(false);
+    } catch {
+      // ignore
+    }
+    this.refresh();
   }
 
   async showPanel(): Promise<void> {
@@ -73,9 +108,27 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private handleMessage(msg: { type?: string; command?: string }): void {
+  rememberProject(projectDir: string, name?: string): void {
+    if (!projectDir || !isLcsProjectDir(projectDir)) {
+      return;
+    }
+    const prev = readRecentProjects(this.context.globalState.get(RECENT_PROJECTS_KEY));
+    const next = pushRecentProject(prev, projectDir, name);
+    void this.context.globalState.update(RECENT_PROJECTS_KEY, next);
+    this.refresh();
+  }
+
+  private handleMessage(msg: {
+    type?: string;
+    command?: string;
+    path?: string;
+  }): void {
     if (msg?.type === 'command' && msg.command) {
       void this.onCommand(msg.command);
+      return;
+    }
+    if (msg?.type === 'openRecent' && msg.path) {
+      void this.onOpenRecent(msg.path);
     }
   }
 
@@ -88,7 +141,6 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
       fs.existsSync(changelogPath) ? fs.readFileSync(changelogPath, 'utf8') : '',
       4
     );
-    // Keep bodies short on the home cards
     changelog = changelog.map((s) => ({
       version: s.version,
       body: s.body.length > 900 ? s.body.slice(0, 900) + '…' : s.body
@@ -98,6 +150,8 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     let projectName: string | undefined;
     let studioWebLinked = false;
     let studioWebSolution: string | undefined;
+    let syncBadge: HomeScreenModel['syncBadge'] = 'unlinked';
+    let syncSummary = 'Not linked to Studio Web Local Workspace';
     if (projectDir && isLcsProjectDir(projectDir)) {
       try {
         const manifest = JSON.parse(
@@ -108,11 +162,22 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
         projectName = path.basename(projectDir);
       }
       const link = getStudioWebLocalLink(projectDir);
+      const status = getStudioWebLocalSyncStatus(projectDir);
+      syncSummary = status.summary;
       if (link) {
         studioWebLinked = true;
         studioWebSolution = path.basename(link.solutionDir);
       }
+      if (status.linked && status.inSync) {
+        syncBadge = 'ok';
+      } else if (status.linked) {
+        syncBadge = 'stale';
+      }
     }
+
+    const recent = enrichRecentProjects(
+      readRecentProjects(this.context.globalState.get(RECENT_PROJECTS_KEY))
+    );
 
     return {
       version: packageJson.version || '0.0.0',
@@ -120,6 +185,9 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
       projectPath: projectDir,
       studioWebLinked,
       studioWebSolution,
+      syncBadge,
+      syncSummary,
+      recent,
       changelog,
       nextSteps: HOME_NEXT_STEPS
     };

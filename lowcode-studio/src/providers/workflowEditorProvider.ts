@@ -118,6 +118,13 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
               text
             );
             await vscode.workspace.applyEdit(edit);
+            try {
+              const workflow = parseWorkflow(text);
+              this.onWorkflowChanged(workflow);
+              this.activePanel?.webview.postMessage({ type: 'setWorkflow', workflow });
+            } catch {
+              // document change handler may refresh later
+            }
             this.activePanel?.webview.postMessage({
               type: 'toast',
               message: 'Reloaded from Studio Web Local edits',
@@ -355,9 +362,15 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
 
     const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument((e) => {
       if (e.document.uri.toString() === document.uri.toString() && e.contentChanges.length) {
-        // External pull / disk reload — refresh designer when we didn't originate the edit
+        // External disk reload while designer tab is not focused — avoid fighting in-memory edits
         if (this.activePanel === webviewPanel && !webviewPanel.active) {
-          updateWebview();
+          try {
+            const workflow = parseWorkflow(document.getText());
+            this.onWorkflowChanged(workflow);
+            webviewPanel.webview.postMessage({ type: 'setWorkflow', workflow });
+          } catch {
+            updateWebview();
+          }
         }
       }
     });

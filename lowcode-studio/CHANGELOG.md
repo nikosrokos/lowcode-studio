@@ -5,6 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.39] — 2026-08-05
+
+### Added
+- **Home: recent projects** with Studio Web sync badges (In sync / Out of sync / Not linked)
+- Variables / Arguments: compact row + **collapsed Default value** per item
+- Properties: **VB repair banner** + Apply all when Assist detects JS-style expressions; red hints on expression fields (including leftover Studio Web keys)
+
+### Fixed
+- Clicking the **activity-bar icon** focuses Home (when the container was hidden)
+- Studio Web–origin activities (e.g. Log Message `Message`/`Level`) normalize onto catalog keys so Properties + right-click / ⋯ work
+- Save pull from Studio Web Local **reloads the open designer** via `setWorkflow`
+- Flowchart nodes get ⋯ menu + reliable right-click → Properties
+
 ## [0.6.38] — 2026-08-05
 
 ### Added
