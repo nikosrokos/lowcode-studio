@@ -47,7 +47,8 @@ export function getDesignerHtml(
   palette: ActivityPaletteState = { favorites: [], recent: [] },
   projects: DesignerProjectEntry[] = [],
   settings: DesignerSettings = DEFAULT_DESIGNER_SETTINGS,
-  codiconCssHref = ''
+  /** Codicon stylesheet with @font-face src rewritten to a webview-safe font URI. */
+  codiconCssText = ''
 ): string {
   const workflowJson = JSON.stringify(workflow).replace(/</g, '\\u003c');
   const catalogJson = JSON.stringify(catalog).replace(/</g, '\\u003c');
@@ -56,8 +57,10 @@ export function getDesignerHtml(
   const paletteJson = JSON.stringify(palette).replace(/</g, '\\u003c');
   const projectsJson = JSON.stringify(projects).replace(/</g, '\\u003c');
   const settingsJson = JSON.stringify(settings).replace(/</g, '\\u003c');
-  const codiconLink = codiconCssHref
-    ? `<link rel="stylesheet" href="${codiconCssHref}" />`
+  // Inline (not <link>) so @font-face url() is an absolute webview URI — relative
+  // urls inside linked CSS fail under vscode-webview:// and leave empty colored squares.
+  const codiconStyle = codiconCssText
+    ? `<style nonce="${nonce}">${codiconCssText}</style>`
     : '';
 
   return `<!DOCTYPE html>
@@ -67,7 +70,7 @@ export function getDesignerHtml(
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource}; script-src 'nonce-${nonce}';" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LowCode Studio Designer</title>
-  ${codiconLink}
+  ${codiconStyle}
   <style>
     :root {
       --bg: var(--vscode-editor-background);
@@ -328,10 +331,14 @@ export function getDesignerHtml(
       color: #fff; background: var(--ico, #64748B);
       box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
     }
-    .act-icon.codicon {
-      font-family: codicon !important; font-weight: normal; font-size: 14px;
+    .act-icon.codicon,
+    .act-icon.codicon[class*='codicon-'] {
+      font: normal normal normal 14px/1 codicon !important;
+      font-family: codicon !important;
       -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+      color: #fff;
     }
+    .act-icon.codicon:before { color: #fff; }
     .card-head .act-icon { width: 20px; height: 20px; font-size: 11px; }
     .card-head .act-icon.codicon { font-size: 13px; }
     .flow-node .act-icon {
@@ -2244,9 +2251,8 @@ export function getDesignerHtml(
         if (state.workflow.startActivityId === id) state.workflow.startActivityId = undefined;
       }
       if (state.breakpoints[id]) delete state.breakpoints[id];
-      if (state.selectedId === id) {
-        state.selectedId = null;
-        state.selectedNode = null;
+      if (idsEqual(state.selectedId, id)) {
+        setSelectedNode(null);
       }
       hideCtxMenu();
       persist(true);
@@ -2289,28 +2295,42 @@ export function getDesignerHtml(
       return changed;
     }
     /** Keep a live node ref so Properties can paint even if walkFind races after SW sync. */
+    function idsEqual(a, b) {
+      return a != null && b != null && String(a) === String(b);
+    }
     function setSelectedNode(node) {
       state.selectedNode = node || null;
       state.selectedId = node && String(node.id || '').trim() ? String(node.id) : null;
     }
     function resolveSelectedNode() {
-      const sel = state.selectedId != null && String(state.selectedId) !== '' ? String(state.selectedId) : null;
+      const sel = state.selectedId != null && String(state.selectedId).trim() !== '' ? String(state.selectedId) : null;
       if (sel) {
         const hit = walkFind(state.workflow.activities, sel);
         if (hit) {
           state.selectedNode = hit.node;
+          state.selectedId = String(hit.node.id);
           return hit;
         }
       }
       if (state.selectedNode && String(state.selectedNode.id || '').trim()) {
         const hit = walkFind(state.workflow.activities, String(state.selectedNode.id));
         if (hit) {
-          state.selectedId = hit.node.id;
+          state.selectedId = String(hit.node.id);
           state.selectedNode = hit.node;
           return hit;
         }
-        // Live node still usable for paint (tree walk missed — e.g. mid-heal)
+        // Live node still usable for paint (tree walk missed — e.g. mid-heal / nested bag)
         return { node: state.selectedNode, list: null, index: -1 };
+      }
+      // DOM still shows selection chrome after a Sync id rewrite — recover from data-id
+      const dom = document.querySelector('.card.selected[data-id], .flow-node.selected[data-id]');
+      const domId = dom && dom.getAttribute('data-id');
+      if (domId) {
+        const hit = walkFind(state.workflow.activities, domId);
+        if (hit) {
+          setSelectedNode(hit.node);
+          return hit;
+        }
       }
       return null;
     }
@@ -2332,11 +2352,15 @@ export function getDesignerHtml(
           if (opts.rerender) renderAll();
           else { renderProps(); renderBreadcrumbs(); renderMinimap(); }
           requestAnimationFrame(() => {
-            if (state.selectedNode === opts.node || state.selectedId === opts.node.id) renderProps();
+            if (state.selectedNode === opts.node || idsEqual(state.selectedId, opts.node.id)) renderProps();
           });
           if (heal) vscode.postMessage({ type: 'edit', workflow: state.workflow });
           return true;
         }
+      }
+      // Click passed a live node that is already in the tree — prefer that object
+      if (hit && opts && opts.node && idsEqual(hit.node.id, opts.node.id)) {
+        hit = { node: opts.node, list: hit.list, index: hit.index };
       }
       if (!hit) {
         setSelectedNode(null);
@@ -2358,7 +2382,7 @@ export function getDesignerHtml(
       }
       // Double-paint next frame — avoids empty props if a concurrent re-render raced
       requestAnimationFrame(() => {
-        if (state.selectedId === hit.node.id || state.selectedNode === hit.node) renderProps();
+        if (idsEqual(state.selectedId, hit.node.id) || state.selectedNode === hit.node) renderProps();
       });
       if (heal) {
         vscode.postMessage({ type: 'edit', workflow: state.workflow });
@@ -2594,16 +2618,18 @@ export function getDesignerHtml(
     /** Ancestor chain from root to the node (inclusive), for nested breadcrumbs. */
     function walkAncestors(list, id, trail) {
       const path = trail || [];
+      const want = String(id ?? '');
+      if (!want) return null;
       for (let i = 0; i < list.length; i++) {
         const node = list[i];
         const next = path.concat(node);
-        if (node.id === id) return next;
+        if (String(node.id ?? '') === want) return next;
         if (node.children) {
-          const hit = walkAncestors(node.children, id, next);
+          const hit = walkAncestors(node.children, want, next);
           if (hit) return hit;
         }
         if (node.elseChildren) {
-          const hit = walkAncestors(node.elseChildren, id, next);
+          const hit = walkAncestors(node.elseChildren, want, next);
           if (hit) return hit;
         }
       }
@@ -2623,10 +2649,10 @@ export function getDesignerHtml(
     function summary(node) {
       const p = node.properties || {};
       switch (node.type) {
-        case 'System.LogMessage': return String(p.message || '');
-        case 'Programming.Assign': return (p.to || '') + ' := ' + (p.value || '');
-        case 'Flowchart.FlowDecision': return String(p.condition || '');
-        case 'REFramework.InvokeWorkflow': return String(p.workflowPath || '');
+        case 'System.LogMessage': return String(coercePaintValue(p.message ?? p.Message) || '');
+        case 'Programming.Assign': return (coercePaintValue(p.to) || '') + ' := ' + (coercePaintValue(p.value) || '');
+        case 'Flowchart.FlowDecision': return String(coercePaintValue(p.condition) || '');
+        case 'REFramework.InvokeWorkflow': return String(coercePaintValue(p.workflowPath ?? p.WorkflowFileName) || '');
         case 'UI.UseApplicationBrowser':
           return (p.mode || 'Browser') + ' ' + String(p.urlOrPath || '').slice(0, 36);
         case 'UI.ExtractTableData': return '→ ' + (p.result || 'extractedTable');
@@ -3258,7 +3284,7 @@ export function getDesignerHtml(
           if (isFlow() && state.workflow.activities.length === 1 && node.type === 'Flowchart.Start') {
             state.workflow.startActivityId = node.id;
           }
-          state.selectedId = node.id;
+          setSelectedNode(node);
           persist(true);
         });
       });
@@ -3297,7 +3323,7 @@ export function getDesignerHtml(
       if (!hit) return false;
       const [item] = hit.list.splice(hit.index, 1);
       insertAtPath(pathKey, item);
-      state.selectedId = activityId;
+      setSelectedNode(item);
       return true;
     }
     function dropZone(pathKey) {
@@ -3336,7 +3362,7 @@ export function getDesignerHtml(
           return;
         }
         insertAtPath(pathKey, node);
-        state.selectedId = node.id;
+        setSelectedNode(node);
         ensurePropsPanelVisible();
         persist(true);
       });
@@ -3357,7 +3383,7 @@ export function getDesignerHtml(
       const card = document.createElement('div');
       card.dataset.id = node.id;
       card.draggable = true;
-      card.className = 'card' + (state.selectedId === node.id ? ' selected' : '') + dryRunClass(node.id);
+      card.className = 'card' + (idsEqual(state.selectedId, node.id) ? ' selected' : '') + dryRunClass(node.id);
       const bpOn = !!state.breakpoints[node.id];
       const selWarn = selectorCardWarn(node);
       if (bpOn) card.classList.add('has-bp');
@@ -3526,7 +3552,7 @@ export function getDesignerHtml(
           : '';
         el.dataset.id = node.id;
         el.className = 'flow-node' +
-          (state.selectedId === node.id ? ' selected' : '') +
+          (idsEqual(state.selectedId, node.id) ? ' selected' : '') +
           (isDecision ? ' decision' : '') +
           (isStart ? ' start' : '') +
           (isEnd ? ' end' : '') +
@@ -3635,7 +3661,7 @@ export function getDesignerHtml(
         if (!node) return;
         state.workflow.activities.push(node);
         if (node.type === 'Flowchart.Start') state.workflow.startActivityId = node.id;
-        state.selectedId = node.id;
+        setSelectedNode(node);
         persist(true);
       };
     }
@@ -4218,7 +4244,7 @@ export function getDesignerHtml(
           const id = btn.getAttribute('data-al-apply');
           const p = proposals.find((x) => x.id === id);
           if (!p || !applyLiveProposal(p)) { toast('Could not apply proposal'); return; }
-          state.selectedId = node.id;
+          setSelectedNode(node);
           persist(true);
           toast('Applied: ' + p.label);
         });
@@ -4270,7 +4296,8 @@ export function getDesignerHtml(
           const id = btn.getAttribute('data-al-panel-apply');
           const p = proposals.find((x) => x.id === id);
           if (!p || !applyLiveProposal(p)) { toast('Could not apply proposal'); return; }
-          state.selectedId = p.activityId;
+          const hit = walkFind(state.workflow.activities, p.activityId);
+          setSelectedNode(hit ? hit.node : null);
           persist(true);
           renderAssistLivePanel();
           toast('Applied: ' + p.label);
@@ -4392,7 +4419,7 @@ export function getDesignerHtml(
       for (const n of clones) n.id = newId();
       if (mode === 'replace') state.workflow.activities = clones;
       else state.workflow.activities = [...(state.workflow.activities || []), ...clones];
-      state.selectedId = clones[0]?.id || null;
+      setSelectedNode(clones[0] || null);
       state.assistScaffoldProposal = null;
       if (els.assistScaffoldInput) els.assistScaffoldInput.value = '';
       renderAssistScaffoldPanel();
@@ -4432,7 +4459,7 @@ export function getDesignerHtml(
             const color = n.color || def?.color || '#64748B';
             const left = Math.round(((n.x || 0) - minX + pad) * scale);
             const top = Math.round(((n.y || 0) - minY + pad) * scale);
-            const sel = state.selectedId === n.id ? ' selected' : '';
+            const sel = idsEqual(state.selectedId, n.id) ? ' selected' : '';
             const label = String(n.displayName || n.type || '').slice(0, 10);
             return '<button type="button" class="mm-node' + sel + '" data-mm-id="' + escapeAttr(n.id) +
               '" title="' + escapeAttr(n.displayName || n.type) + '" style="left:' + left + 'px;top:' + top +
@@ -4443,7 +4470,7 @@ export function getDesignerHtml(
           nodes.map((n, i) => {
             const def = findDef(n.type);
             const color = n.color || def?.color || '#64748B';
-            const sel = state.selectedId === n.id ? ' selected' : '';
+            const sel = idsEqual(state.selectedId, n.id) ? ' selected' : '';
             const icoName = iconCodiconName(def?.icon);
             const icoHtml = icoName
               ? '<span class="mm-ico codicon codicon-' + escapeAttr(icoName) + '" style="background:' + escapeAttr(color) + '"></span>'
@@ -4813,7 +4840,12 @@ export function getDesignerHtml(
       els.breadcrumbs.querySelectorAll('[data-crumb]').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.getAttribute('data-crumb');
-          state.selectedId = id || null;
+          if (!id) {
+            setSelectedNode(null);
+          } else {
+            const hit = walkFind(state.workflow.activities, id);
+            setSelectedNode(hit ? hit.node : null);
+          }
           persist(true);
           if (id) highlightSearchHit(id);
         });
@@ -4856,7 +4888,7 @@ export function getDesignerHtml(
       }
       state.searchHitIndex = ((state.searchHitIndex + delta) % state.searchHits.length + state.searchHits.length) % state.searchHits.length;
       const hit = state.searchHits[state.searchHitIndex];
-      state.selectedId = hit.id;
+      setSelectedNode(hit);
       persist(true);
       zoomToActivity(hit.id);
       updateSearchHitCount();
@@ -4873,7 +4905,7 @@ export function getDesignerHtml(
       if (advance) state.searchHitIndex = (state.searchHitIndex + 1) % state.searchHits.length;
       else state.searchHitIndex = Math.min(state.searchHitIndex, state.searchHits.length - 1);
       const hit = state.searchHits[state.searchHitIndex];
-      state.selectedId = hit.id;
+      setSelectedNode(hit);
       persist(true);
       zoomToActivity(hit.id);
       updateSearchHitCount();
@@ -5320,7 +5352,9 @@ export function getDesignerHtml(
     els.btnAlignSelection?.addEventListener('click', () => alignSelectedFlowNodes());
     document.getElementById('exprDialogAssist')?.addEventListener('click', () => {
       if (state.exprEdit?.nodeId) {
-        state.selectedId = state.exprEdit.nodeId;
+        const hit = walkFind(state.workflow.activities, state.exprEdit.nodeId);
+        if (hit) setSelectedNode(hit.node);
+        else state.selectedId = state.exprEdit.nodeId;
         state.assistLiveScope = 'selected';
       }
       openAssistHelp('live');
@@ -5401,7 +5435,9 @@ export function getDesignerHtml(
         return;
       }
       const step = pb.steps[pb.index];
-      state.selectedId = step.activityId;
+      const stepHit = walkFind(state.workflow.activities, step.activityId);
+      if (stepHit) setSelectedNode(stepHit.node);
+      else state.selectedId = step.activityId;
       const kind = step.executionKind || '';
       const kindHtml = kind ? ' <span class="pb-kind kind-badge ' + kind + '">' + kind + '</span>' : '';
       if (label) {
@@ -5671,6 +5707,13 @@ export function getDesignerHtml(
       const msg = event.data;
       if (msg.type === 'setWorkflow') {
         const keepId = state.selectedId;
+        const keepSnap = state.selectedNode
+          ? {
+              type: state.selectedNode.type,
+              displayName: state.selectedNode.displayName,
+              summary: summary(state.selectedNode)
+            }
+          : null;
         state.workflow = msg.workflow || {};
         state.workflow.variables ||= [];
         state.workflow.arguments ||= [];
@@ -5689,9 +5732,16 @@ export function getDesignerHtml(
           ensureActivityIds(state.workflow.activities);
           vscode.postMessage({ type: 'edit', workflow: state.workflow });
         }
-        const keepHit = keepId ? walkFind(state.workflow.activities, keepId) : null;
-        state.selectedId = keepHit ? keepHit.node.id : null;
-        state.selectedNode = keepHit ? keepHit.node : null;
+        let keepNode = keepId ? walkFind(state.workflow.activities, keepId)?.node : null;
+        // Sync/import may rewrite ids — rematch by type + name + summary fingerprint
+        if (!keepNode && keepSnap) {
+          keepNode = walkCollect(state.workflow.activities).find((n) =>
+            n.type === keepSnap.type &&
+            n.displayName === keepSnap.displayName &&
+            summary(n) === keepSnap.summary
+          ) || null;
+        }
+        setSelectedNode(keepNode || null);
         closeExprEditor();
         renderAll();
       }
@@ -5877,7 +5927,7 @@ export function getDesignerHtml(
       } else {
         state.workflow.activities.push(node);
       }
-      state.selectedId = node.id;
+      setSelectedNode(node);
       if (fromPalette) closePalette();
       persist(true);
       toast('Added ' + node.displayName);
@@ -5899,7 +5949,9 @@ export function getDesignerHtml(
           if (act === 'delete') { deleteActivityById(id); return; }
           if (act === 'bp') { toggleBreakpoint(id); return; }
           if (act === 'runto') {
-            state.selectedId = id;
+            const hit = walkFind(state.workflow.activities, id);
+            if (hit) setSelectedNode(hit.node);
+            else state.selectedId = id;
             postDryRun({ stepThrough: true, runToActivityId: id });
             return;
           }
@@ -5914,7 +5966,7 @@ export function getDesignerHtml(
             if (!hit) return;
             const n = applyVbRepairsToActivity(hit.node);
             if (!n) { toast('No VB repairs for this activity'); return; }
-            state.selectedId = id;
+            setSelectedNode(hit.node);
             persist(true);
             toast('Applied ' + n + ' VB expression repair(s)');
             return;
@@ -5940,7 +5992,7 @@ export function getDesignerHtml(
             const reid = (n) => { n.id = newId(); (n.children || []).forEach(reid); (n.elseChildren || []).forEach(reid); };
             reid(clone);
             hit.list.splice(hit.index + 1, 0, clone);
-            state.selectedId = clone.id;
+            setSelectedNode(clone);
             persist(true);
             toast('Duplicated');
             return;
@@ -5958,7 +6010,7 @@ export function getDesignerHtml(
               } else {
                 // Nested: insert relative via selected + splice after open palette
                 state.insertPath = null;
-                state.selectedId = id;
+                setSelectedNode(hit.node);
                 state._insertBefore = act === 'insert-before';
               }
             }

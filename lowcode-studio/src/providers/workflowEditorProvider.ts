@@ -1121,9 +1121,6 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
     const docPath = document?.uri.fsPath || this.activeDocument?.uri.fsPath || '';
     const projectRoot = docPath ? findProjectRoot(path.dirname(docPath)) : undefined;
     const suggestions = buildPropertySuggestions(projectRoot, workflow);
-    const codiconCss = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, 'media', 'codicons', 'codicon.css')
-    );
     return getDesignerHtml(
       nonce,
       webview.cspSource,
@@ -1133,8 +1130,36 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
       this.getPaletteState(),
       this.buildProjectTree(),
       this.readDesignerSettings(),
-      codiconCss.toString()
+      this.getCodiconCssText(webview)
     );
+  }
+
+  /**
+   * Codicon CSS with @font-face pointing at a webview URI for codicon.ttf.
+   * Linking the stock file keeps a relative ./codicon.ttf url that does not load
+   * in the designer webview (empty colored activity icon squares).
+   */
+  private getCodiconCssText(webview: vscode.Webview): string {
+    const fontUri = webview
+      .asWebviewUri(
+        vscode.Uri.joinPath(this.context.extensionUri, 'media', 'codicons', 'codicon.ttf')
+      )
+      .toString();
+    const cssPath = path.join(
+      this.context.extensionPath,
+      'media',
+      'codicons',
+      'codicon.css'
+    );
+    try {
+      const raw = fs.readFileSync(cssPath, 'utf8');
+      return raw.replace(/url\(\s*["']?\.\/codicon\.ttf[^"')]*["']?\s*\)/gi, `url("${fontUri}")`);
+    } catch {
+      return (
+        `@font-face{font-family:"codicon";font-display:block;` +
+        `src:url("${fontUri}") format("truetype");}`
+      );
+    }
   }
 
   private getErrorHtml(message: string): string {
