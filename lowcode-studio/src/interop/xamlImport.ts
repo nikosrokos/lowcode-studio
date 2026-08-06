@@ -1638,15 +1638,26 @@ function pickCommonProps(
     }
   }
   if (mapped === 'Data.BuildDataTable') {
-    const cols =
-      raw['@_ColumnNames'] ||
-      raw['@_Columns'] ||
-      extractArgument(raw, 'ColumnNames') ||
-      extractArgument(raw, 'Columns');
-    if (cols) {
-      props.columns = String(cleanExpr(cols)).replace(/^"|"$/g, '');
-    } else if (!props.columns) {
-      props.columns = 'Name,Amount,Status';
+    // BuildDataTable has no "Columns"/"ColumnNames" property — its schema lives in
+    // "TableInfo", an ADO.NET DataSet XSD schema string (see extractTableInfoColumns
+    // for the confirmed real shape). Reading @_Columns/@_ColumnNames here always
+    // failed silently and fell back to placeholder columns, discarding whatever
+    // schema the user actually configured.
+    const tableInfoRaw = raw['@_TableInfo'] || extractArgument(raw, 'TableInfo');
+    const parsedCols = tableInfoRaw ? extractTableInfoColumns(String(tableInfoRaw)) : [];
+    if (parsedCols.length) {
+      props.columns = parsedCols.join(',');
+    } else {
+      const cols =
+        raw['@_ColumnNames'] ||
+        raw['@_Columns'] ||
+        extractArgument(raw, 'ColumnNames') ||
+        extractArgument(raw, 'Columns');
+      if (cols) {
+        props.columns = String(cleanExpr(cols)).replace(/^"|"$/g, '');
+      } else if (!props.columns) {
+        props.columns = 'Name,Amount,Status';
+      }
     }
     const dtResult =
       raw['@_DataTable'] ||
@@ -1784,6 +1795,54 @@ function argumentValue(node: unknown): unknown {
     }
   }
   return undefined;
+}
+
+/**
+ * Parses column names out of BuildDataTable's "TableInfo" property — an ADO.NET
+ * DataSet XSD schema string, e.g.:
+ *   <NewDataSet>
+ *     <xs:schema id="NewDataSet" ...>
+ *       <xs:element name="NewDataSet" msdata:IsDataSet="true" ...>
+ *         <xs:complexType>
+ *           <xs:choice minOccurs="0" maxOccurs="unbounded">
+ *             <xs:element name="Table1">
+ *               <xs:complexType>
+ *                 <xs:sequence>
+ *                   <xs:element name="ColName" type="xs:string" minOccurs="0" />
+ *                   ...
+ * Only the leaf column elements carry a `type="xs:..."` attribute — the wrapping
+ * "NewDataSet" and table-name elements don't — so matching on `type="xs:` reliably
+ * excludes those wrapper elements without needing a full XML parse.
+ * Handles both raw XML and the double-escaped form (&lt;xs:element ...) that shows
+ * up when TableInfo has already been through one round of entity-decoding upstream.
+ */
+export function extractTableInfoColumns(tableInfoRaw: string): string[] {
+  if (!tableInfoRaw) {
+    return [];
+  }
+  let text = String(tableInfoRaw);
+  // Undo up to two rounds of entity-encoding — this attribute value is itself XML
+  // embedded inside an XML attribute, so it can arrive singly- or doubly-escaped
+  // depending on which layer last touched it.
+  for (let i = 0; i < 2; i++) {
+    if (!/&lt;|&quot;|&amp;/.test(text)) {
+      break;
+    }
+    text = text
+      .replace(/&quot;/g, '"')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&');
+  }
+  const columns: string[] = [];
+  const re = /<xs:element\s+name="([^"]+)"\s+type="xs:[^"]*"/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    if (m[1]) {
+      columns.push(m[1]);
+    }
+  }
+  return columns;
 }
 
 function findFirstByName(
