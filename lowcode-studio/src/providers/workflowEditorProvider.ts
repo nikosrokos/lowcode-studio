@@ -1135,30 +1135,32 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
   }
 
   /**
-   * Codicon CSS with @font-face pointing at a webview URI for codicon.ttf.
-   * Linking the stock file keeps a relative ./codicon.ttf url that does not load
-   * in the designer webview (empty colored activity icon squares).
+   * Codicon CSS with @font-face embedding the TTF as a data: URI.
+   * External webview font URLs still fail in some Cursor/VS Code hosts
+   * (empty colored activity icon squares) — base64 is reliable.
    */
-  private getCodiconCssText(webview: vscode.Webview): string {
-    const fontUri = webview
-      .asWebviewUri(
-        vscode.Uri.joinPath(this.context.extensionUri, 'media', 'codicons', 'codicon.ttf')
-      )
-      .toString();
+  private getCodiconCssText(_webview: vscode.Webview): string {
     const cssPath = path.join(
       this.context.extensionPath,
       'media',
       'codicons',
       'codicon.css'
     );
+    const fontPath = path.join(
+      this.context.extensionPath,
+      'media',
+      'codicons',
+      'codicon.ttf'
+    );
     try {
       const raw = fs.readFileSync(cssPath, 'utf8');
-      return raw.replace(/url\(\s*["']?\.\/codicon\.ttf[^"')]*["']?\s*\)/gi, `url("${fontUri}")`);
+      const b64 = fs.readFileSync(fontPath).toString('base64');
+      const dataUri = `data:font/truetype;base64,${b64}`;
+      return raw
+        .replace(/url\(\s*["']?\.\/codicon\.ttf[^"')]*["']?\s*\)/gi, `url("${dataUri}")`)
+        .replace(/font-display:\s*block/gi, 'font-display: swap');
     } catch {
-      return (
-        `@font-face{font-family:"codicon";font-display:block;` +
-        `src:url("${fontUri}") format("truetype");}`
-      );
+      return '';
     }
   }
 
