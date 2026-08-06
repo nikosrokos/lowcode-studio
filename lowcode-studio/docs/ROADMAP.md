@@ -1,175 +1,177 @@
 # LowCode Studio — Roadmap
 
-**Goal:** Make LowCode Studio the place you **design, test, and iterate** most RPA work on Mac — with Studio Web used mainly to **publish / Orchestrator**, not to finish the workflow.
+**Goal:** Make LowCode Studio the place you **design, test, and iterate** most RPA work — so you choose it over Studio Web for the daily loop — while **every solution stays continuously synced with Studio Web Local Workspace as-is** (Portable `.uipx` / `.xaml` on disk). Studio Web remains the path to **publish / Orchestrator**, not the place you finish ordinary workflow work.
 
-> Living document. Priorities shift with real Studio Web round-trip pain. Version at time of writing: **0.6.21**.
+> Living document. Priorities follow real end-to-end friction (designer → dry-run → Save sync → open in Studio Web → publish). Version at time of writing: **0.6.41**.
+
+---
+
+## Milestone (0.6.41)
+
+We have a credible Mac-first Studio loop:
+
+| Layer | Status |
+|---|---|
+| Designer UX | Sequence + Flowchart, Maestro frames/dock, mini-map, activity icons, Home |
+| Assist | F0–F4 deterministic helpers + Live propose/apply + in-designer Scaffold (F2) |
+| Sync | Studio Web Local Workspace ↔ Save, adopt/open, leaner sync footprint |
+| Catalog / import | Core UI / data / HTTP / REF + deeper import map (fewer `Imported.*`) |
+| Dry-run | Scenarios (Shift+F5), step-through, fixtures, opt-in real HTTP/Python |
+
+**Next chapter is not “more features in isolation”** — it is **end-to-end UX**: fewer reasons to leave LCS, and zero surprise when Studio Web opens the same solution.
 
 ---
 
 ## North star
 
-| Today | Target |
+| Today (good) | Target (choose LCS) |
 |---|---|
-| Design in LCS → fix selectors / gaps in Studio Web → publish | Design + dry-run + validate in LCS → **one Save sync** → publish in Studio Web |
-| ~59 activities, best-effort XAML | Cover the **80% REF / browser / Excel / API** set with faithful export |
-| Selectors typed by hand | Selectors that feel **done** before leave LCS (builder + validation + optional remote capture) |
-| Dry-run stubs for UI/Python/code | Stronger local simulation + optional real runners where Mac allows |
+| Design in LCS → sometimes finish gaps in Studio Web → publish | Design + dry-run + validate in LCS → **Save sync** → publish in Studio Web |
+| Local Workspace linked; Save pushes Portable XAML | **Always** the same solution folder Studio Web already has — bidirectional, no parallel “export copy” |
+| Assist helps on the selected activity | Assist feels like a **real-time co-pilot** across the open project |
+| Selectors / VB / required props guided in Properties | The workflow feels **publish-ready** before first Studio Web open |
+| Dry-run strong for data/API; UI simulated | Honest simulation + clearer “ready for Windows robot” checklist |
 
 Studio Desktop / Windows robots remain the home for deep desktop UI, Citrix, and some package-only activities — LCS should make that handoff **checklist-clear**, not surprising.
 
 ---
 
-## What already works (keep investing)
+## Hard constraint: Local Workspace as-is
 
-- Sequence + Flowchart designer, Maestro-style frames / dock
-- REFramework scaffold, scenarios (Shift+F5), blueprints
-- Studio Web **Local Workspace** (Portable) + Save → `.xaml` sync
-- UI Automation core (Use Application/Browser, Click, Type, GetText, Extract Table…) + Selector Builder
-- Config.json ↔ Config.xlsx, package validation, `WINDOWS_TODO.md`
-- Custom activity stubs, Cmd+K palette, Input Method
+These are non-negotiable for every roadmap item:
+
+1. **One solution on disk** — LCS project ↔ Studio Web Local Workspace folder (`.uipx` + Portable project). No second “publish-only” tree as the default path.
+2. **Save = sync** — editing in LCS updates what Studio Web already has open; pull/reload keeps the designer honest.
+3. **Round-trip fidelity** — prefer activities and properties that **import and export cleanly**; shrinking `Imported.*` beats catalog vanity.
+4. **Portable by default** for Mac Studio Web; Windows-target remains an explicit legacy / Desktop-robot path.
+5. **Never break open-in-Studio-Web** — sync must not push trash, editor junk, or LCS-only clutter that confuses Local Workspace.
+
+If a feature cannot survive “open the same folder in Studio Web after Save,” it is not done.
 
 ---
 
 ## Principles
 
-1. **LCS-first loop** — anything that forces a Studio Web round-trip for a routine edit is a bug or a roadmap item.
-2. **Honest dry-run** — never pretend a stub is a robot; surface *simulated* clearly; grow real runners carefully.
-3. **Export fidelity over catalog vanity** — better 80 well-exported activities than 200 half-mapped `Imported.*`.
-4. **Portable by default** for Mac Studio Web; Windows path stays explicit for Desktop robots.
-5. **Mac design-time, Windows capture** — bridge the gap with builder UX, validation, and optional remote indicate.
+1. **LCS-first daily path** — anything that forces a Studio Web round-trip for a routine edit is a bug or a roadmap item.
+2. **E2E over surface area** — optimize the loop (open project → edit → Assist → dry-run → Save → publish), not isolated panels.
+3. **Honest dry-run** — never pretend a stub is a robot; surface *simulated* clearly; grow real runners carefully.
+4. **Export fidelity over catalog vanity** — better 80 well-exported activities than 200 half-mapped `Imported.*`.
+5. **Mac design-time, Windows capture** — bridge with builder UX, validation, and optional remote indicate later.
+6. **Assist is deterministic first** — propose → Apply; no Autopilot theater that writes without confirmation.
 
 ---
 
-## Phase A — “Stay in LCS for the daily path”
+## What already works (keep investing)
 
-Highest leverage for *not opening Studio Web to finish work*.
-
-### A1. Workflow contracts
-- **Arguments panel** (In/Out/InOut) in designer — model already has `WorkflowArgument`; wire UI + XAML export/import
-- **Invoke Workflow** argument mapping (today: path only → bare `InvokeWorkflowFile`)
-- Cross-workflow argument chips / validation (“missing Out: `out_TransactionItem`”)
-
-### A2. Import / export fidelity — **shipped in 0.6.29 + 0.6.40**
-- Shrink `Imported.*` → real LCS types for top Studio Web activities — File IO + FlowSwitch (0.6.29); Continue, Move/Rename, regex, DataTable row helpers, Wait Queue Item, Get Credential, Send Hotkey (0.6.40)
-- Preserve more properties on round-trip (HTTP, Excel, UI modern fields) — ongoing
-- Flowchart: FlowSwitch / multi-branch fidelity; fewer Comment placeholders — FlowSwitch mapped + dry-run case edges
-- Keep Studio Web-only triggers out of designer (already partially done)
-- Sync footprint: never push `.lcs-sync-trash` into Studio Web; Open-in guide once; adopt Config-only copies
-
-### A3. Selectors that ship — **shipped in 0.6.27**
-- Stronger Selector Builder: specificity score, Decode paste, copy from sibling
-- Inline validation + Windows TODO messages on canvas cards
-- Validate / Packages / Connect surface Windows TODO in Output
-- Paste helper for UI Explorer / `#id` / embedded classic (modern blob: best-effort extract)
-- Still later: richer modern FullSelectorEncoding decode; remote Indicate Element bridge
-
-### A3 (historical notes)
-- Document clear Mac browser vs Windows desktop selector paths (partially in builder hint)
-
-### A4. Project explorer as the hub
-- Multi-file edit without friction (tabs already VS Code — deepen LCS project tree actions)
-- Diff / “out of sync with Local Workspace” badge — **shipped in 0.6.28**
-- One-click Validate + Windows TODO + package check from explorer (Validate Packages + Manage Packages)
+- Sequence + Flowchart designer, Maestro-style frames / dock, **mini-map**, canvas **activity icons**
+- Home screen, recent projects, sync badges
+- REFramework scaffold, scenarios (Shift+F5), blueprints
+- Studio Web **Local Workspace** (Portable) + Save ↔ sync, adopt/open, lean sync rules
+- UI Automation core + Selector Builder + Windows TODO
+- Config.json ↔ Config.xlsx, package validation / Manage Packages
+- Arguments & variables panels (compact), Cmd+K palette, Input Method
+- Assist F0–F4 + **Live / Scaffold** propose→Apply in designer
+- Opt-in real HTTP / Python dry-run runners
 
 ---
 
-## Phase B — “Activities you’d otherwise add in Studio Web”
+## Theme 1 — End-to-end daily path (highest priority)
 
-### B1. Orchestrator / REF depth
-- Get Transaction Item / Add Queue Item / Get Asset / Set Asset (design + dry-run fixtures)
-- Set Transaction Status already present — align properties with Studio
-- Queue-based REF blueprints with scenario fixtures for queue items
+Make “I never needed Studio Web until publish” the default experience.
 
-### B2. Excel & data (Studio Web common set)
-- Excel Application Scope (or modern Excel equivalent that Studio Web accepts)
-- Read/Write Range property parity; Append; filters
-- DataTable activities already strong — fill gaps (Join, Lookup, Sort) if export maps cleanly
+### T1. Multi-file project flow
+- Project tree as the hub: open, rename, duplicate, reveal-in-Studio-Web-folder
+- Cross-file navigation (Invoke → jump; missing path warnings)
+- **Bulk Assist** across the open project (VB pass, empty required, weak selectors) with propose → Apply
+- Keep explorer / designer / Local Workspace paths aligned (one mental model)
 
-### B3. Control flow & structure
-- Parallel / Parallel For Each (even if dry-run is sequential with a warning)
-- Switch / FlowSwitch full case editor in props
-- Retry Scope property parity; Timeout Scope if mappable
+### T2. Workflow contracts (still the biggest “finish in Studio Web” gap)
+- **Arguments** polish: clear In/Out/InOut editing, defaults, validation
+- **Invoke Workflow** argument mapping UI + faithful XAML export/import (not path-only)
+- Cross-workflow chips (“missing Out: `out_TransactionItem`”) before Save sync
 
-### B4. Messaging & integrations
-- HTTP Request auth / headers / status handling in props + dry-run
-- Mail: richer Send Mail / Get Outlook-equivalent portable activities Studio Web supports
-- Deserialize/Serialize already there — add JSON Path / JObject helpers if useful
+### T3. Publish-ready gate in LCS
+- One command / dock action: **Ready for Studio Web?** (packages, Portable, selectors, required props, `Imported.*`, Windows TODO)
+- Surface the same issues Assist Live already finds — project-wide, with Apply all where safe
+- After green gate: **Reveal Local Workspace** / open Studio Web is a publish step, not a repair step
 
-### B5. Testing pack (design-time)
-- Map key `UiPath.Testing.Activities` (Verify Expression, etc.) so pinned package isn’t empty
-- Bridge scenarios.json ↔ something Studio Test Cases can consume (even one-way export)
-
----
-
-## Phase C — “Run & debug without leaving Cursor”
-
-### C1. Dry-run 2.0
-- Breakpoints / run-to-here (beyond step-through)
-- Variable watch panel (editable mid-run for scenarios)
-- Fixture library UI (HTTP, UI selectors, tables) instead of only JSON
-- Clear per-activity: `simulated` | `real` | `unsupported`
-
-### C2. Real local runners (Mac-capable) — **shipped in 0.6.29 (HTTP + Python)**
-- Real HTTP in dry-run (opt-in) — **shipped**
-- Real Python via local interpreter when Python Scope path is set — **shipped**
-- Optional headless browser smoke for Click/Type/GetText against a URL (experimental; not UiPath robot)
-
-### C3. Logs & traces
-- Structured run log exportable to Studio Web / text
-- Highlight failing activity + jump to props (already partial) + suggested fix chips
+### T4. Sync UX that disappears
+- Clearer In sync / Out of sync / conflict when Studio Web edited the same `.xaml`
+- Pull → designer reload already exists — deepen conflict copy and “what changed”
+- Zero surprise files in the `.uipx` folder (continue lean sync discipline)
 
 ---
 
-## Phase D — “UI / UX that feels like Maestro + Studio”
+## Theme 2 — Designer UX that beats Studio Web for editing
 
-### D1. Canvas
-- Mini-map / fit selection; tidy / align for flowchart
-- Search-in-workflow (“find Log Message”)
-- Breadcrumbs for nested containers (Use App / If / Try)
-- Drag to reorder with clearer drop ghosts (sequence already has spine — refine)
+### T5. Canvas & navigation — **partially shipped (0.6.41)**
+- Mini-map — **shipped**
+- Fit selection / zoom-to-activity; tidy / align for flowchart (deeper)
+- Search-in-workflow — keep improving hit quality + replace/next
+- Breadcrumbs for nested containers — keep investing
+- Clearer drop ghosts / reorder affordances
 
-### D2. Properties
-- Expression editor (larger, expand dialog — Maestro pattern)
+### T6. Properties & expressions
+- Larger expression editor (Maestro-style expand) with VB Assist inline
 - Typed editors (DataTable columns, dictionary, secret-as-variable)
-- “Required for Studio Web” checklist per selected activity — **shipped in 0.6.28**
+- “Required for Studio Web” checklist — **shipped**; keep tying it to T3 gate
 
-### D3. Onboarding
-- First-run: Create REF → Dry Run scenario → Connect Local Workspace wizard — **shipped in 0.6.28**
-- In-product tips tied to `WINDOWS_TODO` / Portable
-
-### D4. Visual system
-- Keep Maestro dock / frames; refine empty states, icons, density
-- Light/dark polish vs VS Code theme tokens
-- Accessibility: keyboard path for dock + float frames
+### T7. Onboarding & empty states
+- First-run wizard — **shipped**; tighten copy around Local Workspace as the only ship path
+- Empty canvas / empty project CTAs that push blueprint → scenario → Connect (not “explore menus”)
 
 ---
 
-## Phase E — “Ship closer to Orchestrator”
+## Theme 3 — Catalog & fidelity (so you don’t add steps in Studio Web)
 
-### E1. Publish path
-- Documented one-click “Open in Studio Web to publish” (deep link / reveal)
-- Longer-term: Orchestrator publish API if UiPath exposes a Mac-friendly path (explore; don’t promise)
+### T8. Import / export map — **ongoing (0.6.29 → 0.6.40+)**
+- Keep shrinking `Imported.*` for the next Studio Web–common set (Integration Service / Testing / mail variants)
+- Preserve more properties on round-trip (HTTP auth/headers, Excel modern fields, UI modern)
+- Flowchart multi-branch / FlowSwitch case editor parity in props
 
-### E2. Packages
-- UI to add/remove NuGet deps with Studio Web–compatible versions — **Manage Packages in 0.6.28**
-- Warn on default `[1.0.0]` pins and unknown custom packages — **shipped in 0.6.28**
-
-### E3. Dual target clarity
-- Portable (Studio Web Mac) vs Windows (Desktop robot) switcher with consequences explained
-- Generate both artifacts when needed without confusing Local Workspace
+### T9. Activities you’d otherwise add in Studio Web
+- Orchestrator / REF depth (queue/asset property parity + scenario fixtures)
+- Excel Application Scope / modern Excel parity Studio Web accepts
+- Parallel / Retry / Timeout where mappable (honest dry-run warnings)
+- Testing pack design-time maps so pinned packages aren’t empty
 
 ---
 
-## Phase F — “Assist (AI) — greenfield”
+## Theme 4 — Run & debug without leaving Cursor
 
-Only after A–C foundations; avoid Autopilot theater. **F0/F1 0.6.29 · F3 0.6.30 · F4 0.6.31 · F2 0.6.38** (deterministic, no LLM).
+### T10. Dry-run 2.0
+- Breakpoints / run-to-here beyond step-through
+- Watch panel editable mid-run for scenarios
+- Fixture library UI (HTTP, selectors, tables)
+- Per-activity badge: `simulated` | `real` | `unsupported`
 
-- Generate sequence from natural language → LCS activities (constrained to catalog) — **F2 shipped (0.6.38)**
-- Suggest selectors / repair placeholders from page HTML snippet or failed dry-run — **F3 shipped**
-- Scenario generator from Process description — **F1 shipped**
-- “Explain this workflow” / “why Studio Web will reject this Save” — **F0 shipped**
-- VB expression typo / function-style repairs (UiPath Visual Basic) — **F4 shipped**
-- Repair from failed dry-run traces — **F2 shipped (0.6.38)**
+### T11. Traces → Assist
+- Structured run log; jump to failing activity + props
+- Failed dry-run → Live proposals (already started with F2 repair) — make it one click from the dock
+
+---
+
+## Theme 5 — Assist as real-time co-pilot
+
+Deterministic, propose→Apply. **F0–F4 + Live/Scaffold shipped through 0.6.41.**
+
+### T12. Deeper Assist UX
+- Richer F2 scaffolds (containers / branches / nested Use Browser from description)
+- Multi-file scaffold + project-wide VB / selector pass
+- Assist results that respect Local Workspace sync (never emit LCS-only types that become `Imported.*` after Save)
+- Optional later: constrained LLM *behind* the same propose→Apply contract (not free-form chat edits)
+
+---
+
+## Theme 6 — Ship closer to Orchestrator
+
+### T13. Publish path
+- Documented one-click “Open / reveal Local Workspace for publish”
+- Longer-term: Orchestrator publish API if UiPath exposes a Mac-friendly path (**explore; don’t promise**)
+
+### T14. Packages & targets
+- Manage Packages — **shipped**; keep Studio Web–compatible version ranges honest
+- Portable vs Windows switcher with consequences explained; never silently break Mac Local Workspace
 
 ---
 
@@ -177,26 +179,27 @@ Only after A–C foundations; avoid Autopilot theater. **F0/F1 0.6.29 · F3 0.6.
 
 | Not prioritizing | Why |
 |---|---|
-| Full Studio Desktop feature parity | Windows-only surface area (Citrix, deep UI Explorer, coded workflows) |
+| Full Studio Desktop feature parity | Windows-only surface (Citrix, deep UI Explorer, coded workflows) |
 | Replacing Maestro `.flow` | Separate UiPath product; LCS stays classic workflow / REF |
 | Guaranteeing robot-identical dry-run for all UI | Needs Windows robot / Studio; LCS remains design + simulate |
-| Marketplace publisher | Nice later; fidelity first |
+| A second sync format beside Local Workspace | Local Workspace **as-is** is the product contract |
+| Marketplace publisher before fidelity | Nice later; round-trip + E2E UX first |
 
 ---
 
 ## Suggested sequencing (impact × fit)
 
 ```
-A1 Arguments + Invoke mapping
-A2 Import map shrink (Imported.*)
-A3 Selector validation in-canvas
-B1 Orchestrator queue/asset activities
-B2 Excel Scope / parity
-C1 Dry-run breakpoints + watch
-D2 Expression editor
-E2 Package UI
-C2 Optional real HTTP/Python
-F  Assist (after catalog + contracts solid)
+T2  Arguments + Invoke mapping          ← biggest “finish in Studio Web” hole
+T3  Ready-for-Studio-Web gate           ← E2E confidence before publish
+T1  Multi-file / project-wide Assist    ← daily-path speed
+T4  Sync conflict clarity               ← trust Local Workspace as-is
+T6  Expression editor + VB Assist       ← editing comfort vs Studio Web
+T8  Next import-map slice               ← fewer Imported.*
+T10 Dry-run breakpoints + watch         ← stay in Cursor to verify
+T12 Richer scaffolds / multi-file F2    ← Assist depth
+T9  Excel / Orchestrator parity         ← fewer Studio Web activity adds
+T13 Publish reveal / deep link          ← last mile
 ```
 
 ---
@@ -204,15 +207,18 @@ F  Assist (after catalog + contracts solid)
 ## Success metrics (practical)
 
 - **Hours in LCS before first Studio Web open** ↑
-- **Save → Studio Web open** with zero XAML parse errors ↑
+- **Save → open same Local Workspace in Studio Web** with zero XAML parse errors ↑
+- **Edits made only to finish work in Studio Web** (per project) ↓
 - **`Imported.*` / Comment placeholders** per imported Main ↓
-- **Placeholder selectors** left at Connect ↓
-- **Scenario dry-runs** used as gate before Connect ↑
+- **Placeholder / weak selectors** left at Connect ↓
+- **Scenario dry-runs** used as gate before publish ↑
+- **Ready-for-Studio-Web gate** green rate before Reveal ↑
 
 ---
 
 ## How to use this doc
 
-- Pick **one Phase A item** per release when possible — daily-path friction first.
-- Pair every new activity with: catalog entry · dry-run behavior · XAML import · XAML export · package pin · test.
-- Update this file when a phase item ships (move to “What already works” or strike through).
+- Prefer **one Theme 1 (E2E daily path) item** per release when possible.
+- Pair every new activity with: catalog · dry-run · XAML import · XAML export · package pin · **Local Workspace round-trip test**.
+- Never land a feature that invents a parallel ship path around Local Workspace.
+- Update this file when a theme item ships (move under “What already works” or mark **shipped**).
