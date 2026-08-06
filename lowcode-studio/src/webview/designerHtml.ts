@@ -486,13 +486,17 @@ export function getDesignerHtml(
       word-break: break-word; margin-bottom: 6px;
     }
     .canvas-search-wrap { display: flex; align-items: center; gap: 4px; min-width: 0; }
-    .canvas-search-wrap .workflow-search { flex: 1; min-width: 120px; }
+    .canvas-search-wrap .workflow-search { flex: 1; min-width: 100px; max-width: 180px; }
     .canvas-search-wrap .sr-nav {
       appearance: none; border: 1px solid var(--border); background: var(--input-bg);
       color: var(--muted); border-radius: 6px; width: 26px; height: 26px; cursor: pointer; font-size: 12px;
+      display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
     }
     .canvas-search-wrap .sr-nav:hover { color: var(--text); border-color: var(--focus); }
+    .canvas-search-wrap .sr-nav.active { color: var(--focus); border-color: var(--focus); }
     .canvas-search-wrap .sr-count { font-size: 10px; color: var(--muted); min-width: 28px; text-align: center; }
+    .canvas-search-wrap:not(.open) .canvas-search-fields { display: none; }
+    .canvas-search-fields { display: flex; align-items: center; gap: 4px; min-width: 0; }
     .panel .frame-resize-x {
       position: absolute; top: 0; bottom: 0; width: 5px; cursor: ew-resize;
       z-index: 6; background: transparent;
@@ -1430,11 +1434,14 @@ export function getDesignerHtml(
           <button class="btn" id="btnFitCanvas" type="button" title="Fit content / selection (⤢)">Fit</button>
           <button class="btn" id="btnAlignSelection" type="button" title="Align flowchart nodes to selection" style="display:none">Align</button>
         </div>
-        <div class="canvas-search-wrap">
-          <input class="workflow-search" id="workflowSearch" placeholder="Find activity…" title="Find in workflow — Enter / ↓ next · ↑ previous" />
-          <button type="button" class="sr-nav" id="btnSearchPrev" title="Previous match (↑)">↑</button>
-          <span class="sr-count" id="searchHitCount"></span>
-          <button type="button" class="sr-nav" id="btnSearchNext" title="Next match (Enter / ↓)">↓</button>
+        <div class="canvas-search-wrap" id="canvasSearchWrap">
+          <button type="button" class="sr-nav" id="btnToggleSearch" title="Find activity">⌕</button>
+          <div class="canvas-search-fields" id="canvasSearchFields">
+            <input class="workflow-search" id="workflowSearch" placeholder="Find activity…" title="Find in workflow — Enter / ↓ next · ↑ previous · Esc close" />
+            <button type="button" class="sr-nav" id="btnSearchPrev" title="Previous match (↑)">↑</button>
+            <span class="sr-count" id="searchHitCount"></span>
+            <button type="button" class="sr-nav" id="btnSearchNext" title="Next match (Enter / ↓)">↓</button>
+          </div>
         </div>
         <div class="zoom-tools">
           <button class="btn" id="btnZoomOutLegacy" type="button" title="Zoom out">−</button>
@@ -1781,7 +1788,7 @@ export function getDesignerHtml(
       dragOffset: { x: 0, y: 0 },
       zoom: 1,
       collapsedCats: {},
-      collapsedPropSections: {},
+      collapsedPropSections: { studioWeb: true },
       propsMode: 'docked',
       propsWidth: 300,
       propsHeight: Math.round(window.innerHeight * 0.7),
@@ -2154,7 +2161,10 @@ export function getDesignerHtml(
           ensurePropsPanelVisible();
           state.collapsedPropSections.activity = false;
           state.collapsedPropSections.general = false;
-          state.collapsedPropSections.studioWeb = false;
+          // Keep Studio Web checklist collapsed so Activity props stay visible
+          if (state.collapsedPropSections.studioWeb === undefined) {
+            state.collapsedPropSections.studioWeb = true;
+          }
           if (opts.rerender) renderAll();
           else { renderProps(); renderBreadcrumbs(); renderMinimap(); }
           if (heal) vscode.postMessage({ type: 'edit', workflow: state.workflow });
@@ -2170,7 +2180,9 @@ export function getDesignerHtml(
       ensurePropsPanelVisible();
       state.collapsedPropSections.activity = false;
       state.collapsedPropSections.general = false;
-      state.collapsedPropSections.studioWeb = false;
+      if (state.collapsedPropSections.studioWeb === undefined) {
+        state.collapsedPropSections.studioWeb = true;
+      }
       if (opts?.rerender) renderAll();
       else {
         renderProps();
@@ -2298,11 +2310,26 @@ export function getDesignerHtml(
         escapeAttr((def?.displayName || '') + (def?.icon ? ' ' + def.icon : '')) + '">' + escapeHtml(glyph) + '</span>';
     }
 
+    /** Variable-binding props — leave empty on add (user creates / picks vars). */
+    function isVarBindingProp(p) {
+      const n = String(p?.name || '');
+      if (/^(to|result|item|row|values|argumentMappings)$/i.test(n)) return true;
+      if (/dataTable/i.test(n)) return true;
+      if (/^(output|destination|source|target)$/i.test(n) && (p.type === 'string' || p.type === 'expression' || !p.type)) return true;
+      return false;
+    }
     function createActivity(type, x, y) {
       const def = findDef(type);
       if (!def) return null;
       const properties = {};
-      for (const p of def.properties) properties[p.name] = p.defaultValue ?? '';
+      for (const p of def.properties) {
+        // Do not auto-seed variable names (dt, result, …) — Properties stay blank until user chooses
+        if (isVarBindingProp(p)) {
+          properties[p.name] = '';
+        } else {
+          properties[p.name] = p.defaultValue ?? '';
+        }
+      }
       const node = { id: newId(), type: def.type, displayName: def.displayName, properties };
       if (def.container) node.children = [];
       if (def.hasElse) node.elseChildren = [];
@@ -2378,15 +2405,17 @@ export function getDesignerHtml(
     }
 
     function walkFind(list, id) {
+      const want = String(id ?? '');
+      if (!want) return null;
       for (let i = 0; i < list.length; i++) {
         const node = list[i];
-        if (node.id === id) return { node, list, index: i };
+        if (String(node.id ?? '') === want) return { node, list, index: i };
         if (node.children) {
-          const hit = walkFind(node.children, id);
+          const hit = walkFind(node.children, want);
           if (hit) return hit;
         }
         if (node.elseChildren) {
-          const hit = walkFind(node.elseChildren, id);
+          const hit = walkFind(node.elseChildren, want);
           if (hit) return hit;
         }
       }
@@ -4278,9 +4307,7 @@ export function getDesignerHtml(
         return;
       }
       ensurePropsPanelVisible();
-      // Always expand core sections when selecting (Studio Web imports often look "empty" when collapsed)
-      state.collapsedPropSections.activity = false;
-      state.collapsedPropSections.general = false;
+      // Do NOT force-expand sections here — that broke expand/collapse. selectActivity opens them once.
       const node = hit.node;
       node.properties = node.properties || {};
       const def = findDef(node.type);
@@ -4411,10 +4438,18 @@ export function getDesignerHtml(
       if (node.type === 'REFramework.InvokeWorkflow') wireInvokeMapEditor(node);
 
       els.props.querySelectorAll('.prop-section-head').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const section = btn.parentElement.getAttribute('data-section');
-          state.collapsedPropSections[section] = !state.collapsedPropSections[section];
-          renderProps();
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const sectionEl = btn.parentElement;
+          const section = sectionEl?.getAttribute('data-section');
+          if (!section) return;
+          const next = !state.collapsedPropSections[section];
+          state.collapsedPropSections[section] = next;
+          // Toggle in place — full re-render wiped inputs and re-forced open sections
+          sectionEl.classList.toggle('collapsed', next);
+          const chev = btn.querySelector('.chev');
+          if (chev) chev.textContent = next ? '▸' : '▾';
         });
       });
 
@@ -4962,11 +4997,21 @@ export function getDesignerHtml(
     });
     document.getElementById('btnExpandProps')?.addEventListener('click', () => {
       state.collapsedPropSections = {};
-      renderProps();
+      els.props.querySelectorAll('.prop-section').forEach((sec) => {
+        sec.classList.remove('collapsed');
+        const chev = sec.querySelector('.prop-section-head .chev');
+        if (chev) chev.textContent = '▾';
+      });
     });
     document.getElementById('btnCollapseProps')?.addEventListener('click', () => {
       state.collapsedPropSections = { general: true, activity: true, studioWeb: true, flow: true };
-      renderProps();
+      els.props.querySelectorAll('.prop-section').forEach((sec) => {
+        const id = sec.getAttribute('data-section');
+        if (id) state.collapsedPropSections[id] = true;
+        sec.classList.add('collapsed');
+        const chev = sec.querySelector('.prop-section-head .chev');
+        if (chev) chev.textContent = '▸';
+      });
     });
     document.getElementById('btnToggleConnections')?.addEventListener('click', () => {
       toggleSideSection(els.connectionsSection);
@@ -5391,6 +5436,27 @@ export function getDesignerHtml(
       }
     });
     let searchTimer = null;
+    function setSearchOpen(open) {
+      const wrap = document.getElementById('canvasSearchWrap');
+      const btn = document.getElementById('btnToggleSearch');
+      if (!wrap) return;
+      wrap.classList.toggle('open', !!open);
+      btn?.classList.toggle('active', !!open);
+      if (open) {
+        requestAnimationFrame(() => els.workflowSearch?.focus());
+      } else if (els.workflowSearch) {
+        els.workflowSearch.value = '';
+        state.searchHits = [];
+        state.searchHitIndex = 0;
+        updateSearchHitCount();
+      }
+    }
+    document.getElementById('btnToggleSearch')?.addEventListener('click', () => {
+      const wrap = document.getElementById('canvasSearchWrap');
+      setSearchOpen(!wrap?.classList.contains('open'));
+    });
+    // Collapsed by default — only ⌕ icon until user opens Find
+    setSearchOpen(false);
     els.workflowSearch?.addEventListener('input', () => {
       clearTimeout(searchTimer);
       searchTimer = setTimeout(() => {
@@ -5399,6 +5465,11 @@ export function getDesignerHtml(
       }, 220);
     });
     els.workflowSearch?.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setSearchOpen(false);
+        return;
+      }
       if (e.key !== 'Enter') return;
       e.preventDefault();
       runWorkflowSearch(true);

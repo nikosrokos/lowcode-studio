@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.45] — 2026-08-06
+
+### Fixed
+- **Properties expand / collapse** — section headers toggle in place (no longer re-forced open on every re-render)
+- **Existing activities** — selection id matching hardened; General + Activity open on select so Log Message / Build Data Table props and Delete work
+- Find activity starts **collapsed** (⌕); opens in the same canvas-bar spot; Esc closes
+
+### Changed
+- Adding an activity no longer prefills variable bindings (`dt`, `result`, …) — create / pick variables yourself
+- Hide `.lcs-sync-trash` from VS Code Explorer and Project Explorer
+
 ## [0.6.44] — 2026-08-06
 
 ### Fixed

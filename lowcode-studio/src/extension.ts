@@ -137,6 +137,7 @@ let homeProviderRef: HomeViewProvider | undefined;
 let extensionContext: vscode.ExtensionContext;
 
 export function activate(context: vscode.ExtensionContext): void {
+  void hideSyncTrashInExplorer();
   extensionContext = context;
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
@@ -1749,6 +1750,26 @@ async function importConfigXlsxCommand(): Promise<void> {
   }
 }
 
+async function hideSyncTrashInExplorer(): Promise<void> {
+  try {
+    const cfg = vscode.workspace.getConfiguration('files');
+    const current = { ...(cfg.get<Record<string, boolean>>('exclude') || {}) };
+    const key = `**/${SYNC_TRASH_DIR}`;
+    if (current[key] === true) {
+      return;
+    }
+    current[key] = true;
+    // Prefer workspace scope when a folder is open; else global
+    const target =
+      (vscode.workspace.workspaceFolders?.length || 0) > 0
+        ? vscode.ConfigurationTarget.Workspace
+        : vscode.ConfigurationTarget.Global;
+    await cfg.update('exclude', current, target);
+  } catch {
+    // ignore — Project Explorer still filters trash
+  }
+}
+
 async function setActiveProjectDir(projectDir: string): Promise<void> {
   await extensionContext.workspaceState.update('lowcodeStudio.activeProjectDir', projectDir);
   projectProvider?.setActiveProject(projectDir);
@@ -1756,6 +1777,7 @@ async function setActiveProjectDir(projectDir: string): Promise<void> {
   editorProvider?.refreshProjectTree?.();
   homeProviderRef?.rememberProject(projectDir);
   homeProviderRef?.refresh();
+  void hideSyncTrashInExplorer();
 }
 
 /**

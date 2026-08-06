@@ -43,6 +43,14 @@ function run(): void {
   assert.ok(html.includes('mm-row'), 'minimap shows labeled rows');
   assert.ok(html.includes('--activity-column-width: 480px'), 'narrower activity column');
   assert.ok(html.includes('max-height: min(70vh, 420px)'), 'context menu scrolls when near bottom');
+  assert.ok(html.includes('id="btnToggleSearch"'), 'Find activity toggle icon');
+  assert.ok(html.includes('function setSearchOpen'), 'Find collapses / opens in place');
+  assert.ok(html.includes('isVarBindingProp'), 'activity add skips auto variable bindings');
+  assert.ok(html.includes('Toggle in place'), 'prop sections collapse without full re-render');
+  assert.ok(
+    !html.includes('Always expand core sections when selecting'),
+    'must not force-expand prop sections on every renderProps'
+  );
 
   console.log('designerUxFixes.test.ts: ok');
 }
