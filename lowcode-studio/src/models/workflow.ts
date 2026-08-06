@@ -224,7 +224,8 @@ export function parseWorkflow(text: string): WorkflowDocument {
 }
 
 function normalizeActivity(a: ActivityNode): ActivityNode {
-  const id = String(a?.id || '').trim() || newId();
+  const id =
+    typeof a?.id === 'string' && String(a.id).trim() ? String(a.id).trim() : newId();
   const children = Array.isArray(a.children)
     ? a.children.map(normalizeActivity)
     : a.children != null

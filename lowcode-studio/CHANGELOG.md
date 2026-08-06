@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.55] — 2026-08-06
+
+### Fixed
+- **Studio Web–edited activities: select + edit Properties** (high priority)
+  - Select by **object identity** (card click) so id mismatches no longer blank the panel while Delete still worked
+  - Avoid full `renderAll` on every card click (was destroying the card mid-`pointerdown` and racing prop wiring)
+  - **Delegated** property `input`/`change`/`blur` listeners — edits work even if Assist/VB wiring throws after paint
+  - Sanitize non-string activity ids; coerce PascalCase / ExpressionText before paint
+
 ## [0.6.54] — 2026-08-06
 
 ### Fixed

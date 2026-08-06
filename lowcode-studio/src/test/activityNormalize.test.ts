@@ -298,6 +298,31 @@ function run(): void {
     assert.ok(String(round.activities[0].id || '').trim());
   }
 
+  // Non-string ids must be healed (break walkFind / Properties select)
+  {
+    const rawText = JSON.stringify({
+      schemaVersion: '1.0',
+      name: 'Main',
+      type: 'Sequence',
+      variables: [],
+      activities: [
+        {
+          id: { ExpressionText: 'bad' },
+          type: 'System.LogMessage',
+          displayName: 'Log Message',
+          properties: { Message: '"x"', Level: 'Info' }
+        }
+      ]
+    });
+    assert.ok(rawWorkflowHasMissingIds(rawText), 'object id counts as missing');
+    const raw = JSON.parse(rawText);
+    const { doc, changed } = migrateWorkflowDocument(raw);
+    assert.ok(changed);
+    assert.strictEqual(typeof doc.activities[0].id, 'string');
+    assert.ok(doc.activities[0].id.trim());
+    assert.strictEqual(doc.activities[0].properties.message, '"x"');
+  }
+
   console.log('activityNormalize.test.ts OK');
 }
 
