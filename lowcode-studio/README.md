@@ -1,12 +1,12 @@
 # LowCode Studio
 
-**Version 0.7.1** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.7.2** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.7.1-0ea5e9)
+![version](https://img.shields.io/badge/version-0.7.2-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
@@ -170,12 +170,18 @@ See [docs/ACTIVITIES.md](docs/ACTIVITIES.md). Invoke Code / UI steps are dry-run
 - Designer **Assist Live / Scaffold** tabs with propose → Apply
 - **Invoke argument mapping**, expr **VB Assist**, canvas Fit/Find/Align, cleaner Assist popup
 
-### Next (5) — E2E UX, Local Workspace as-is
-1. **Ready for Studio Web?** gate (project-wide Assist + packages + selectors)
-2. Multi-file Assist (bulk VB / required / selectors) + richer F2 scaffolds
-3. Sync conflict clarity when Studio Web edits the same solution
-4. Next import-map / Excel–Orchestrator parity (fewer `Imported.*`)
-5. Dry-run breakpoints + watch panel
+### Shipped recently (0.7.2)
+- **Ready for Studio Web?** gate (command + dock) → Reveal Local Workspace when green
+- **Project Assist** — VB + selector scan across the whole project
+- Project tree Duplicate / Rename / Reveal in Studio Web folder
+- Sync **conflict clarity** (per-file stale list + pull “what changed” report)
+
+### Next (5) — stay in Cursor longer
+1. Dry-run breakpoints + watch panel
+2. Richer F2 scaffolds / multi-file scaffold
+3. Next import-map / Excel–Orchestrator parity (fewer `Imported.*`)
+4. Canvas distribute / drop polish
+5. Typed property editors (DataTable, dictionary, secrets)
 
 Full plan: [docs/ROADMAP.md](docs/ROADMAP.md)
 

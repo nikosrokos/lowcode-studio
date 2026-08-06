@@ -42,9 +42,12 @@ import {
 import {
   getStudioWebLocalLink,
   getStudioWebLocalSyncStatus,
+  formatStudioWebPullReport,
+  formatStudioWebSyncStatusDetail,
   trySyncFromStudioWebLocal,
   trySyncToStudioWebLocal
 } from '../interop/studioWebLocal';
+import { resolveInvokeWorkflowPath } from '../interop/packageValidation';
 
 export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
   public static readonly viewType = 'lowcodeStudio.workflowEditor';
@@ -188,7 +191,15 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
   async pullStudioWebForActiveDesigner(opts?: {
     force?: boolean;
     wholeProject?: boolean;
-  }): Promise<{ ok: boolean; message: string }> {
+  }): Promise<{
+    ok: boolean;
+    message: string;
+    updated?: string[];
+    created?: string[];
+    conflicts?: string[];
+    backups?: string[];
+    report?: string;
+  }> {
     const document = this.activeDocument;
     const panel = this.activePanel;
     if (!document || !panel) {
@@ -215,13 +226,27 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
       }
       this.pushSyncStatus(document, panel);
       this.refreshProjectTree();
+      const report = formatStudioWebPullReport(pulled);
       if (pulled.updated.length === 0 && pulled.conflicts.length === 0) {
-        return { ok: true, message: 'Already in sync with Studio Web Local.' };
+        return {
+          ok: true,
+          message: 'Already in sync with Studio Web Local.',
+          updated: [],
+          created: [],
+          conflicts: [],
+          backups: pulled.backups,
+          report
+        };
       }
       if (pulled.conflicts.length && !pulled.updated.length) {
         return {
           ok: false,
-          message: `${pulled.conflicts.length} conflict(s) — both sides changed. Save to keep LCS, or Sync with force.`
+          message: `${pulled.conflicts.length} conflict(s) — both sides changed. Save to keep LCS, or Sync with force.`,
+          updated: pulled.updated,
+          created: pulled.created,
+          conflicts: pulled.conflicts,
+          backups: pulled.backups,
+          report
         };
       }
       const msg =
@@ -229,7 +254,15 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
         (pulled.created.length ? ` (${pulled.created.length} new)` : '') +
         (reloaded ? ' · designer reloaded' : '') +
         (pulled.conflicts.length ? ` · ${pulled.conflicts.length} conflict(s) skipped` : '');
-      return { ok: true, message: msg };
+      return {
+        ok: true,
+        message: msg,
+        updated: pulled.updated,
+        created: pulled.created,
+        conflicts: pulled.conflicts,
+        backups: pulled.backups,
+        report
+      };
     } catch (err) {
       return {
         ok: false,
@@ -289,7 +322,10 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
     const thisStale = status.stale.find((s) => s.workflowRel === rel);
     const xamlNewerHere = thisStale?.reason === 'xaml-newer';
     const lcsNewerHere = thisStale?.reason === 'lcs-newer';
+    const conflictHere = thisStale?.reason === 'conflict';
     const anyXamlNewer = status.stale.some((s) => s.reason === 'xaml-newer');
+    const conflictCount = status.stale.filter((s) => s.reason === 'conflict').length;
+    const anyConflict = conflictCount > 0;
     panel.webview.postMessage({
       type: 'syncStatus',
       linked: status.linked,
@@ -301,24 +337,34 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
         : status.linked
           ? { rel, reason: 'in-sync' }
           : null,
-      needsPull: Boolean(xamlNewerHere || (anyXamlNewer && !lcsNewerHere)),
+      needsPull: Boolean(xamlNewerHere || conflictHere || ((anyXamlNewer || anyConflict) && !lcsNewerHere)),
       xamlNewerCount: status.stale.filter((s) => s.reason === 'xaml-newer').length,
-      lcsNewerCount: status.stale.filter((s) => s.reason === 'lcs-newer').length
+      lcsNewerCount: status.stale.filter((s) => s.reason === 'lcs-newer').length,
+      conflictCount,
+      staleFiles: status.stale.map((s) => ({
+        rel: s.workflowRel,
+        reason: s.reason
+      }))
     });
 
     // One VS Code toast per stale fingerprint (Sync action → pull + reload)
-    if (status.linked && anyXamlNewer) {
+    if (status.linked && (anyXamlNewer || anyConflict)) {
       const key = status.stale
-        .filter((s) => s.reason === 'xaml-newer')
-        .map((s) => s.workflowRel)
+        .filter((s) => s.reason === 'xaml-newer' || s.reason === 'conflict')
+        .map((s) => `${s.workflowRel}:${s.reason}`)
         .sort()
         .join('|');
       if (key && key !== this.syncAlertNotifiedFor) {
         this.syncAlertNotifiedFor = key;
+        const n =
+          status.stale.filter((s) => s.reason === 'xaml-newer').length + conflictCount;
         void vscode.window
           .showWarningMessage(
-            `Studio Web has newer changes (${status.stale.filter((s) => s.reason === 'xaml-newer').length}). Sync without reopening?`,
+            anyConflict
+              ? `Studio Web sync: ${conflictCount} conflict(s), ${n} file(s) need attention. Sync without reopening?`
+              : `Studio Web has newer changes (${n}). Sync without reopening?`,
             'Sync now',
+            'Show details',
             'Dismiss'
           )
           .then(async (choice) => {
@@ -326,12 +372,22 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
               const result = await this.pullStudioWebForActiveDesigner({
                 wholeProject: true
               });
+              if (result.report) {
+                const channel = getLowCodeOutput();
+                channel.appendLine('');
+                channel.appendLine(result.report);
+              }
               void vscode.window.showInformationMessage(result.message);
               panel.webview.postMessage({
                 type: 'toast',
                 message: result.message,
                 logged: true
               });
+            } else if (choice === 'Show details') {
+              const channel = getLowCodeOutput();
+              channel.clear();
+              channel.appendLine(formatStudioWebSyncStatusDetail(status));
+              channel.show(true);
             }
           });
       }
@@ -876,6 +932,47 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           this.refreshProjectTree();
           break;
         }
+        case 'duplicateWorkflow': {
+          await this.duplicateWorkflowFile(String(message.path || ''));
+          break;
+        }
+        case 'renameWorkflow': {
+          await this.renameWorkflowFile(String(message.path || ''));
+          break;
+        }
+        case 'revealStudioWebFolder': {
+          await this.revealStudioWebFolderFor(String(message.path || ''));
+          break;
+        }
+        case 'checkWorkflowPath': {
+          const workflowPath = String(message.workflowPath || '');
+          const requestId = String(message.requestId || '');
+          const projectRoot = findProjectRoot(path.dirname(document.uri.fsPath));
+          const fromRel = projectRoot
+            ? path.relative(projectRoot, document.uri.fsPath).replace(/\\/g, '/')
+            : undefined;
+          const resolved =
+            projectRoot && workflowPath
+              ? resolveInvokeWorkflowPath(projectRoot, workflowPath, fromRel) ||
+                this.resolveWorkflowPath(document, workflowPath)
+              : this.resolveWorkflowPath(document, workflowPath);
+          webviewPanel.webview.postMessage({
+            type: 'workflowPathResolved',
+            requestId,
+            workflowPath,
+            exists: Boolean(resolved),
+            resolvedPath: resolved || ''
+          });
+          break;
+        }
+        case 'readyForStudioWeb': {
+          await vscode.commands.executeCommand('lowcodeStudio.readyForStudioWeb');
+          break;
+        }
+        case 'projectAssistScan': {
+          await vscode.commands.executeCommand('lowcodeStudio.projectAssistScan');
+          break;
+        }
         case 'activityUsed': {
           await this.rememberActivityUse(String(message.activityType || ''));
           break;
@@ -915,6 +1012,14 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
             wholeProject: Boolean(message.wholeProject),
             force: Boolean(message.force)
           });
+          if (result.report) {
+            const channel = getLowCodeOutput();
+            channel.appendLine('');
+            channel.appendLine(result.report);
+            if (result.conflicts?.length || result.updated?.length) {
+              channel.show(true);
+            }
+          }
           webviewPanel.webview.postMessage({
             type: 'toast',
             message: result.message,
@@ -923,7 +1028,11 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           webviewPanel.webview.postMessage({
             type: 'syncPullResult',
             ok: result.ok,
-            message: result.message
+            message: result.message,
+            updated: result.updated || [],
+            created: result.created || [],
+            conflicts: result.conflicts || [],
+            backups: result.backups || []
           });
           break;
         }
@@ -1007,6 +1116,180 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
     }
     await this.updateTextDocument(document, doc);
     return true;
+  }
+
+  private async duplicateWorkflowFile(filePath: string): Promise<void> {
+    if (!filePath || !filePath.endsWith('.lcs.json') || !fs.existsSync(filePath)) {
+      return;
+    }
+    const projectRoot = findProjectRoot(path.dirname(filePath));
+    const dir = path.dirname(filePath);
+    const base = path.basename(filePath, '.lcs.json');
+    const suggested = `${base}_Copy`;
+    const name = await vscode.window.showInputBox({
+      prompt: 'Duplicate workflow as (without extension)',
+      value: suggested,
+      validateInput: (v) =>
+        /^[A-Za-z_][A-Za-z0-9_-]*$/.test(v) ? undefined : 'Use letters, numbers, _ or -'
+    });
+    if (!name) {
+      return;
+    }
+    const dest = path.join(dir, `${name}.lcs.json`);
+    if (fs.existsSync(dest)) {
+      void vscode.window.showErrorMessage(`Already exists: ${name}.lcs.json`);
+      return;
+    }
+    try {
+      const text = fs.readFileSync(filePath, 'utf8');
+      const doc = parseWorkflow(text);
+      doc.name = name;
+      fs.writeFileSync(dest, stringifyWorkflow(doc), 'utf8');
+      if (projectRoot) {
+        this.registerWorkflowInManifest(
+          projectRoot,
+          path.relative(projectRoot, dest).replace(/\\/g, '/')
+        );
+      }
+      this.refreshProjectTree();
+      await vscode.commands.executeCommand(
+        'vscode.openWith',
+        vscode.Uri.file(dest),
+        WorkflowEditorProvider.viewType,
+        { preview: false }
+      );
+      void vscode.window.showInformationMessage(`Duplicated → ${name}.lcs.json`);
+    } catch (err) {
+      void vscode.window.showErrorMessage(
+        err instanceof Error ? err.message : 'Duplicate failed'
+      );
+    }
+  }
+
+  private async renameWorkflowFile(filePath: string): Promise<void> {
+    if (!filePath || !filePath.endsWith('.lcs.json') || !fs.existsSync(filePath)) {
+      return;
+    }
+    const projectRoot = findProjectRoot(path.dirname(filePath));
+    const dir = path.dirname(filePath);
+    const base = path.basename(filePath, '.lcs.json');
+    const name = await vscode.window.showInputBox({
+      prompt: 'Rename workflow (without extension)',
+      value: base,
+      validateInput: (v) => {
+        if (!/^[A-Za-z_][A-Za-z0-9_-]*$/.test(v)) {
+          return 'Use letters, numbers, _ or -';
+        }
+        if (v === base) {
+          return undefined;
+        }
+        if (fs.existsSync(path.join(dir, `${v}.lcs.json`))) {
+          return 'A workflow with that name already exists';
+        }
+        return undefined;
+      }
+    });
+    if (!name || name === base) {
+      return;
+    }
+    const dest = path.join(dir, `${name}.lcs.json`);
+    try {
+      const text = fs.readFileSync(filePath, 'utf8');
+      const doc = parseWorkflow(text);
+      doc.name = name;
+      fs.writeFileSync(dest, stringifyWorkflow(doc), 'utf8');
+      fs.unlinkSync(filePath);
+      if (projectRoot) {
+        const oldRel = path.relative(projectRoot, filePath).replace(/\\/g, '/');
+        const newRel = path.relative(projectRoot, dest).replace(/\\/g, '/');
+        this.renameWorkflowInManifest(projectRoot, oldRel, newRel);
+      }
+      this.refreshProjectTree();
+      await vscode.commands.executeCommand(
+        'vscode.openWith',
+        vscode.Uri.file(dest),
+        WorkflowEditorProvider.viewType,
+        { preview: false }
+      );
+      void vscode.window.showInformationMessage(`Renamed → ${name}.lcs.json`);
+    } catch (err) {
+      void vscode.window.showErrorMessage(
+        err instanceof Error ? err.message : 'Rename failed'
+      );
+    }
+  }
+
+  private async revealStudioWebFolderFor(filePath: string): Promise<void> {
+    const projectRoot =
+      (filePath && findProjectRoot(path.dirname(filePath))) ||
+      (this.activeDocument
+        ? findProjectRoot(path.dirname(this.activeDocument.uri.fsPath))
+        : undefined);
+    if (!projectRoot) {
+      void vscode.window.showWarningMessage('No LowCode Studio project found.');
+      return;
+    }
+    const link = getStudioWebLocalLink(projectRoot);
+    if (!link?.solutionDir || !fs.existsSync(link.solutionDir)) {
+      void vscode.window.showWarningMessage(
+        'Not linked to a Studio Web Local Workspace. Run Connect first.'
+      );
+      return;
+    }
+    let reveal = path.join(link.solutionDir, link.projectFolder);
+    if (filePath.endsWith('.lcs.json') && fs.existsSync(filePath)) {
+      const rel = path
+        .relative(projectRoot, filePath)
+        .replace(/\\/g, '/')
+        .replace(/\.lcs\.json$/i, '.xaml');
+      const xamlAbs = path.join(link.solutionDir, link.projectFolder, rel);
+      if (fs.existsSync(xamlAbs)) {
+        reveal = xamlAbs;
+      } else if (fs.existsSync(path.dirname(xamlAbs))) {
+        reveal = path.dirname(xamlAbs);
+      }
+    }
+    await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(reveal));
+  }
+
+  private registerWorkflowInManifest(projectRoot: string, rel: string): void {
+    const manifestPath = path.join(projectRoot, 'project.json');
+    try {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
+        workflows?: string[];
+      };
+      manifest.workflows = [...new Set([...(manifest.workflows || []), rel])];
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+    } catch {
+      // ignore
+    }
+  }
+
+  private renameWorkflowInManifest(
+    projectRoot: string,
+    oldRel: string,
+    newRel: string
+  ): void {
+    const manifestPath = path.join(projectRoot, 'project.json');
+    try {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
+        main?: string;
+        workflows?: string[];
+      };
+      if (manifest.main === oldRel) {
+        manifest.main = newRel;
+      }
+      manifest.workflows = [
+        ...new Set(
+          (manifest.workflows || [])
+            .map((w) => (w === oldRel ? newRel : w))
+            .concat(newRel)
+        )
+      ];
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+    } catch {
+      // ignore
+    }
   }
 
   private resolveWorkflowPath(

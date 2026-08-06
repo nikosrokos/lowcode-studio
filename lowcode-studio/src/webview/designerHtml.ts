@@ -368,11 +368,32 @@ export function getDesignerHtml(
     .project-node .project-remove {
       border: none; background: transparent; color: var(--muted);
       cursor: pointer; font-size: 14px; line-height: 1; padding: 0 4px;
-      border-radius: 4px;
+      border-radius: 4px; opacity: 0;
     }
+    .project-node:hover .project-remove { opacity: 1; }
     .project-node .project-remove:hover {
       color: #ef4444; background: color-mix(in srgb, #ef4444 12%, transparent);
     }
+    .project-node .project-more {
+      border: none; background: transparent; color: var(--muted);
+      cursor: pointer; font-size: 12px; line-height: 1; padding: 0 4px;
+      border-radius: 4px; opacity: 0;
+    }
+    .project-node:hover .project-more { opacity: 1; }
+    .project-node .project-more:hover {
+      color: var(--text); background: var(--hover);
+    }
+    .project-ctx {
+      position: fixed; z-index: 90; min-width: 190px; display: none;
+      background: var(--panel); border: 1px solid var(--border);
+      box-shadow: 0 8px 24px rgba(0,0,0,.28); padding: 4px 0; border-radius: 6px;
+    }
+    .project-ctx.show { display: block; }
+    .project-ctx button {
+      display: block; width: 100%; text-align: left; border: none; background: transparent;
+      color: var(--text); font: inherit; font-size: 12px; padding: 6px 12px; cursor: pointer;
+    }
+    .project-ctx button:hover { background: var(--hover); }
     .project-children { margin-left: 12px; border-left: 1px solid var(--border); padding-left: 4px; }
     .project-empty { padding: 16px 12px; color: var(--muted); font-size: 12px; line-height: 1.45; }
     .panel.right {
@@ -1466,6 +1487,13 @@ export function getDesignerHtml(
           </button>
           <div class="left-section-body">
             <div class="project-tree" id="projectTree"></div>
+            <div class="project-ctx" id="projectCtx" role="menu">
+              <button type="button" data-proj-act="open">Open</button>
+              <button type="button" data-proj-act="duplicate">Duplicate</button>
+              <button type="button" data-proj-act="rename">Rename</button>
+              <button type="button" data-proj-act="reveal-sw">Reveal in Studio Web folder</button>
+              <button type="button" data-proj-act="reveal-os">Reveal in OS</button>
+            </div>
           </div>
         </section>
         <section class="left-section" data-section="activities">
@@ -1889,6 +1917,7 @@ export function getDesignerHtml(
       </div>
       <span class="dock-sep" aria-hidden="true"></span>
       <button class="dock-btn" id="btnValidate" type="button" title="Validate workflow">✓</button>
+      <button class="dock-btn" id="btnReadyGate" type="button" title="Ready for Studio Web? — packages, Portable, selectors, Imported.*">◉</button>
       <button class="dock-btn" id="btnDryRun" type="button" title="Dry Run (run all)">▶</button>
       <button class="dock-btn" id="btnStepThrough" type="button" title="Step through on canvas">⏭</button>
       <span class="dock-sep" aria-hidden="true"></span>
@@ -1913,6 +1942,9 @@ export function getDesignerHtml(
       assistScaffoldProposal: null,
       assistLiveScope: 'selected',
       assistLiveKinds: { vb: true, required: true, selector: true },
+      invokePathExists: {},
+      invokePathPending: {},
+      projectCtx: null,
       minimapCollapsed: false,
       searchHits: [],
       searchHitIndex: 0,
@@ -2046,23 +2078,46 @@ export function getDesignerHtml(
         } else {
           pill.classList.add('show', 'warn');
           pill.classList.remove('ok');
+          const conflicts = msg.conflictCount || 0;
           const n = msg.xamlNewerCount || 0;
-          pill.textContent = n ? ('Studio Web newer · ' + n) : 'Out of sync';
+          pill.textContent = conflicts
+            ? ('Conflict · ' + conflicts)
+            : (n ? ('Studio Web newer · ' + n) : 'Out of sync');
           pill.title = msg.summary || 'Out of sync';
         }
       }
       if (alert && els.syncAlertText) {
-        const key = (msg.summary || '') + '|' + (msg.xamlNewerCount || 0) + '|' + (msg.needsPull ? '1' : '0');
+        const key = (msg.summary || '') + '|' + (msg.xamlNewerCount || 0) + '|' + (msg.conflictCount || 0) + '|' + (msg.needsPull ? '1' : '0');
         state.syncStatusKey = key;
         const show = msg.linked && msg.needsPull && state.syncDismissedKey !== key;
         alert.classList.toggle('show', show);
         if (show) {
-          const label = msg.solutionLabel ? (' “' + msg.solutionLabel + '”') : '';
-          els.syncAlertText.innerHTML = '<strong>Studio Web changed</strong> — pull' +
-            escapeHtml(label) + ' into this designer without closing the project. ' +
-            '<span style="opacity:.8">' + escapeHtml(msg.summary || '') + '</span>';
+          const label = msg.solutionLabel ? (' “' + escapeHtml(msg.solutionLabel) + '”') : '';
+          const conflicts = msg.conflictCount || 0;
+          const files = Array.isArray(msg.staleFiles) ? msg.staleFiles : [];
+          const preview = files.slice(0, 3).map((f) => {
+            const reason = f.reason === 'conflict' ? 'conflict' : f.reason === 'xaml-newer' ? 'SW newer' : f.reason;
+            return escapeHtml(f.rel) + ' (' + escapeHtml(reason) + ')';
+          }).join(', ');
+          const more = files.length > 3 ? (' +' + (files.length - 3) + ' more') : '';
+          els.syncAlertText.innerHTML = conflicts
+            ? ('<strong>Sync conflict</strong> — both sides changed' + label + '. Pull skips conflicts; Save keeps LCS (SW copy → trash). ' +
+              (preview ? '<span style="opacity:.85">' + preview + more + '</span> · ' : '') +
+              '<span style="opacity:.8">' + escapeHtml(msg.summary || '') + '</span>')
+            : ('<strong>Studio Web changed</strong> — pull' + label + ' into this designer without closing the project. ' +
+              (preview ? '<span style="opacity:.85">' + preview + more + '</span> · ' : '') +
+              '<span style="opacity:.8">' + escapeHtml(msg.summary || '') + '</span>');
         }
       }
+    }
+    function requestInvokePathCheck(workflowPath) {
+      const path = String(workflowPath || '').trim();
+      if (!path) return;
+      state.invokePathPending = state.invokePathPending || {};
+      if (state.invokePathPending[path]) return;
+      state.invokePathPending[path] = true;
+      const requestId = 'inv-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+      vscode.postMessage({ type: 'checkWorkflowPath', workflowPath: path, requestId });
     }
     function requestStudioWebPull(opts) {
       if (state.syncBusy) return;
@@ -2290,8 +2345,11 @@ export function getDesignerHtml(
         const removeBtn = canRemove && depth === 0
           ? '<button type="button" class="project-remove" data-remove-kind="' + escapeAttr(node.kind) + '" data-path="' + escapeAttr(node.path) + '" title="Remove from explorer">×</button>'
           : '';
+        const moreBtn = (node.kind === 'workflow' || node.kind === 'file' || node.kind === 'project' || node.kind === 'solution')
+          ? '<button type="button" class="project-more" data-kind="' + escapeAttr(node.kind) + '" data-path="' + escapeAttr(node.path) + '" title="More actions">⋯</button>'
+          : '';
         let html = '<div class="project-node' + active + '" data-kind="' + escapeAttr(node.kind) + '" data-path="' + escapeAttr(node.path) + '">' +
-          '<span class="ico">' + icon + '</span><span class="label">' + escapeHtml(node.name) + '</span>' + badge + removeBtn + '</div>';
+          '<span class="ico">' + icon + '</span><span class="label">' + escapeHtml(node.name) + '</span>' + badge + moreBtn + removeBtn + '</div>';
         if (node.children && node.children.length) {
           html += '<div class="project-children">' + node.children.map((c) => nodeHtml(c, depth + 1)).join('') + '</div>';
         }
@@ -2306,8 +2364,15 @@ export function getDesignerHtml(
           vscode.postMessage({ type: 'removeFromExplorer', kind, path: p });
         });
       });
+      els.projectTree.querySelectorAll('.project-more').forEach((btn) => {
+        btn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          showProjectCtx(btn, btn.getAttribute('data-kind') || '', btn.getAttribute('data-path') || '');
+        });
+      });
       els.projectTree.querySelectorAll('.project-node').forEach((el) => {
         el.addEventListener('click', () => {
+          hideProjectCtx();
           const kind = el.getAttribute('data-kind');
           const p = el.getAttribute('data-path') || '';
           if (kind === 'project') {
@@ -2319,7 +2384,40 @@ export function getDesignerHtml(
             vscode.postMessage({ type: 'openProjectFile', path: p });
           }
         });
+        el.addEventListener('contextmenu', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          showProjectCtx(el, el.getAttribute('data-kind') || '', el.getAttribute('data-path') || '', ev.clientX, ev.clientY);
+        });
       });
+    }
+    function hideProjectCtx() {
+      const menu = document.getElementById('projectCtx');
+      if (menu) menu.classList.remove('show');
+      state.projectCtx = null;
+    }
+    function showProjectCtx(anchor, kind, filePath, x, y) {
+      const menu = document.getElementById('projectCtx');
+      if (!menu) return;
+      state.projectCtx = { kind, path: filePath };
+      const isWorkflow = kind === 'workflow' || (kind === 'file' && String(filePath).endsWith('.lcs.json'));
+      menu.querySelectorAll('[data-proj-act]').forEach((btn) => {
+        const act = btn.getAttribute('data-proj-act');
+        let show = true;
+        if (act === 'duplicate' || act === 'rename') show = isWorkflow;
+        if (act === 'open') show = kind === 'workflow' || kind === 'file';
+        if (act === 'reveal-sw') show = kind === 'workflow' || kind === 'file' || kind === 'project' || kind === 'solution';
+        btn.style.display = show ? '' : 'none';
+      });
+      let left = x, top = y;
+      if (left == null || top == null) {
+        const r = anchor.getBoundingClientRect();
+        left = r.right - 8;
+        top = r.bottom + 2;
+      }
+      menu.style.left = Math.max(8, Math.min(left, window.innerWidth - 200)) + 'px';
+      menu.style.top = Math.max(8, Math.min(top, window.innerHeight - 160)) + 'px';
+      menu.classList.add('show');
     }
 
     function isFlow() { return state.workflow.type === 'Flowchart'; }
@@ -4068,12 +4166,23 @@ export function getDesignerHtml(
       if (node.type === 'REFramework.InvokeWorkflow') {
         const wp = String(node.properties?.workflowPath || '').trim();
         const known = (state.suggestions?.workflowPaths || []).map(String);
-        const ok = !!wp && (known.length === 0 || known.some(k => k === wp || k.endsWith('/' + wp) || k.endsWith('\\\\' + wp)));
+        const remapped = wp.endsWith('.xaml') ? wp.replace(/\.xaml$/i, '.lcs.json') : wp;
+        const inSuggestions = !!wp && (known.length === 0 || known.some(k =>
+          k === wp || k === remapped || k.endsWith('/' + wp) || k.endsWith('/' + remapped) ||
+          k.endsWith('\\\\' + wp) || k.endsWith('\\\\' + remapped)
+        ));
+        const hostHit = state.invokePathExists && state.invokePathExists[wp];
+        const exists = hostHit === true || (hostHit !== false && inSuggestions);
+        if (wp && hostHit === undefined) {
+          requestInvokePathCheck(wp);
+        }
         items.push({
-          ok: !!wp,
-          text: wp
-            ? (ok ? 'Invoke path set: ' + wp : 'Invoke path set — confirm file exists in project')
-            : 'Invoke Workflow needs a workflow path'
+          ok: !!wp && exists,
+          text: !wp
+            ? 'Invoke Workflow needs a workflow path'
+            : (exists
+              ? 'Invoke path found: ' + wp
+              : 'Invoke path missing on disk: ' + wp)
         });
         const target = state.targetArgsByPath[wp];
         if (target && target.length) {
@@ -5723,6 +5832,32 @@ export function getDesignerHtml(
     document.getElementById('btnValidate').addEventListener('click', () => {
       vscode.postMessage({ type: 'validate', workflow: state.workflow });
     });
+    document.getElementById('btnReadyGate')?.addEventListener('click', () => {
+      vscode.postMessage({ type: 'readyForStudioWeb' });
+    });
+    document.getElementById('projectCtx')?.querySelectorAll('[data-proj-act]').forEach((btn) => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const act = btn.getAttribute('data-proj-act');
+        const ctx = state.projectCtx || {};
+        hideProjectCtx();
+        if (act === 'open' && ctx.path) {
+          vscode.postMessage({ type: 'openProjectFile', path: ctx.path });
+        } else if (act === 'duplicate' && ctx.path) {
+          vscode.postMessage({ type: 'duplicateWorkflow', path: ctx.path });
+        } else if (act === 'rename' && ctx.path) {
+          vscode.postMessage({ type: 'renameWorkflow', path: ctx.path });
+        } else if (act === 'reveal-sw') {
+          vscode.postMessage({ type: 'revealStudioWebFolder', path: ctx.path || '' });
+        } else if (act === 'reveal-os' && ctx.path) {
+          vscode.postMessage({ type: 'revealInOs', path: ctx.path });
+        }
+      });
+    });
+    document.addEventListener('click', () => hideProjectCtx());
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') hideProjectCtx();
+    });
     function dryRunClass(id) {
       if (!state.playback) return '';
       const step = state.playback.steps[state.playback.index];
@@ -6135,6 +6270,28 @@ export function getDesignerHtml(
         if (els.btnSync) els.btnSync.disabled = false;
         if (els.btnSyncNow) els.btnSyncNow.disabled = false;
         if (msg.ok) state.syncDismissedKey = '';
+        const parts = [];
+        if (Array.isArray(msg.updated) && msg.updated.length) {
+          parts.push('updated: ' + msg.updated.slice(0, 3).join(', ') + (msg.updated.length > 3 ? '…' : ''));
+        }
+        if (Array.isArray(msg.conflicts) && msg.conflicts.length) {
+          parts.push('conflicts: ' + msg.conflicts.slice(0, 3).join(', '));
+        }
+        if (parts.length) {
+          toast((msg.message || 'Sync') + ' · ' + parts.join(' · '));
+        }
+      }
+      if (msg.type === 'workflowPathResolved') {
+        const wp = String(msg.workflowPath || '');
+        state.invokePathExists = state.invokePathExists || {};
+        state.invokePathPending = state.invokePathPending || {};
+        if (wp) {
+          state.invokePathExists[wp] = !!msg.exists;
+          delete state.invokePathPending[wp];
+          if (state.selectedId) {
+            try { renderProps(); } catch (_) {}
+          }
+        }
       }
     });
 

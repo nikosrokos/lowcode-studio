@@ -280,16 +280,13 @@ function classifyActivity(
         code: 'invoke-missing-path',
         message: `${activity.displayName}: Invoke Workflow has no workflow path.`
       });
-    } else if (projectDir) {
-      const abs = path.isAbsolute(rel) ? rel : path.join(projectDir, rel);
-      if (!fs.existsSync(abs)) {
-        warnings.push({
-          ...base,
-          severity: 'warning',
-          code: 'invoke-missing-file',
-          message: `${activity.displayName}: invoked workflow not found: ${rel}`
-        });
-      }
+    } else if (projectDir && !resolveInvokeWorkflowPath(projectDir, rel, workflowRel)) {
+      warnings.push({
+        ...base,
+        severity: 'warning',
+        code: 'invoke-missing-file',
+        message: `${activity.displayName}: invoked workflow not found: ${rel}`
+      });
     }
   }
 
@@ -364,7 +361,38 @@ export function formatPackageValidationReport(result: PackageValidationResult): 
   return lines.join('\n');
 }
 
-function listLcsWorkflows(projectDir: string): string[] {
+/**
+ * Resolve an Invoke Workflow path the same way the designer does:
+ * remap `.xaml` → `.lcs.json`, try project root + caller directory.
+ */
+export function resolveInvokeWorkflowPath(
+  projectDir: string,
+  workflowPath: string,
+  fromWorkflowRel?: string
+): string | undefined {
+  const relative = workflowPath.trim().replace(/\\/g, '/');
+  if (!relative) {
+    return undefined;
+  }
+  const withLcs =
+    relative.endsWith('.xaml') && !relative.endsWith('.lcs.json')
+      ? relative.replace(/\.xaml$/i, '.lcs.json')
+      : relative;
+  const fromDir = fromWorkflowRel
+    ? path.join(projectDir, path.dirname(fromWorkflowRel))
+    : undefined;
+  const candidates = [
+    path.isAbsolute(relative) ? relative : undefined,
+    path.isAbsolute(withLcs) ? withLcs : undefined,
+    path.join(projectDir, withLcs),
+    path.join(projectDir, relative),
+    fromDir ? path.join(fromDir, withLcs) : undefined,
+    fromDir ? path.join(fromDir, relative) : undefined
+  ].filter((p): p is string => Boolean(p));
+  return candidates.find((p) => fs.existsSync(p));
+}
+
+export function listLcsWorkflows(projectDir: string): string[] {
   const results: string[] = [];
   const stack = [projectDir];
   while (stack.length) {
@@ -376,11 +404,19 @@ function listLcsWorkflows(projectDir: string): string[] {
       continue;
     }
     for (const entry of entries) {
-      if (entry.name === 'node_modules' || entry.name === '.git' || entry.name.endsWith('.StudioWeb')) {
+      if (
+        entry.name === 'node_modules' ||
+        entry.name === '.git' ||
+        entry.name === '.lcs-sync-trash' ||
+        entry.name.endsWith('.StudioWeb')
+      ) {
         continue;
       }
       const full = path.join(current, entry.name);
       if (entry.isDirectory()) {
+        if (entry.name.startsWith('.')) {
+          continue;
+        }
         stack.push(full);
       } else if (entry.isFile() && entry.name.endsWith('.lcs.json')) {
         results.push(path.relative(projectDir, full).replace(/\\/g, '/'));

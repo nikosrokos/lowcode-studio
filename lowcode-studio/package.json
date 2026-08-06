@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Mac-first low-code RPA for VS Code/Cursor: REFramework design, scenario dry-runs (Shift+F5), and the easiest Connect to Studio Web handoff for Orchestrator publish.",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -116,6 +116,27 @@
         "title": "Validate Packages — NuGet deps and Windows selector warnings",
         "icon": "$(warning)",
         "shortTitle": "Validate",
+        "category": "LowCode Studio"
+      },
+      {
+        "command": "lowcodeStudio.readyForStudioWeb",
+        "title": "Ready for Studio Web? — packages, Portable, selectors, Imported.*",
+        "icon": "$(pass)",
+        "shortTitle": "Ready?",
+        "category": "LowCode Studio"
+      },
+      {
+        "command": "lowcodeStudio.projectAssistScan",
+        "title": "Project Assist — VB + selector scan across open project",
+        "icon": "$(sparkle)",
+        "shortTitle": "Project Assist",
+        "category": "LowCode Studio"
+      },
+      {
+        "command": "lowcodeStudio.showSyncStatus",
+        "title": "Studio Web Sync Status — per-file In sync / Out of sync / conflict",
+        "icon": "$(sync)",
+        "shortTitle": "Sync Status",
         "category": "LowCode Studio"
       },
       {
@@ -394,6 +415,24 @@
           "when": "view == lowcodeStudio.projects",
           "group": "navigation@4",
           "tooltip": "Validate Packages — NuGet deps and Windows selector warnings"
+        },
+        {
+          "command": "lowcodeStudio.readyForStudioWeb",
+          "when": "view == lowcodeStudio.projects",
+          "group": "navigation@4.5",
+          "tooltip": "Ready for Studio Web? — publish gate"
+        },
+        {
+          "command": "lowcodeStudio.projectAssistScan",
+          "when": "view == lowcodeStudio.projects",
+          "group": "navigation@4.6",
+          "tooltip": "Project Assist — VB + selector scan across project"
+        },
+        {
+          "command": "lowcodeStudio.showSyncStatus",
+          "when": "view == lowcodeStudio.projects",
+          "group": "navigation@4.7",
+          "tooltip": "Studio Web Sync Status — per-file detail"
         },
         {
           "command": "lowcodeStudio.refreshExplorer",
@@ -757,7 +796,7 @@
     "package": "npm run bundle && vsce package --no-dependencies",
     "lint": "tsc --noEmit",
     "docs:activities": "npm run compile && node scripts/generate-activities-md.js",
-    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && node out/test/windowsTarget.test.js && node out/test/extractTableData.test.js && node out/test/selectorBuilder.test.js && node out/test/windowsTodo.test.js && node out/test/strongDryRun.test.js && node out/test/blueprints.test.js && node out/test/activityPaletteSmartProps.test.js && node out/test/inputMethod.test.js && node out/test/projectResolve.test.js && node out/test/studioWebLocal.test.js && node out/test/useAppBrowserUx.test.js && node out/test/designerUxFixes.test.js && node out/test/workflowArguments.test.js && node out/test/phaseBActivities.test.js && node out/test/dryRun2.test.js && node out/test/whatsNew.test.js && node out/test/studioWebLocalSync.test.js && node out/test/packageManager.test.js && node out/test/a2ImportMap.test.js && node out/test/realRunners.test.js && node out/test/assist.test.js && node out/test/assistF2.test.js && node out/test/studioWebActivityExport.test.js && node out/test/studioWebBidirectional.test.js && node out/test/studioWebAdopt.test.js && node out/test/activityNormalize.test.js && node out/test/recentProjects.test.js && node out/test/deeperImportMap.test.js && npm run docs:activities"
+    "test": "npm run compile && node out/test/simulator.test.js && node out/test/reframework.test.js && node out/test/xamlImport.test.js && node out/test/selectorRoundTrip.test.js && node out/test/pythonActivities.test.js && node out/test/customActivities.test.js && node out/test/refDryRun.test.js && node out/test/topActivities.test.js && node out/test/configBridge.test.js && node out/test/studioWebConnect.test.js && node out/test/packageValidation.test.js && node out/test/windowsTarget.test.js && node out/test/extractTableData.test.js && node out/test/selectorBuilder.test.js && node out/test/windowsTodo.test.js && node out/test/strongDryRun.test.js && node out/test/blueprints.test.js && node out/test/activityPaletteSmartProps.test.js && node out/test/inputMethod.test.js && node out/test/projectResolve.test.js && node out/test/studioWebLocal.test.js && node out/test/useAppBrowserUx.test.js && node out/test/designerUxFixes.test.js && node out/test/workflowArguments.test.js && node out/test/phaseBActivities.test.js && node out/test/dryRun2.test.js && node out/test/whatsNew.test.js && node out/test/studioWebLocalSync.test.js && node out/test/packageManager.test.js && node out/test/a2ImportMap.test.js && node out/test/realRunners.test.js && node out/test/assist.test.js && node out/test/assistF2.test.js && node out/test/studioWebActivityExport.test.js && node out/test/studioWebBidirectional.test.js && node out/test/studioWebAdopt.test.js && node out/test/activityNormalize.test.js && node out/test/recentProjects.test.js && node out/test/deeperImportMap.test.js && node out/test/theme1DailyPath.test.js && npm run docs:activities"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
