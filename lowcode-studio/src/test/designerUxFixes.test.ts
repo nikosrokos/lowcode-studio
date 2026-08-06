@@ -63,12 +63,16 @@ function run(): void {
   assert.ok(html.includes('function idsEqual'), 'selection id compare is type-safe');
   assert.ok(html.includes('.card.selected[data-id]'), 'props recover selection from DOM after Sync');
   assert.ok(html.includes('rematch by type'), 'Sync rematches selection when ids rewrite');
+  assert.ok(html.includes('ICON_GLYPHS'), 'visible glyph fallbacks for activity icons');
+  assert.ok(html.includes('act-fb'), 'glyph fallback span always painted');
+  assert.ok(html.includes('pointerdown'), 'select on pointerdown so draggable cards paint props');
+  assert.ok(html.includes('Optimistic paint'), 'selectActivity paints props before walk races');
   assert.ok(html.includes('codicon-'), 'codicon classes for activity icons');
   assert.ok(html.includes('function iconCodiconName'), 'codicon name from catalog $(icon)');
   assert.ok(html.includes('function coercePaintValue'), 'coerce SW ExpressionText before paint');
-  assert.ok(!html.includes('ICON_GLYPHS'), 'emoji glyph map replaced by codicons');
+  assert.ok(html.includes('font-src') && html.includes('data:'), 'CSP allows data: font for embedded codicon');
 
-  // Font must be webview-absolute — relative ./codicon.ttf in linked CSS does not load
+  // Font must be embeddable — relative ./codicon.ttf in linked CSS does not load
   const withFont = getDesignerHtml(
     'nonce',
     'https://example',
@@ -78,9 +82,9 @@ function run(): void {
     undefined,
     undefined,
     undefined,
-    '@font-face{font-family:"codicon";src:url("https://example/codicon.ttf") format("truetype");}'
+    '@font-face{font-family:"codicon";src:url("data:font/truetype;base64,AAA") format("truetype");}'
   );
-  assert.ok(withFont.includes('url("https://example/codicon.ttf")'), 'codicon @font-face uses injected webview URI');
+  assert.ok(withFont.includes('data:font/truetype;base64,'), 'codicon @font-face uses embedded data URI');
   assert.ok(withFont.includes('<style nonce="nonce">'), 'codicon CSS inlined (not broken relative link)');
   assert.ok(!withFont.includes('codicon.css'), 'does not rely on linked stock codicon.css');
 

@@ -67,7 +67,7 @@ export function getDesignerHtml(
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource}; script-src 'nonce-${nonce}';" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource} data:; script-src 'nonce-${nonce}';" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LowCode Studio Designer</title>
   ${codiconStyle}
@@ -339,6 +339,9 @@ export function getDesignerHtml(
       color: #fff;
     }
     .act-icon.codicon:before { color: #fff; }
+    /* Visible glyph fallback when codicon ::before font fails to paint */
+    .act-icon .act-fb { font-family: inherit; font-size: 11px; font-weight: 700; line-height: 1; color: #fff; }
+    .act-icon.codicon.codicon-ready .act-fb { display: none; }
     .card-head .act-icon { width: 20px; height: 20px; font-size: 11px; }
     .card-head .act-icon.codicon { font-size: 13px; }
     .flow-node .act-icon {
@@ -2335,11 +2338,15 @@ export function getDesignerHtml(
       return null;
     }
     function selectActivity(id, opts) {
+      // Optimistic paint — Properties must not stay empty while heal/walk races
+      if (opts && opts.node) {
+        if (!String(opts.node.id || '').trim()) opts.node.id = newId();
+        setSelectedNode(opts.node);
+      }
       const heal = ensureActivityIds(state.workflow.activities);
       let hit = String(id || '').trim() ? walkFind(state.workflow.activities, String(id)) : null;
       // Prefer live node reference (click / contextmenu) — survives heal assigning a new id
       if (!hit && opts && opts.node) {
-        if (!String(opts.node.id || '').trim()) opts.node.id = newId();
         hit = walkFind(state.workflow.activities, opts.node.id);
         if (!hit) {
           setSelectedNode(opts.node);
@@ -2349,8 +2356,12 @@ export function getDesignerHtml(
           if (state.collapsedPropSections.studioWeb === undefined) {
             state.collapsedPropSections.studioWeb = true;
           }
-          if (opts.rerender) renderAll();
-          else { renderProps(); renderBreadcrumbs(); renderMinimap(); }
+          renderProps();
+          renderBreadcrumbs();
+          renderMinimap();
+          if (opts.rerender) {
+            if (isFlow()) renderFlowchart(); else renderSequence();
+          }
           requestAnimationFrame(() => {
             if (state.selectedNode === opts.node || idsEqual(state.selectedId, opts.node.id)) renderProps();
           });
@@ -2363,7 +2374,7 @@ export function getDesignerHtml(
         hit = { node: opts.node, list: hit.list, index: hit.index };
       }
       if (!hit) {
-        setSelectedNode(null);
+        if (!(opts && opts.node)) setSelectedNode(null);
         if (heal) persist(false);
         return false;
       }
@@ -2374,9 +2385,10 @@ export function getDesignerHtml(
       if (state.collapsedPropSections.studioWeb === undefined) {
         state.collapsedPropSections.studioWeb = true;
       }
+      // Always paint props first so Selection never looks empty during full re-render
+      renderProps();
       if (opts?.rerender) renderAll();
       else {
-        renderProps();
         renderBreadcrumbs();
         renderMinimap();
       }
@@ -2474,21 +2486,47 @@ export function getDesignerHtml(
     }
     function escapeAttr(s) { return escapeHtml(s).replace(/'/g, '&#39;'); }
 
-    /** Same codicon names as the VS Code Activities tree ($(output) → codicon-output). */
+    /**
+     * Catalog $(codicon) → compact glyph badge. Always paint a visible character —
+     * webview codicon fonts are unreliable (empty colored squares if ::before fails).
+     */
+    const ICON_GLYPHS = {
+      output: '☰', watch: '⏱', comment: '💬', 'comment-discussion': '💬', terminal: '>_',
+      'file-text': '📄', save: '💾', 'diff-added': '+', search: '⌕', 'new-folder': '📁',
+      files: '📑', trash: '🗑', 'file-symlink-file': '↗', edit: '✎', 'find-replace': '⇄',
+      close: '×', 'symbol-variable': '𝑥', 'symbol-namespace': '{}', code: '</>',
+      error: '!', 'debug-stop': '■', 'debug-breakpoint-conditional': '◆', sync: '↻',
+      'debug-restart': '↺', 'debug-pause': '❚❚', 'debug-continue': '▶', 'list-ordered': '1.',
+      shield: '🛡', 'list-flat': '≡', 'type-hierarchy-sub': '⎇', 'split-horizontal': '◫',
+      'list-tree': '🌳', window: '▢', browser: '🌐', inspect: '🔍', keyboard: '⌨',
+      selection: '▣', eye: '👁', check: '✓', 'list-selection': '☑', 'device-camera': '📷',
+      'symbol-property': '⚙', table: '▦', file: '📄', add: '+', filter: '▽',
+      'arrow-swap': '⇄', 'clear-all': '⊘', export: '↗', 'git-merge': '⑂',
+      'symbol-field': '·', 'arrow-both': '↔', 'symbol-key': '🔑', mail: '✉', globe: '🌐',
+      inbox: '📥', json: '{}', 'bracket-dot': '[.]', 'symbol-misc': '✦', 'file-code': '</>',
+      play: '▶', 'symbol-method': 'ƒ', 'debug-start': '▶', 'run-all': '⇉', key: '🔑',
+      lock: '🔒', checklist: '☑'
+    };
     function iconCodiconName(icon) {
       return String(icon || '').replace(/^\$\(|\)$/g, '').trim();
+    }
+    function iconGlyph(icon) {
+      const key = iconCodiconName(icon);
+      return ICON_GLYPHS[key] || '●';
     }
     function activityIconHtml(defOrType, color) {
       const def = typeof defOrType === 'string' ? findDef(defOrType) : defOrType;
       const c = color || def?.color || '#64748B';
       const name = iconCodiconName(def?.icon);
+      const glyph = iconGlyph(def?.icon);
       const title = escapeAttr((def?.displayName || '') + (def?.icon ? ' ' + def.icon : ''));
+      const fb = '<span class="act-fb" aria-hidden="true">' + escapeHtml(glyph) + '</span>';
       if (name) {
         return '<span class="act-icon codicon codicon-' + escapeAttr(name) + '" style="--ico:' +
-          escapeAttr(c) + ';background:' + escapeAttr(c) + '" title="' + title + '"></span>';
+          escapeAttr(c) + ';background:' + escapeAttr(c) + '" title="' + title + '">' + fb + '</span>';
       }
       return '<span class="act-icon" style="--ico:' + escapeAttr(c) + ';background:' + escapeAttr(c) +
-        '" title="' + title + '">●</span>';
+        '" title="' + title + '">' + fb + '</span>';
     }
     function coercePaintValue(val) {
       if (val == null || typeof val !== 'object' || Array.isArray(val)) return val;
@@ -3401,12 +3439,21 @@ export function getDesignerHtml(
       card.addEventListener('mouseenter', (e) => showTip(tipHtml(node), e.clientX, e.clientY));
       card.addEventListener('mousemove', (e) => showTip(tipHtml(node), e.clientX, e.clientY));
       card.addEventListener('mouseleave', hideTip);
-      card.addEventListener('click', (e) => {
+      // pointerdown: draggable cards often swallow click after a tiny move
+      const selectThis = (e) => {
         if (e.target.closest('[data-card-menu]')) return;
         if (!String(node.id || '').trim()) node.id = newId();
         selectActivity(node.id, { rerender: true, node: node });
         hideTip();
         hideCtxMenu();
+      };
+      card.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        selectThis(e);
+      });
+      card.addEventListener('click', (e) => {
+        // Re-assert selection if pointerdown was skipped (keyboard / accessibility)
+        if (!idsEqual(state.selectedId, node.id)) selectThis(e);
       });
       card.addEventListener('contextmenu', (e) => {
         e.preventDefault();
@@ -4471,10 +4518,7 @@ export function getDesignerHtml(
             const def = findDef(n.type);
             const color = n.color || def?.color || '#64748B';
             const sel = idsEqual(state.selectedId, n.id) ? ' selected' : '';
-            const icoName = iconCodiconName(def?.icon);
-            const icoHtml = icoName
-              ? '<span class="mm-ico codicon codicon-' + escapeAttr(icoName) + '" style="background:' + escapeAttr(color) + '"></span>'
-              : '<span class="mm-ico" style="background:' + escapeAttr(color) + '">●</span>';
+            const icoHtml = activityIconHtml(def || n.type, color).replace('act-icon', 'act-icon mm-ico');
             const name = n.displayName || n.type || 'Activity';
             return '<button type="button" class="mm-row' + sel + '" data-mm-id="' + escapeAttr(n.id) +
               '" title="#' + (i + 1) + ' ' + escapeAttr(name) + '">' +
@@ -4488,7 +4532,8 @@ export function getDesignerHtml(
         btn.addEventListener('click', () => {
           const id = btn.getAttribute('data-mm-id');
           if (!id) return;
-          selectActivity(id, { rerender: true });
+          const hit = walkFind(state.workflow.activities, id);
+          selectActivity(id, { rerender: true, node: hit?.node });
           highlightSearchHit(id);
         });
       });
@@ -5165,6 +5210,7 @@ export function getDesignerHtml(
       renderConnectionsPanel();
       syncDockActive();
       if (state.assistHelpOpen && state.assistTab === 'live') renderAssistLivePanel();
+      markCodiconsReady();
     }
 
     function persist(rerender) {
@@ -6080,10 +6126,21 @@ export function getDesignerHtml(
       }
     });
 
+    function markCodiconsReady() {
+      const apply = () => {
+        document.querySelectorAll('.act-icon.codicon').forEach((el) => el.classList.add('codicon-ready'));
+      };
+      if (document.fonts && document.fonts.load) {
+        document.fonts.load('14px codicon').then(apply).catch(() => {});
+        // If font never loads, keep .act-fb glyphs visible
+      }
+    }
+
     restorePropsPanelState();
     applyPropsPanelLayout();
     syncSuggestionVariables();
     renderAll();
+    markCodiconsReady();
     vscode.postMessage({ type: 'ready' });
   </script>
 </body>

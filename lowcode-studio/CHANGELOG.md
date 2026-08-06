@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.51] — 2026-08-06
+
+### Fixed
+- **Activity icons actually visible** — restore always-on glyph badges (☰ / ⏱ / 💬 …); embed `codicon.ttf` as a `data:` font (webview URI fonts still failed in Cursor → empty colored squares). CSP allows `font-src data:`
+- **Properties on card press** — select on `pointerdown` (draggable cards were eating `click`); optimistic `setSelectedNode` + paint props before full re-render so Studio Web activities show Message/Level immediately
+
 ## [0.6.50] — 2026-08-06
 
 ### Fixed
