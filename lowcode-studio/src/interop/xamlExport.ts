@@ -836,6 +836,51 @@ function normalizeAttachMode(raw: unknown): string | undefined {
  * Build Data Table is Windows-only. Portable (Studio Web) rewrite:
  * Assign New DataTable + Add Data Column per column (cross-platform).
  */
+/**
+ * Builds the ADO.NET DataSet XSD schema string that UiPath.Core.Activities.BuildDataTable
+ * actually stores its column definitions in (the "TableInfo" property). This is NOT a
+ * simple "Columns"/"ColumnNames" attribute — BuildDataTable has no such property. Verified
+ * against real Studio-exported XAML samples, e.g.:
+ *   <ui:BuildDataTable DataTable="[dt]" TableInfo="&lt;NewDataSet&gt;
+ *     &lt;xs:schema id=&quot;NewDataSet&quot; ...&gt;
+ *       &lt;xs:element name=&quot;NewDataSet&quot;&gt;
+ *         &lt;xs:complexType&gt;
+ *           &lt;xs:choice minOccurs=&quot;0&quot; maxOccurs=&quot;unbounded&quot;&gt;
+ *             &lt;xs:element name=&quot;Table1&quot;&gt;
+ *               &lt;xs:complexType&gt;
+ *                 &lt;xs:sequence&gt;
+ *                   &lt;xs:element name=&quot;ColName&quot; type=&quot;xs:string&quot; minOccurs=&quot;0&quot; /&gt;
+ *                   ...
+ * Only the leaf column elements carry a `type="xs:..."` attribute — the wrapping
+ * NewDataSet/Table1 elements don't — which is also what the import-side parser below
+ * keys off of.
+ */
+function buildTableInfoSchema(columns: string[]): string {
+  const cols = (columns.length ? columns : ['Column1'])
+    .map(
+      (col) =>
+        `          <xs:element name="${escapeAttr(col)}" type="xs:string" minOccurs="0" />`
+    )
+    .join('\n');
+  return `<NewDataSet>
+  <xs:schema id="NewDataSet" xmlns="" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xs:element name="NewDataSet" msdata:IsDataSet="true" msdata:UseCurrentLocale="true">
+      <xs:complexType>
+        <xs:choice minOccurs="0" maxOccurs="unbounded">
+          <xs:element name="Table1">
+            <xs:complexType>
+              <xs:sequence>
+${cols}
+              </xs:sequence>
+            </xs:complexType>
+          </xs:element>
+        </xs:choice>
+      </xs:complexType>
+    </xs:element>
+  </xs:schema>
+</NewDataSet>`;
+}
+
 function renderBuildDataTable(
   activity: ActivityNode,
   pad: string,
@@ -849,7 +894,11 @@ function renderBuildDataTable(
   const display = escapeAttr(exportDisplayName(activity.displayName));
 
   if (!isPortableExport()) {
-    return `${pad}<ui:BuildDataTable DisplayName="${display}" DataTable="[${escapeAttr(result)}]" />`;
+    // BuildDataTable is Windows/Windows-Legacy only (not Cross-platform) — this is the
+    // real export path. Previously this emitted no schema at all, so every configured
+    // column was silently dropped and Studio Web would show an empty/blank table.
+    const tableInfo = escapeAttr(buildTableInfoSchema(columns));
+    return `${pad}<ui:BuildDataTable DisplayName="${display}" DataTable="[${escapeAttr(result)}]" TableInfo="${tableInfo}" />`;
   }
 
   const initPad = pad + '  ';
@@ -873,6 +922,7 @@ ${initPad}</Assign>
 ${colXml}
 ${pad}</Sequence>`;
 }
+
 
 function renderPythonActivity(activity: ActivityNode, pad: string, indent: number): string {
   switch (activity.type) {
@@ -917,12 +967,15 @@ function renderExtractTableData(activity: ActivityNode, pad: string): string {
     .filter(Boolean)
     .join(' ');
 
+  // Real modern class is UiPath.UIAutomationNext.Activities.NExtractData —
+  // "ExtractTableData" is not a real class name and was silently breaking Studio Web
+  // load after sync.
   if (!target) {
-    return `${pad}<uia:ExtractTableData ${attrs} />`;
+    return `${pad}<uia:NExtractData ${attrs} />`;
   }
-  return `${pad}<uia:ExtractTableData ${attrs}>
+  return `${pad}<uia:NExtractData ${attrs}>
 ${target}
-${pad}</uia:ExtractTableData>`;
+${pad}</uia:NExtractData>`;
 }
 
 function renderUiActivity(activity: ActivityNode, pad: string, indent: number): string {
@@ -973,8 +1026,17 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
                 : activity.type === 'UI.TakeScreenshot'
                   ? 'uia:NTakeScreenshot'
                   : activity.type === 'UI.GetAttribute'
-                    ? 'uia:NGetAttribute'
-                    : 'uia:NClick';
+                    ? 'uia:NGetAttributeGeneric'
+                    : activity.type === 'UI.SendHotkey'
+                      ? 'uia:NKeyboardShortcuts'
+                      : (() => {
+                          // Should never happen for a type isUiActivity() accepts —
+                          // previously this silently fell back to NClick (wrong tag,
+                          // dropped properties) instead of surfacing the gap.
+                          throw new Error(
+                            `xamlExport: no modern UI Automation tag mapped for lcsType "${activity.type}"`
+                          );
+                        })();
 
   const extra: string[] = [];
   if (activity.type === 'UI.Click') {
@@ -1006,6 +1068,14 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
   }
   if (activity.type === 'UI.GetAttribute') {
     extra.push(`Attribute="${escapeAttr(String(props.attribute || 'aaname'))}"`);
+  }
+  if (activity.type === 'UI.SendHotkey') {
+    // BEST EFFORT — could not confirm the exact NKeyboardShortcuts XAML property
+    // name/shape (a real Studio Web export of this activity would confirm whether
+    // it's a flat "Shortcut" attribute or a nested Shortcuts collection element).
+    // If this activity still fails to load after this fix, capture a real XAML
+    // sample from Studio Web/Desktop and adjust this block accordingly.
+    extra.push(`Shortcut="[${escapeAttr(toVbStringArgument(props.key))}]"`);
   }
   if (activity.type === 'UI.GetText' || activity.type === 'UI.GetAttribute') {
     const resultVar = String(

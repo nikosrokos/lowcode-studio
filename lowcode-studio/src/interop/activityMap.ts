@@ -5,6 +5,8 @@ export interface MappedActivity {
   xamlLocalNames: string[];
   /** Optional XML namespace hint used when exporting */
   xamlNamespace?: 'ui' | 'uia' | 'excel' | 'mail' | 'python' | 'default';
+  /** Canonical name written on export. Defaults to xamlLocalNames[0] when omitted. */
+  exportName?: string;
 }
 
 type Ns = 'ui' | 'uia' | 'excel' | 'mail' | 'python' | 'default';
@@ -13,6 +15,7 @@ const MAP: Array<{
   lcsType: string;
   xamlLocalNames: string[];
   xamlNamespace?: Ns;
+  exportName?: string;
 }> = [
   { lcsType: 'System.LogMessage', xamlLocalNames: ['LogMessage'], xamlNamespace: 'ui' },
   { lcsType: 'System.Delay', xamlLocalNames: ['Delay'], xamlNamespace: 'default' },
@@ -78,73 +81,109 @@ const MAP: Array<{
     xamlLocalNames: ['Continue'],
     xamlNamespace: 'default'
   },
+
+  // --- UI Automation (modern / "Next") activities ---
+  // NOTE: xamlLocalNames lists every name we accept on IMPORT (classic + modern
+  // aliases, for tolerance reading older/mixed projects). exportName is the ONE
+  // canonical name we WRITE on save, verified against UiPath.UIAutomationNext.Activities
+  // docs (docs.uipath.com/activities/other/latest/ui-automation/...). This split is
+  // the fix for activities round-tripping incorrectly after save/sync to Studio Web:
+  // previously xamlLocalNames[0] was used for export, which for several rows was a
+  // classic (or in one case entirely made-up) name rather than the modern class name.
   {
     lcsType: 'UI.Click',
     xamlLocalNames: ['Click', 'NClick', 'TargetAwareClick', 'ClickImage'],
-    xamlNamespace: 'uia'
+    xamlNamespace: 'uia',
+    exportName: 'NClick'
   },
   {
     lcsType: 'UI.TypeInto',
     xamlLocalNames: ['TypeInto', 'NTypeInto', 'TypeSecureText'],
-    xamlNamespace: 'uia'
+    xamlNamespace: 'uia',
+    exportName: 'NTypeInto'
   },
   {
     lcsType: 'UI.GetText',
     xamlLocalNames: ['GetText', 'NGetText', 'GetFullText', 'GetVisibleText'],
-    xamlNamespace: 'uia'
+    xamlNamespace: 'uia',
+    exportName: 'NGetText'
   },
   {
     lcsType: 'UI.ElementExists',
-    xamlLocalNames: ['ElementExists', 'UiElementExists', 'CheckAppState'],
-    xamlNamespace: 'uia'
+    // Modern equivalent is "Check App State" (NCheckState), not a standalone
+    // "ElementExists" class. WaitAppear/WaitDissapear modes on NCheckState cover
+    // both "does it exist" and "wait for it" semantics.
+    xamlLocalNames: ['ElementExists', 'UiElementExists', 'CheckAppState', 'NCheckState'],
+    xamlNamespace: 'uia',
+    exportName: 'NCheckState'
   },
   {
     lcsType: 'UI.Check',
     xamlLocalNames: ['Check', 'NCheck', 'CheckState'],
-    xamlNamespace: 'uia'
+    xamlNamespace: 'uia',
+    exportName: 'NCheck'
   },
   {
     lcsType: 'UI.Hover',
     xamlLocalNames: ['Hover', 'NHover'],
-    xamlNamespace: 'uia'
+    xamlNamespace: 'uia',
+    exportName: 'NHover'
   },
   {
     lcsType: 'UI.SendHotkey',
     xamlLocalNames: ['SendHotkey', 'KeyboardShortcuts', 'NKeyboardShortcuts'],
-    xamlNamespace: 'uia'
+    xamlNamespace: 'uia',
+    exportName: 'NKeyboardShortcuts'
   },
   {
     lcsType: 'UI.SelectItem',
     xamlLocalNames: ['SelectItem', 'NSelectItem'],
-    xamlNamespace: 'uia'
+    xamlNamespace: 'uia',
+    exportName: 'NSelectItem'
   },
   {
     lcsType: 'UI.TakeScreenshot',
     xamlLocalNames: ['TakeScreenshot', 'NTakeScreenshot'],
-    xamlNamespace: 'uia'
+    xamlNamespace: 'uia',
+    exportName: 'NTakeScreenshot'
   },
   {
     lcsType: 'UI.OpenApplication',
+    // No modern "N*" replacement exists for classic Open Application / Open Browser —
+    // the modern activity set replaces both with Use Application/Browser
+    // (NApplicationCard, see UI.UseApplicationBrowser below). Left as classic on
+    // export since there's nothing modern to point it at; flagging in case this
+    // needs to be reworked to just funnel into UseApplicationBrowser instead.
     xamlLocalNames: ['OpenApplication', 'OpenBrowser', 'NOpenApplication'],
     xamlNamespace: 'uia'
   },
   {
     lcsType: 'UI.UseApplicationBrowser',
+    // 'UseApplicationBrowser' (previously exportName default) is NOT a real UiPath
+    // class — it doesn't exist in any package. This was silently breaking export.
     xamlLocalNames: [
       'UseApplicationBrowser',
       'NApplicationCard',
       'ApplicationCard',
       'UseBrowser'
     ],
-    xamlNamespace: 'uia'
+    xamlNamespace: 'uia',
+    exportName: 'NApplicationCard'
   },
   {
     lcsType: 'UI.GetAttribute',
-    xamlLocalNames: ['GetAttribute', 'NGetAttribute'],
-    xamlNamespace: 'uia'
+    xamlLocalNames: ['GetAttribute', 'NGetAttribute', 'NGetAttributeGeneric'],
+    xamlNamespace: 'uia',
+    exportName: 'NGetAttributeGeneric'
   },
   {
     lcsType: 'UI.WaitElement',
+    // UNVERIFIED: could not confirm a modern "N*" equivalent for Wait Element
+    // Vanish / On Element Appear in current UiPath docs. If this activity is
+    // actually used in your modern solutions, it may need to be re-modeled as
+    // UI.ElementExists (NCheckState with WaitAppear/WaitDissapear) instead of
+    // exported under a classic name. Left unset (falls back to classic
+    // xamlLocalNames[0]) pending confirmation — do not treat this row as fixed.
     xamlLocalNames: [
       'WaitElementVanish',
       'OnElementAppear',
@@ -161,12 +200,17 @@ const MAP: Array<{
       'NExtractData',
       'ExtractStructuredData'
     ],
-    xamlNamespace: 'uia'
+    xamlNamespace: 'uia',
+    exportName: 'NExtractData'
   },
+
   { lcsType: 'Data.ReadCsv', xamlLocalNames: ['ReadCsvFile', 'ReadCSV'], xamlNamespace: 'ui' },
   { lcsType: 'Data.WriteCsv', xamlLocalNames: ['WriteCsvFile', 'WriteCSV'], xamlNamespace: 'ui' },
   {
     lcsType: 'Data.BuildDataTable',
+    // Verified: UiPath.Core.Activities.BuildDataTable — name is correct.
+    // If this activity isn't round-tripping correctly, the bug is almost certainly
+    // in the property/column-schema serializer, not in this tag-name mapping.
     xamlLocalNames: ['BuildDataTable'],
     xamlNamespace: 'ui'
   },
@@ -529,7 +573,7 @@ export function xamlInfoForLcsType(
     return undefined;
   }
   return {
-    localName: row.xamlLocalNames[0],
+    localName: row.exportName || row.xamlLocalNames[0],
     ns: row.xamlNamespace || 'default'
   };
 }
