@@ -5,6 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.7.2] — 2026-08-06
+
+### Added
+- **Theme 1 — End-to-end daily path**
+  - **Ready for Studio Web?** gate (command + designer dock ◉) — packages, Portable openability, selectors, `Imported.*`, Invoke paths, Windows TODO; green → Reveal Local Workspace / Open Studio Web
+  - **Project Assist** — scan VB (F4) + selectors (F3) across the whole project; propose → Apply all / VB only / selectors only
+  - **Project tree** — Duplicate / Rename / Reveal in Studio Web folder (⋯ menu + right-click)
+  - **Sync conflict clarity** — distinct conflict reason when both sides changed; per-file stale list in alert + **Sync Status** command; pull report lists updated / conflicts / trash backups
+  - Invoke path check uses real disk resolve (`.xaml` → `.lcs.json` remap) in validation + Properties checklist
+
+### Changed
+- Sync pill shows **Conflict · N** when both LCS and Studio Web diverged
+
 ## [0.7.1] — 2026-08-06
 
 ### Added

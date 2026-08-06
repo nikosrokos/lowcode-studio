@@ -1,6 +1,6 @@
 # LowCode Studio — Activity coverage
 
-Generated for **v0.7.1** from the extension activity catalog.
+Generated for **v0.7.2** from the extension activity catalog.
 
 This list is what you can design in VS Code / Cursor, dry-run locally, and best-effort import/export with UiPath Studio / Studio Web.
 

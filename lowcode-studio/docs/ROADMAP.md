@@ -2,22 +2,23 @@
 
 **Goal:** Design, test, and iterate most RPA work in LowCode Studio — then **Save sync** into Studio Web Local Workspace for publish / Orchestrator. Studio Web is the ship path, not the daily editor.
 
-> Living document · current product version **0.7.1**
+> Living document · current product version **0.7.2**
 
 ---
 
-## Where we are (0.7.1)
+## Where we are (0.7.2)
 
 | Layer | Status |
 |---|---|
 | Designer | Sequence + Flowchart, Maestro frames/dock, mini-map, Fit/Find/Align, Home, **light/dark/auto theme** |
 | Properties / SW reopen | Select + edit after Studio Web Sync (ids, PascalCase, ExpressionText, delegated editors) |
-| Assist | F0–F4 + Live/Scaffold popup + expr VB Assist + Invoke argument mapping |
-| Sync | Local Workspace ↔ Save, adopt/open, sync banner/pull, lean footprint |
+| Assist | F0–F4 + Live/Scaffold popup + expr VB Assist + Invoke argument mapping + **project-wide Assist** |
+| Sync | Local Workspace ↔ Save, adopt/open, sync banner/pull, **conflict clarity**, lean footprint |
 | Catalog / import | Core UI / data / HTTP / REF / Excel / Orchestrator maps (fewer `Imported.*`) |
 | Dry-run | Scenarios (Shift+F5), step-through, fixtures, opt-in real HTTP/Python |
+| Publish gate | **Ready for Studio Web?** (packages, Portable, selectors, Imported.*, Invoke, Windows TODO) |
 
-**Next chapter:** end-to-end confidence — fewer reasons to leave LCS before publish, and zero surprise when Studio Web opens the same folder.
+**Next chapter:** designer editing depth + catalog fidelity — stay in Cursor longer, fewer Studio Web activity adds.
 
 ---
 
@@ -39,8 +40,10 @@ Already in product — keep investing only as polish, not as roadmap themes:
 - Designer **Appearance**: Auto / Light / Dark + toolbar ☀/☽ toggle
 - Arguments / variables panels; Invoke Workflow mapping UI + Out/InOut XAML
 - Expression editor with VB Assist; “Required for Studio Web” checklist; Selector Builder
-- Assist F0–F4 + Live / Scaffold propose→Apply
-- Studio Web Local Workspace sync (Save, pull, adopt, conflict trash)
+- Assist F0–F4 + Live / Scaffold propose→Apply + **project-wide VB / selector scan**
+- Studio Web Local Workspace sync (Save, pull, adopt, conflict trash) + **per-file sync / conflict clarity**
+- **Ready for Studio Web?** publish gate (command + dock) → Reveal Local Workspace
+- Project tree: **duplicate / rename / reveal Studio Web folder**; Invoke missing-path disk resolve
 - REFramework scaffold, scenarios, blueprints, package validation / Manage Packages
 - Deeper import map (file I/O, Excel/Orch modern locals, UI / data / HTTP / REF)
 - Opt-in real HTTP / Python dry-run runners; Windows TODO surface
@@ -48,25 +51,6 @@ Already in product — keep investing only as polish, not as roadmap themes:
 ---
 
 ## Open backlog
-
-### Theme 1 — End-to-end daily path (highest priority)
-
-#### T1. Multi-file project flow
-- Project tree hub: rename, duplicate, reveal-in-Studio-Web-folder
-- Cross-file navigation (Invoke → jump; missing path warnings)
-- **Bulk Assist** across the open project (VB, empty required, weak selectors) with propose → Apply
-
-#### T3. Publish-ready gate
-- One command / dock action: **Ready for Studio Web?** (packages, Portable, selectors, required props, `Imported.*`, Windows TODO)
-- Project-wide surface of Assist Live issues + Apply all where safe
-- After green: Reveal Local Workspace / open Studio Web is publish, not repair
-
-#### T4. Sync conflict clarity
-- Clearer In sync / Out of sync / conflict when Studio Web edited the same `.xaml`
-- Deeper conflict copy and “what changed” after pull
-- Keep lean sync discipline (zero surprise files in `.uipx`)
-
----
 
 ### Theme 2 — Designer editing depth
 
@@ -77,7 +61,7 @@ Already in product — keep investing only as polish, not as roadmap themes:
 
 #### T6. Typed property editors
 - DataTable columns, dictionary, secret-as-variable editors
-- Keep tying “Required for Studio Web” into T3 gate
+- Keep tying “Required for Studio Web” into the publish gate
 
 #### T7. Onboarding copy
 - Tighten first-run / empty canvas around Local Workspace as the only ship path
@@ -118,7 +102,7 @@ Already in product — keep investing only as polish, not as roadmap themes:
 
 #### T12. Richer Assist
 - Richer F2 scaffolds (containers / branches / nested Use Browser from description)
-- Multi-file scaffold + project-wide VB / selector pass
+- Multi-file scaffold (beyond project Assist scan)
 - Never emit LCS-only types that become `Imported.*` after Save
 - Optional later: constrained LLM behind the same propose→Apply contract
 
@@ -127,8 +111,8 @@ Already in product — keep investing only as polish, not as roadmap themes:
 ### Theme 6 — Closer to Orchestrator
 
 #### T13. Publish path
-- One-click “Open / reveal Local Workspace for publish”
 - Longer-term: Orchestrator publish API if UiPath exposes a Mac-friendly path (**explore; don’t promise**)
+- (Reveal Local Workspace after green gate — shipped in 0.7.2)
 
 #### T14. Packages & targets
 - Keep Studio Web–compatible version ranges honest
@@ -139,15 +123,13 @@ Already in product — keep investing only as polish, not as roadmap themes:
 ## Suggested next (impact × fit)
 
 ```
-T3   Ready-for-Studio-Web gate        ← E2E confidence before publish
-T1   Multi-file / project-wide Assist ← daily-path speed
-T4   Sync conflict clarity            ← trust Local Workspace as-is
 T10  Dry-run breakpoints + watch      ← stay in Cursor to verify
 T12  Richer scaffolds / multi-file F2 ← Assist depth
 T8   Next import-map slice            ← fewer Imported.*
 T9   Excel / Orchestrator depth       ← fewer Studio Web activity adds
-T13  Publish reveal / deep link       ← last mile
+T5   Canvas distribute / drop polish  ← daily editing feel
 T6   Typed property editors           ← remaining expression UX
+T13  Orchestrator publish API explore ← last mile (optional)
 ```
 
 ---
@@ -178,7 +160,7 @@ T6   Typed property editors           ← remaining expression UX
 
 ## How to use this doc
 
-- Prefer **one Theme 1 item** per release when possible.
+- Prefer **one Theme item** per release when possible.
 - Pair every new activity with: catalog · dry-run · XAML import · XAML export · package pin · Local Workspace round-trip test.
 - Never invent a ship path around Local Workspace.
 - When something ships: move it under **Shipped**, drop it from Open backlog, refresh the sequencing list.

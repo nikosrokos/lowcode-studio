@@ -1118,7 +1118,7 @@ export function trySyncFromStudioWebLocal(
 export interface StudioWebLocalStaleFile {
   workflowRel: string;
   xamlRel: string;
-  reason: 'missing-xaml' | 'lcs-newer' | 'xaml-newer';
+  reason: 'missing-xaml' | 'lcs-newer' | 'xaml-newer' | 'conflict';
 }
 
 export interface StudioWebLocalSyncStatus {
@@ -1191,8 +1191,7 @@ export function getStudioWebLocalSyncStatus(
         } else if (lcsChanged && !xamlChanged) {
           stale.push({ workflowRel: rel, xamlRel, reason: 'lcs-newer' });
         } else if (lcsChanged && xamlChanged) {
-          // Both diverged — surface as xaml-newer so Pull is offered
-          stale.push({ workflowRel: rel, xamlRel, reason: 'xaml-newer' });
+          stale.push({ workflowRel: rel, xamlRel, reason: 'conflict' });
         }
       } else {
         const lcsStat = fs.statSync(lcsAbs);
@@ -1211,9 +1210,13 @@ export function getStudioWebLocalSyncStatus(
   const inSync = stale.length === 0;
   const xamlNewer = stale.filter((s) => s.reason === 'xaml-newer').length;
   const lcsNewer = stale.filter((s) => s.reason === 'lcs-newer').length;
+  const conflicts = stale.filter((s) => s.reason === 'conflict').length;
   let summary = 'Synced with Studio Web Local Workspace';
   if (!inSync) {
     const parts: string[] = [];
+    if (conflicts) {
+      parts.push(`${conflicts} conflict(s) — both sides changed`);
+    }
     if (xamlNewer) {
       parts.push(`${xamlNewer} Studio Web newer (Pull or Save to merge)`);
     }
@@ -1234,6 +1237,87 @@ export function getStudioWebLocalSyncStatus(
     stale,
     summary
   };
+}
+
+export function formatStudioWebPullReport(result: StudioWebPullResult): string {
+  const lines: string[] = [
+    'Studio Web pull — what changed',
+    '─'.repeat(48)
+  ];
+  if (result.updated.length) {
+    lines.push(`Updated (${result.updated.length}):`);
+    for (const rel of result.updated) {
+      lines.push(`  · ${rel}`);
+    }
+  }
+  if (result.created.length) {
+    lines.push(`Created (${result.created.length}):`);
+    for (const rel of result.created) {
+      lines.push(`  · ${rel}`);
+    }
+  }
+  if (result.conflicts.length) {
+    lines.push(`Conflicts — both sides changed, skipped (${result.conflicts.length}):`);
+    for (const rel of result.conflicts) {
+      lines.push(`  ! ${rel}`);
+    }
+    lines.push(
+      `  Tip: Save to keep LCS (Studio Web copy → ${SYNC_TRASH_DIR}/), or Sync with force to take Studio Web.`
+    );
+  }
+  if (result.backups.length) {
+    lines.push(`Backups in ${SYNC_TRASH_DIR}/ (${result.backups.length}):`);
+    for (const bak of result.backups.slice(0, 12)) {
+      lines.push(`  · ${bak}`);
+    }
+  }
+  if (
+    !result.updated.length &&
+    !result.created.length &&
+    !result.conflicts.length
+  ) {
+    lines.push('Already in sync — nothing pulled.');
+  }
+  if (result.warnings.length) {
+    lines.push('', `Import warnings (${result.warnings.length}):`);
+    for (const w of result.warnings.slice(0, 20)) {
+      lines.push(`  · ${w.message}`);
+    }
+  }
+  return lines.join('\n');
+}
+
+export function formatStudioWebSyncStatusDetail(
+  status: StudioWebLocalSyncStatus
+): string {
+  const lines: string[] = [
+    'Studio Web sync status',
+    '─'.repeat(48),
+    status.summary
+  ];
+  if (!status.linked) {
+    return lines.join('\n');
+  }
+  if (status.link?.solutionDir) {
+    lines.push(`Solution: ${status.link.solutionDir}`);
+  }
+  if (!status.stale.length) {
+    lines.push('All workflows in sync.');
+    return lines.join('\n');
+  }
+  lines.push('', 'Per-file:');
+  for (const s of status.stale) {
+    const label =
+      s.reason === 'conflict'
+        ? 'CONFLICT (both changed)'
+        : s.reason === 'xaml-newer'
+          ? 'Studio Web newer'
+          : s.reason === 'lcs-newer'
+            ? 'LCS newer'
+            : 'missing .xaml';
+    lines.push(`  · ${s.workflowRel} — ${label}`);
+  }
+  return lines.join('\n');
 }
 
 function listLcsWorkflowRels(lcsProjectDir: string): string[] {

@@ -67,7 +67,9 @@ import {
 } from './interop/studioWebConnect';
 import {
   adoptStudioWebSolutionAsLcsProject,
+  formatStudioWebSyncStatusDetail,
   getStudioWebLocalLink,
+  getStudioWebLocalSyncStatus,
   isStudioWebSolutionDir,
   SYNC_TRASH_DIR,
   trySyncFromStudioWebLocal,
@@ -79,6 +81,15 @@ import {
   formatPackageValidationReport,
   validateProjectPackages
 } from './interop/packageValidation';
+import {
+  evaluateReadyForStudioWeb,
+  formatReadyForStudioWebReport
+} from './interop/readyForStudioWeb';
+import {
+  applyProjectAssistScan,
+  formatProjectAssistReport,
+  scanProjectAssist
+} from './interop/projectAssist';
 import {
   loadPackageInventory,
   writeManifestPackagePins
@@ -324,6 +335,15 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand('lowcodeStudio.validatePackages', () =>
       validatePackagesCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.readyForStudioWeb', () =>
+      readyForStudioWebCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.projectAssistScan', () =>
+      projectAssistScanCommand()
+    ),
+    vscode.commands.registerCommand('lowcodeStudio.showSyncStatus', () =>
+      showSyncStatusCommand()
     ),
     vscode.commands.registerCommand('lowcodeStudio.validateWorkflow', async () => {
       const doc = await getActiveWorkflowDocument();
@@ -1070,6 +1090,189 @@ async function validatePackagesCommand(): Promise<void> {
     vscode.window.showErrorMessage(
       err instanceof Error ? err.message : 'Package validation failed'
     );
+  }
+}
+
+async function readyForStudioWebCommand(): Promise<void> {
+  const projectDir = await resolveLcsProjectDir();
+  if (!projectDir) {
+    return;
+  }
+  try {
+    const report = evaluateReadyForStudioWeb(projectDir);
+    const channel = getOutput();
+    channel.clear();
+    channel.appendLine(formatReadyForStudioWebReport(report));
+    channel.show(true);
+
+    if (report.ready) {
+      const actions = ['Reveal Local Workspace', 'Open Studio Web', 'Open Output'] as const;
+      const pick = await vscode.window.showInformationMessage(
+        report.summary,
+        ...actions
+      );
+      if (pick === 'Reveal Local Workspace') {
+        const dir = report.solutionDir;
+        if (dir && fs.existsSync(dir)) {
+          await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(dir));
+        } else {
+          void vscode.window.showWarningMessage(
+            'Not linked yet — run Connect to Studio Web Local Workspace first.'
+          );
+        }
+      } else if (pick === 'Open Studio Web') {
+        await vscode.env.openExternal(vscode.Uri.parse(STUDIO_WEB_URL));
+      }
+      return;
+    }
+
+    const pick = await vscode.window.showWarningMessage(
+      report.summary,
+      'Manage Packages',
+      'Project Assist',
+      'Open Output',
+      'Connect'
+    );
+    if (pick === 'Manage Packages') {
+      await managePackagesCommand(projectDir);
+    } else if (pick === 'Project Assist') {
+      await projectAssistScanCommand(projectDir);
+    } else if (pick === 'Connect') {
+      await vscode.commands.executeCommand('lowcodeStudio.connectStudioWeb');
+    }
+  } catch (err) {
+    vscode.window.showErrorMessage(
+      err instanceof Error ? err.message : 'Ready for Studio Web check failed'
+    );
+  }
+}
+
+async function projectAssistScanCommand(forcedProjectDir?: string): Promise<void> {
+  const projectDir = forcedProjectDir || (await resolveLcsProjectDir());
+  if (!projectDir) {
+    return;
+  }
+  try {
+    const scan = scanProjectAssist(projectDir);
+    const channel = getOutput();
+    channel.clear();
+    channel.appendLine(formatProjectAssistReport(scan));
+    channel.show(true);
+
+    if (!scan.total) {
+      void vscode.window.showInformationMessage(
+        'Project Assist: no VB or selector hits across the project.'
+      );
+      return;
+    }
+
+    const pick = await vscode.window.showQuickPick(
+      [
+        {
+          label: `$(check) Apply all safe repairs (${scan.expressionCount} VB + ${scan.actionableSelectorCount} selectors)`,
+          value: 'all' as const
+        },
+        {
+          label: '$(symbol-string) Apply VB expression repairs only',
+          value: 'vb' as const
+        },
+        {
+          label: '$(inspect) Apply actionable selector repairs only',
+          value: 'sel' as const
+        },
+        {
+          label: '$(book) Report only (no changes)',
+          value: 'none' as const
+        }
+      ],
+      {
+        placeHolder: `Project Assist — ${scan.total} hit(s) in ${scan.workflows.length} workflow(s)`
+      }
+    );
+    if (!pick || pick.value === 'none') {
+      return;
+    }
+
+    const applied = applyProjectAssistScan(scan, {
+      expressions: pick.value === 'all' || pick.value === 'vb',
+      selectors: pick.value === 'all' || pick.value === 'sel'
+    });
+    projectProvider.refresh();
+    editorProvider?.refreshProjectTree?.();
+    // Soft-refresh active designer when it matches an applied file
+    const activePath = editorProvider?.getActiveDocumentPath?.();
+    if (activePath && editorProvider) {
+      const rel = path.relative(projectDir, activePath).replace(/\\/g, '/');
+      if (applied.appliedFiles.includes(rel) && fs.existsSync(activePath)) {
+        try {
+          await editorProvider.applyWorkflowDocument(
+            parseWorkflow(fs.readFileSync(activePath, 'utf8'))
+          );
+        } catch {
+          // ignore — file is on disk
+        }
+      }
+    }
+    if (applied.errors.length) {
+      channel.appendLine('');
+      channel.appendLine('Apply errors:');
+      applied.errors.forEach((e) => channel.appendLine(`  ! ${e}`));
+    }
+    void vscode.window.showInformationMessage(
+      `Project Assist applied → ${applied.appliedFiles.length} file(s) · ${applied.expressionApplied} VB · ${applied.selectorApplied} selectors`
+    );
+  } catch (err) {
+    vscode.window.showErrorMessage(
+      err instanceof Error ? err.message : 'Project Assist scan failed'
+    );
+  }
+}
+
+async function showSyncStatusCommand(): Promise<void> {
+  const projectDir = await resolveLcsProjectDir();
+  if (!projectDir) {
+    return;
+  }
+  const status = getStudioWebLocalSyncStatus(projectDir);
+  const channel = getOutput();
+  channel.clear();
+  channel.appendLine(formatStudioWebSyncStatusDetail(status));
+  channel.show(true);
+
+  if (!status.linked) {
+    void vscode.window.showInformationMessage(status.summary);
+    return;
+  }
+  if (status.inSync) {
+    const pick = await vscode.window.showInformationMessage(
+      status.summary,
+      'Reveal Local Workspace'
+    );
+    if (pick === 'Reveal Local Workspace' && status.link?.solutionDir) {
+      await vscode.commands.executeCommand(
+        'revealFileInOS',
+        vscode.Uri.file(status.link.solutionDir)
+      );
+    }
+    return;
+  }
+  const trashDir = path.join(projectDir, SYNC_TRASH_DIR);
+  const actions = ['Sync now', 'Open Output'];
+  if (fs.existsSync(trashDir)) {
+    actions.push('Open sync trash');
+  }
+  const pick = await vscode.window.showWarningMessage(status.summary, ...actions);
+  if (pick === 'Sync now') {
+    const result = await editorProvider?.pullStudioWebForActiveDesigner?.({
+      wholeProject: true
+    });
+    if (result?.report) {
+      channel.appendLine('');
+      channel.appendLine(result.report);
+    }
+    void vscode.window.showInformationMessage(result?.message || 'Sync finished');
+  } else if (pick === 'Open sync trash' && fs.existsSync(trashDir)) {
+    await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(trashDir));
   }
 }
 

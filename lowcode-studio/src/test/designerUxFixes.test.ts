@@ -37,7 +37,12 @@ function run(): void {
   assert.ok(html.includes('alignSelectedFlowNodes'), 'flowchart align');
   assert.ok(html.includes('assist-filter'), 'cleaner Assist live filters');
   assert.ok(html.includes('assist-help-link'), 'Assist help demoted to ? link');
-  assert.ok(html.includes('id="exprDialogAssist"'), 'Assist button in expression dialog');
+  assert.ok(html.includes('id="btnReadyGate"'), 'Ready for Studio Web dock button');
+  assert.ok(html.includes('duplicateWorkflow'), 'project tree duplicate action');
+  assert.ok(html.includes('revealStudioWebFolder'), 'reveal Studio Web folder action');
+  assert.ok(html.includes('checkWorkflowPath'), 'Invoke path exists host check');
+  assert.ok(html.includes('conflictCount'), 'sync conflict clarity in pill/alert');
+  assert.ok(html.includes('id="projectCtx"'), 'project tree context menu');
   assert.ok(html.includes('function selectActivity'), 'selectActivity heals Studio Web selection');
   assert.ok(html.includes('ensureActivityIds'), 'missing activity ids healed');
   assert.ok(html.includes('mm-row'), 'minimap shows labeled rows');
