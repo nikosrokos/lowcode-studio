@@ -243,6 +243,61 @@ function run(): void {
     );
   }
 
+  // Excel / Orchestrator PascalCase + ExpressionText round-trip (SW-edited props)
+  {
+    const node = normalizeActivityNode({
+      id: 'ex1',
+      type: 'Excel.ReadRange',
+      displayName: 'Read Range',
+      properties: {
+        WorkbookPath: { ExpressionText: '"Data/in.xlsx"' },
+        SheetName: 'Sheet1',
+        Result: 'dt'
+      }
+    });
+    assert.strictEqual(node.properties.workbookPath, '"Data/in.xlsx"');
+    assert.strictEqual(node.properties.WorkbookPath, undefined);
+    assert.strictEqual(node.properties.result, 'dt');
+
+    const orch = normalizeActivityNode({
+      id: 'oq1',
+      type: 'Orchestrator.AddQueueItem',
+      displayName: 'Add Queue Item',
+      properties: {
+        QueueName: 'MainQueue',
+        ItemInformation: { ExpressionText: '{}' }
+      }
+    });
+    assert.strictEqual(orch.properties.queueName, 'MainQueue');
+    assert.strictEqual(orch.properties.itemInformation, '{}');
+  }
+
+  // Mutate after migrate → stringify → parse must keep edits (SW reopen Properties)
+  {
+    const rawText = JSON.stringify({
+      schemaVersion: '1.0',
+      name: 'Main',
+      type: 'Sequence',
+      variables: [],
+      activities: [
+        {
+          type: 'System.LogMessage',
+          displayName: 'Log Message',
+          properties: {
+            Message: { ExpressionText: '"from SW"' },
+            Level: 'Info'
+          }
+        }
+      ]
+    });
+    const raw = JSON.parse(rawText);
+    const { doc } = migrateWorkflowDocument(raw);
+    doc.activities[0].properties.message = '"edited in LCS"';
+    const round = parseWorkflow(stringifyWorkflow(doc));
+    assert.strictEqual(round.activities[0].properties.message, '"edited in LCS"');
+    assert.ok(String(round.activities[0].id || '').trim());
+  }
+
   console.log('activityNormalize.test.ts OK');
 }
 

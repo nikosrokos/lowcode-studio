@@ -91,6 +91,80 @@ const ALIASES: Record<string, Record<string, string>> = {
   },
   'ControlFlow.DoWhile': {
     Condition: 'condition'
+  },
+  'Excel.ReadRange': {
+    WorkbookPath: 'workbookPath',
+    SheetName: 'sheetName',
+    Range: 'range',
+    Result: 'result',
+    DataTable: 'result'
+  },
+  'Excel.WriteRange': {
+    WorkbookPath: 'workbookPath',
+    SheetName: 'sheetName',
+    DataTable: 'data',
+    Data: 'data'
+  },
+  'Excel.AppendRange': {
+    WorkbookPath: 'workbookPath',
+    SheetName: 'sheetName',
+    DataTable: 'data',
+    Data: 'data'
+  },
+  'Excel.ReadCell': {
+    WorkbookPath: 'workbookPath',
+    SheetName: 'sheetName',
+    Cell: 'cell',
+    Result: 'result'
+  },
+  'Excel.WriteCell': {
+    WorkbookPath: 'workbookPath',
+    SheetName: 'sheetName',
+    Cell: 'cell',
+    Value: 'value'
+  },
+  'Excel.ExcelApplicationScope': {
+    WorkbookPath: 'workbookPath',
+    CreateNewFile: 'createIfNotExists',
+    CreateIfNotExists: 'createIfNotExists'
+  },
+  'Orchestrator.GetTransactionItem': {
+    QueueName: 'queueName',
+    FolderPath: 'folderPath',
+    Reference: 'reference',
+    Result: 'result',
+    TransactionItem: 'result'
+  },
+  'Orchestrator.WaitQueueItem': {
+    QueueName: 'queueName',
+    FolderPath: 'folderPath',
+    TimeoutMS: 'timeoutMs',
+    TimeoutMs: 'timeoutMs',
+    Result: 'result',
+    TransactionItem: 'result'
+  },
+  'Orchestrator.AddQueueItem': {
+    QueueName: 'queueName',
+    FolderPath: 'folderPath',
+    Reference: 'reference',
+    Priority: 'priority',
+    ItemInformation: 'itemInformation'
+  },
+  'Orchestrator.GetAsset': {
+    AssetName: 'assetName',
+    FolderPath: 'folderPath',
+    Result: 'result'
+  },
+  'Orchestrator.GetCredential': {
+    AssetName: 'assetName',
+    FolderPath: 'folderPath',
+    Username: 'username',
+    Password: 'password'
+  },
+  'Orchestrator.SetAsset': {
+    AssetName: 'assetName',
+    FolderPath: 'folderPath',
+    Value: 'value'
   }
 };
 

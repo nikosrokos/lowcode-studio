@@ -187,7 +187,7 @@ const MAP: Array<{
   },
   {
     lcsType: 'Data.ForEachRow',
-    xamlLocalNames: ['ForEachRow', 'ForEachRowX'],
+    xamlLocalNames: ['ForEachRow', 'ForEachRowX', 'ForEachExcelRow'],
     xamlNamespace: 'ui'
   },
   {
@@ -202,22 +202,62 @@ const MAP: Array<{
   },
   {
     lcsType: 'Excel.ReadRange',
-    xamlLocalNames: ['ReadRange', 'ReadRangeX', 'ExcelReadRange'],
+    xamlLocalNames: [
+      'ReadRange',
+      'ReadRangeX',
+      'ExcelReadRange',
+      'ReadExcelRange'
+    ],
     xamlNamespace: 'excel'
   },
   {
     lcsType: 'Excel.WriteRange',
-    xamlLocalNames: ['WriteRange', 'WriteRangeX', 'ExcelWriteRange'],
+    xamlLocalNames: [
+      'WriteRange',
+      'WriteRangeX',
+      'ExcelWriteRange',
+      'WriteDataTableToExcel',
+      'WriteExcelRange'
+    ],
     xamlNamespace: 'excel'
   },
   {
     lcsType: 'Excel.ReadCell',
-    xamlLocalNames: ['ReadCell', 'ReadCellX'],
+    xamlLocalNames: [
+      'ReadCell',
+      'ReadCellX',
+      'ReadCellValueX',
+      'ReadCellFormulaX',
+      'ExcelReadCell'
+    ],
     xamlNamespace: 'excel'
   },
   {
     lcsType: 'Excel.WriteCell',
-    xamlLocalNames: ['WriteCell', 'WriteCellX'],
+    xamlLocalNames: ['WriteCell', 'WriteCellX', 'WriteCellValueX', 'ExcelWriteCell'],
+    xamlNamespace: 'excel'
+  },
+  {
+    lcsType: 'Excel.AppendRange',
+    xamlLocalNames: [
+      'AppendRange',
+      'AppendRangeX',
+      'ExcelAppendRange',
+      'AppendDataTableToExcel'
+    ],
+    xamlNamespace: 'excel'
+  },
+  {
+    lcsType: 'Excel.ExcelApplicationScope',
+    xamlLocalNames: [
+      'ExcelApplicationScope',
+      'ExcelProcessScope',
+      'UseExcelFile',
+      'SaveExcelFileX',
+      'SaveExcelFile',
+      'CloseExcel',
+      'CloseWorkbook'
+    ],
     xamlNamespace: 'excel'
   },
   {
@@ -318,16 +358,6 @@ const MAP: Array<{
     xamlNamespace: 'ui'
   },
   {
-    lcsType: 'Excel.AppendRange',
-    xamlLocalNames: ['AppendRange', 'AppendRangeX', 'ExcelAppendRange'],
-    xamlNamespace: 'excel'
-  },
-  {
-    lcsType: 'Excel.ExcelApplicationScope',
-    xamlLocalNames: ['ExcelApplicationScope', 'ExcelProcessScope', 'UseExcelFile'],
-    xamlNamespace: 'excel'
-  },
-  {
     lcsType: 'ControlFlow.Parallel',
     xamlLocalNames: ['Parallel'],
     xamlNamespace: 'default'
@@ -360,12 +390,22 @@ const MAP: Array<{
   },
   {
     lcsType: 'Orchestrator.GetTransactionItem',
-    xamlLocalNames: ['GetQueueItem', 'GetTransactionItem'],
+    xamlLocalNames: [
+      'GetQueueItem',
+      'GetTransactionItem',
+      'GetQueueItems',
+      'GetTransactionItems'
+    ],
     xamlNamespace: 'ui'
   },
   {
     lcsType: 'Orchestrator.AddQueueItem',
-    xamlLocalNames: ['AddQueueItem'],
+    xamlLocalNames: [
+      'AddQueueItem',
+      'BulkAddQueueItems',
+      'AddTransactionItem',
+      'AddQueueItemAndStartTransaction'
+    ],
     xamlNamespace: 'ui'
   },
   {
@@ -385,7 +425,7 @@ const MAP: Array<{
   },
   {
     lcsType: 'Orchestrator.SetAsset',
-    xamlLocalNames: ['SetAsset'],
+    xamlLocalNames: ['SetAsset', 'SetCredential', 'DeleteAsset'],
     xamlNamespace: 'ui'
   },
   {

@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.54] — 2026-08-06
+
+### Fixed
+- **Activity icons showing `$("`** — template-literal broke the `$(codicon)` strip regex; strip with `indexOf`/`slice` instead. Known icons keep ASCII badges (`LG`, `T`, …); unknown icons fall back to a **circle** (`●`)
+- **Studio Web–reopened Properties** — never select/paint/edit detached orphans; soft-rematch by type/name/summary into the live tree; Excel/Orchestrator PascalCase aliases on migrate
+
+### Added
+- **Import map** — Excel/Orchestrator modern locals (`WriteDataTableToExcel`, `ReadCellValueX`, `BulkAddQueueItems`, `GetQueueItems`, `SetCredential`, …) map to catalog types (fewer `Imported.*`)
+
 ## [0.6.53] — 2026-08-06
 
 ### Fixed
