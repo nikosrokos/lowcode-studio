@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.53] — 2026-08-06
+
+### Fixed
+- **Canvas icons** — replace emoji/● badges with ASCII labels (`LG`, `T`, `C`, …) that always paint in Electron webviews (emoji rendered as white circles)
+- **Properties on Studio Web–reopened activities** — prop edits mutate the live tree node (`liveTreeNode` / `persistPropEdit`); stop preferring a detached click copy; migrate **raw** disk JSON on open so missing ids / PascalCase / Sequence wraps are written durably
+
 ## [0.6.52] — 2026-08-06
 
 ### Fixed

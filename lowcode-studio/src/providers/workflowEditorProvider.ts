@@ -986,14 +986,19 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
 
   private async migrateDocumentIfNeeded(document: vscode.TextDocument): Promise<boolean> {
     const text = document.getText();
-    let workflow: WorkflowDocument;
+    let raw: WorkflowDocument;
     try {
-      workflow = parseWorkflow(text);
+      raw = JSON.parse(text) as WorkflowDocument;
     } catch {
       return false;
     }
+    if (!raw || raw.schemaVersion !== '1.0') {
+      return false;
+    }
+    // Migrate RAW disk JSON (not parseWorkflow result) so PascalCase / missing ids /
+    // singleton Sequence are detected and written back for durable Properties edits.
     const missingIds = rawWorkflowHasMissingIds(text);
-    const { doc, changed } = migrateWorkflowDocument(workflow);
+    const { doc, changed } = migrateWorkflowDocument(raw);
     if (!missingIds && !changed) {
       return false;
     }

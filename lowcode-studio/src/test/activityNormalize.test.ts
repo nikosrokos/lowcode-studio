@@ -199,6 +199,50 @@ function run(): void {
     assert.strictEqual(node.properties.message, '"from object"');
   }
 
+  // SW reopen: migrate RAW disk JSON (no ids, PascalCase, ExpressionText, Sequence wrap)
+  {
+    const rawText = JSON.stringify({
+      schemaVersion: '1.0',
+      name: 'Main',
+      type: 'Sequence',
+      variables: [],
+      activities: [
+        {
+          type: 'ControlFlow.Sequence',
+          displayName: 'Main',
+          properties: {},
+          children: [
+            {
+              type: 'System.LogMessage',
+              displayName: 'Log Message',
+              properties: {
+                Message: { ExpressionText: '"hello from SW"' },
+                Level: 'Info'
+              }
+            }
+          ]
+        }
+      ]
+    });
+    assert.ok(rawWorkflowHasMissingIds(rawText), 'SW pull often omits ids');
+    const raw = JSON.parse(rawText);
+    const { doc, changed } = migrateWorkflowDocument(raw);
+    assert.ok(changed, 'raw SW migrate must report changed');
+    assert.strictEqual(doc.activities.length, 1);
+    assert.strictEqual(doc.activities[0].type, 'System.LogMessage');
+    assert.ok(String(doc.activities[0].id || '').trim(), 'healed id');
+    assert.strictEqual(doc.activities[0].properties.message, '"hello from SW"');
+    assert.strictEqual(doc.activities[0].properties.Message, undefined);
+    // parseWorkflow first then migrate would hide the change — raw path is required
+    const alreadyParsed = parseWorkflow(rawText);
+    const second = migrateWorkflowDocument(alreadyParsed);
+    assert.strictEqual(
+      second.changed,
+      false,
+      'parseWorkflow-first migrate is a no-op (must migrate raw disk JSON instead)'
+    );
+  }
+
   console.log('activityNormalize.test.ts OK');
 }
 
