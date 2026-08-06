@@ -89,8 +89,8 @@ export function getDesignerHtml(
       --dock-h: 64px;
       --left-width: 280px;
       --props-width: 300px;
-      --activity-column-width: 560px;
-      --flow-node-width: 156px;
+      --activity-column-width: 480px;
+      --flow-node-width: 148px;
     }
     * { box-sizing: border-box; }
     html, body {
@@ -316,26 +316,45 @@ export function getDesignerHtml(
     }
     .minimap-body { padding: 0 10px 10px; }
     .minimap-stage {
-      position: relative; min-height: 96px; max-height: 140px; overflow: auto;
+      position: relative; min-height: 96px; max-height: 180px; overflow: auto;
       border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
       border-radius: 8px; background:
         linear-gradient(180deg, color-mix(in srgb, var(--input-bg) 80%, transparent), transparent),
         var(--board);
     }
     .minimap-empty { padding: 28px 10px; text-align: center; font-size: 11px; color: var(--muted); }
-    .minimap-seq { display: flex; flex-direction: column; gap: 3px; padding: 8px; }
+    .minimap-seq { display: flex; flex-direction: column; gap: 3px; padding: 6px; }
+    .mm-row {
+      appearance: none; border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+      border-radius: 6px; cursor: pointer; padding: 0; width: 100%;
+      display: grid; grid-template-columns: 4px 22px 1fr; align-items: center; gap: 6px;
+      background: color-mix(in srgb, var(--input-bg) 70%, transparent); color: var(--text);
+      text-align: left; min-height: 26px; opacity: .92;
+    }
+    .mm-row .mm-accent { align-self: stretch; border-radius: 6px 0 0 6px; }
+    .mm-row .mm-ico {
+      width: 18px; height: 18px; border-radius: 5px; display: inline-flex;
+      align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff;
+    }
+    .mm-row .mm-label {
+      font-size: 10px; font-weight: 650; overflow: hidden; text-overflow: ellipsis;
+      white-space: nowrap; padding-right: 6px;
+    }
+    .mm-row .mm-step { color: var(--muted); font-weight: 600; margin-right: 4px; }
     .mm-bar {
       appearance: none; border: none; height: 8px; border-radius: 3px; cursor: pointer;
       opacity: .85; padding: 0; width: 100%;
     }
-    .mm-bar.selected, .mm-node.selected {
+    .mm-row.selected, .mm-bar.selected, .mm-node.selected {
       outline: 2px solid var(--focus); outline-offset: 1px; opacity: 1;
     }
-    .mm-bar:hover, .mm-node:hover { opacity: 1; filter: brightness(1.08); }
+    .mm-row:hover, .mm-bar:hover, .mm-node:hover { opacity: 1; filter: brightness(1.06); }
     .minimap-flow { position: relative; margin: 8px auto; }
     .mm-node {
-      position: absolute; width: 14px; height: 10px; border-radius: 3px;
-      border: none; cursor: pointer; padding: 0; opacity: .9;
+      position: absolute; min-width: 28px; max-width: 72px; height: 18px; border-radius: 4px;
+      border: none; cursor: pointer; padding: 0 4px; opacity: .95;
+      font-size: 8px; font-weight: 700; color: #fff; overflow: hidden; text-overflow: ellipsis;
+      white-space: nowrap; line-height: 18px; text-align: center;
     }
     .assist-live {
       margin: 0 0 10px; padding: 8px 10px; border-radius: 8px;
@@ -797,7 +816,7 @@ export function getDesignerHtml(
       width: max-content; min-width: 100%;
     }
     .sequence {
-      max-width: var(--activity-column-width, 560px); margin: 0 auto;
+      max-width: var(--activity-column-width, 480px); margin: 0 auto;
       background: var(--board);
       border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
       border-radius: 12px;
@@ -845,6 +864,7 @@ export function getDesignerHtml(
       background: var(--panel); border: 1px solid var(--border);
       border-radius: 10px; box-shadow: var(--shadow-frame);
       padding: 4px; display: none;
+      max-height: min(70vh, 420px); overflow-y: auto;
     }
     .ctx-menu.show { display: block; }
     .ctx-menu button {
@@ -2123,13 +2143,24 @@ export function getDesignerHtml(
     }
     function selectActivity(id, opts) {
       const heal = ensureActivityIds(state.workflow.activities);
-      const targetId = id;
-      if (!String(targetId || '').trim()) {
-        state.selectedId = null;
-        if (heal) persist(false);
-        return false;
+      let hit = String(id || '').trim() ? walkFind(state.workflow.activities, String(id)) : null;
+      // Prefer live node reference (click handlers) — survives heal assigning a new id
+      if (!hit && opts && opts.node) {
+        if (!String(opts.node.id || '').trim()) opts.node.id = newId();
+        hit = walkFind(state.workflow.activities, opts.node.id);
+        if (!hit) {
+          // Node is in-memory but not found (shouldn't happen) — still paint props from it
+          state.selectedId = opts.node.id;
+          ensurePropsPanelVisible();
+          state.collapsedPropSections.activity = false;
+          state.collapsedPropSections.general = false;
+          state.collapsedPropSections.studioWeb = false;
+          if (opts.rerender) renderAll();
+          else { renderProps(); renderBreadcrumbs(); renderMinimap(); }
+          if (heal) vscode.postMessage({ type: 'edit', workflow: state.workflow });
+          return true;
+        }
       }
-      const hit = walkFind(state.workflow.activities, targetId);
       if (!hit) {
         state.selectedId = null;
         if (heal) persist(false);
@@ -2137,15 +2168,19 @@ export function getDesignerHtml(
       }
       state.selectedId = hit.node.id;
       ensurePropsPanelVisible();
-      // Keep Activity section open so Studio Web / imported props are visible
       state.collapsedPropSections.activity = false;
       state.collapsedPropSections.general = false;
+      state.collapsedPropSections.studioWeb = false;
       if (opts?.rerender) renderAll();
       else {
         renderProps();
         renderBreadcrumbs();
         renderMinimap();
       }
+      // Double-paint next frame — avoids empty props if a concurrent re-render raced
+      requestAnimationFrame(() => {
+        if (state.selectedId === hit.node.id) renderProps();
+      });
       if (heal) {
         vscode.postMessage({ type: 'edit', workflow: state.workflow });
       }
@@ -2154,10 +2189,12 @@ export function getDesignerHtml(
     function showCtxMenu(x, y, activityId) {
       const menu = document.getElementById('ctxMenu');
       if (!menu) return;
-      state.ctxTargetId = activityId;
-      state.selectedId = activityId;
-      ensurePropsPanelVisible();
-      const hit = walkFind(state.workflow.activities, activityId);
+      if (!String(activityId || '').trim()) {
+        ensureActivityIds(state.workflow.activities);
+      }
+      selectActivity(activityId, { rerender: false });
+      state.ctxTargetId = state.selectedId || activityId;
+      const hit = state.selectedId ? walkFind(state.workflow.activities, state.selectedId) : null;
       const node = hit?.node;
       const openBtn = menu.querySelector('[data-ctx="open"]');
       const vbBtn = menu.querySelector('[data-ctx="vb-repair"]');
@@ -2174,7 +2211,7 @@ export function getDesignerHtml(
       // Ignore the click that often follows contextmenu / ⋯ button (was hiding the menu instantly)
       state.ctxIgnoreClickUntil = Date.now() + 320;
       menu.classList.add('show');
-      // Position after paint so offsetWidth/Height are accurate
+      // Position after paint so offsetWidth/Height are accurate — flip up near bottom
       requestAnimationFrame(() => {
         const pad = 8;
         const mw = menu.offsetWidth || 180;
@@ -2182,9 +2219,16 @@ export function getDesignerHtml(
         let left = x;
         let top = y;
         if (left + mw > window.innerWidth - pad) left = window.innerWidth - mw - pad;
-        if (top + mh > window.innerHeight - pad) top = window.innerHeight - mh - pad;
+        // Prefer opening upward when the menu would clip below the viewport
+        if (top + mh > window.innerHeight - pad) {
+          top = y - mh;
+          if (top < pad) {
+            top = Math.max(pad, window.innerHeight - mh - pad);
+          }
+        }
         menu.style.left = Math.max(pad, left) + 'px';
         menu.style.top = Math.max(pad, top) + 'px';
+        menu.style.maxHeight = Math.min(mh, window.innerHeight - pad * 2) + 'px';
       });
     }
     function renderWatch(snapshot) {
@@ -3136,17 +3180,16 @@ export function getDesignerHtml(
       card.addEventListener('click', (e) => {
         if (e.target.closest('[data-card-menu]')) return;
         if (!String(node.id || '').trim()) node.id = newId();
-        selectActivity(node.id, { rerender: true });
+        selectActivity(node.id, { rerender: true, node: node });
         hideTip();
         hideCtxMenu();
       });
       card.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        state.selectedId = node.id;
+        if (!String(node.id || '').trim()) node.id = newId();
         hideTip();
         showCtxMenu(e.clientX, e.clientY, node.id);
-        renderProps();
       });
       card.querySelector('[data-card-menu]')?.addEventListener('mousedown', (e) => {
         e.preventDefault();
@@ -3335,7 +3378,7 @@ export function getDesignerHtml(
           const pt = stagePoint(e);
           state.dragOffset = { x: pt.x - (node.x || 0), y: pt.y - (node.y || 0) };
           hideTip();
-          selectActivity(node.id, { rerender: false });
+          selectActivity(node.id, { rerender: false, node: node });
           renderConnectionsPanel();
           document.querySelectorAll('.flow-node').forEach(n => n.classList.remove('selected'));
           el.classList.add('selected');
@@ -4192,9 +4235,10 @@ export function getDesignerHtml(
             const left = Math.round(((n.x || 0) - minX + pad) * scale);
             const top = Math.round(((n.y || 0) - minY + pad) * scale);
             const sel = state.selectedId === n.id ? ' selected' : '';
+            const label = String(n.displayName || n.type || '').slice(0, 10);
             return '<button type="button" class="mm-node' + sel + '" data-mm-id="' + escapeAttr(n.id) +
               '" title="' + escapeAttr(n.displayName || n.type) + '" style="left:' + left + 'px;top:' + top +
-              'px;background:' + escapeAttr(color) + '"></button>';
+              'px;background:' + escapeAttr(color) + '">' + escapeHtml(label) + '</button>';
           }).join('') + '</div>';
       } else {
         stage.innerHTML = '<div class="minimap-seq">' +
@@ -4202,9 +4246,14 @@ export function getDesignerHtml(
             const def = findDef(n.type);
             const color = n.color || def?.color || '#64748B';
             const sel = state.selectedId === n.id ? ' selected' : '';
-            return '<button type="button" class="mm-bar' + sel + '" data-mm-id="' + escapeAttr(n.id) +
-              '" title="#' + (i + 1) + ' ' + escapeAttr(n.displayName || n.type) +
-              '" style="background:' + escapeAttr(color) + '"></button>';
+            const glyph = iconGlyph(def?.icon);
+            const name = n.displayName || n.type || 'Activity';
+            return '<button type="button" class="mm-row' + sel + '" data-mm-id="' + escapeAttr(n.id) +
+              '" title="#' + (i + 1) + ' ' + escapeAttr(name) + '">' +
+              '<span class="mm-accent" style="background:' + escapeAttr(color) + '"></span>' +
+              '<span class="mm-ico" style="background:' + escapeAttr(color) + '">' + escapeHtml(glyph) + '</span>' +
+              '<span class="mm-label"><span class="mm-step">#' + (i + 1) + '</span>' +
+              escapeHtml(name) + '</span></button>';
           }).join('') + '</div>';
       }
       stage.querySelectorAll('[data-mm-id]').forEach((btn) => {
@@ -4230,7 +4279,8 @@ export function getDesignerHtml(
       }
       ensurePropsPanelVisible();
       // Always expand core sections when selecting (Studio Web imports often look "empty" when collapsed)
-      if (state.collapsedPropSections.activity === undefined) state.collapsedPropSections.activity = false;
+      state.collapsedPropSections.activity = false;
+      state.collapsedPropSections.general = false;
       const node = hit.node;
       node.properties = node.properties || {};
       const def = findDef(node.type);

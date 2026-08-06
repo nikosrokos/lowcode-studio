@@ -32,6 +32,10 @@ import {
 } from '../interop/activityPalette';
 import { buildPropertySuggestions } from '../interop/propertySuggestions';
 import {
+  migrateWorkflowDocument,
+  rawWorkflowHasMissingIds
+} from '../interop/activityNormalize';
+import {
   buildCurrentProjectTree,
   findProjectRoot
 } from '../interop/projectResolve';
@@ -356,6 +360,14 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
       }
     } catch {
       // open with current LCS content
+    }
+
+    // Existing projects: heal missing ids / PascalCase / singleton Sequence onto disk
+    // so Properties clicks work without recreating in Studio Web.
+    try {
+      await this.migrateDocumentIfNeeded(document);
+    } catch {
+      // paint whatever is on disk
     }
 
     updateWebview();
@@ -734,6 +746,23 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
       }
       await cfg.update(key, value, vscode.ConfigurationTarget.Global);
     }
+  }
+
+  private async migrateDocumentIfNeeded(document: vscode.TextDocument): Promise<boolean> {
+    const text = document.getText();
+    let workflow: WorkflowDocument;
+    try {
+      workflow = parseWorkflow(text);
+    } catch {
+      return false;
+    }
+    const missingIds = rawWorkflowHasMissingIds(text);
+    const { doc, changed } = migrateWorkflowDocument(workflow);
+    if (!missingIds && !changed) {
+      return false;
+    }
+    await this.updateTextDocument(document, doc);
+    return true;
   }
 
   private resolveWorkflowPath(

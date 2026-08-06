@@ -241,13 +241,14 @@ function normalizeActivity(a: ActivityNode): ActivityNode {
 }
 
 export function stringifyWorkflow(doc: WorkflowDocument): string {
+  const normalized = normalizeWorkflowDocument(JSON.parse(JSON.stringify(doc)) as WorkflowDocument);
   const updated: WorkflowDocument = {
-    ...doc,
-    connections: doc.type === 'Flowchart' ? doc.connections || [] : doc.connections,
+    ...normalized,
+    connections: normalized.type === 'Flowchart' ? normalized.connections || [] : normalized.connections,
     metadata: {
-      ...doc.metadata,
+      ...normalized.metadata,
       updatedAt: new Date().toISOString(),
-      createdAt: doc.metadata?.createdAt || new Date().toISOString()
+      createdAt: normalized.metadata?.createdAt || new Date().toISOString()
     }
   };
   return JSON.stringify(updated, null, 2) + '\n';

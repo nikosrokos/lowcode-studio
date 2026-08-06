@@ -220,3 +220,69 @@ export function normalizeWorkflowDocument(doc: WorkflowDocument): WorkflowDocume
   doc.arguments = Array.isArray(doc.arguments) ? doc.arguments : [];
   return doc;
 }
+
+/**
+ * Promote a lone root ControlFlow.Sequence so Studio Web–style trees expose
+ * real steps at the top level (Properties / click targets).
+ */
+export function unwrapSingletonSequence(doc: WorkflowDocument): boolean {
+  if (!doc || doc.type === 'Flowchart') {
+    return false;
+  }
+  if (!Array.isArray(doc.activities) || doc.activities.length !== 1) {
+    return false;
+  }
+  const root = doc.activities[0];
+  if (!root || root.type !== 'ControlFlow.Sequence') {
+    return false;
+  }
+  const kids = Array.isArray(root.children) ? root.children : [];
+  if (!kids.length) {
+    return false;
+  }
+  doc.activities = kids;
+  return true;
+}
+
+/** True when raw JSON still has blank ids (common on older Studio Web pulls). */
+export function rawWorkflowHasMissingIds(text: string): boolean {
+  try {
+    const raw = JSON.parse(text) as { activities?: ActivityNode[] };
+    const visit = (list: ActivityNode[] | undefined): boolean => {
+      for (const n of list || []) {
+        if (!String(n?.id || '').trim()) {
+          return true;
+        }
+        if (visit(n.children) || visit(n.elseChildren)) {
+          return true;
+        }
+      }
+      return false;
+    };
+    return visit(raw.activities);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Designer-ready migration for existing projects: normalize props/types, heal ids,
+ * unwrap a singleton Sequence wrapper. Mutates and returns whether anything changed.
+ */
+export function migrateWorkflowDocument(doc: WorkflowDocument): { doc: WorkflowDocument; changed: boolean } {
+  const before = JSON.stringify({
+    activities: doc.activities,
+    variables: doc.variables,
+    arguments: doc.arguments
+  });
+  normalizeWorkflowDocument(doc);
+  const unwrapped = unwrapSingletonSequence(doc);
+  // Re-normalize after unwrap (children may still need PascalCase / ids)
+  normalizeWorkflowDocument(doc);
+  const after = JSON.stringify({
+    activities: doc.activities,
+    variables: doc.variables,
+    arguments: doc.arguments
+  });
+  return { doc, changed: unwrapped || before !== after };
+}
