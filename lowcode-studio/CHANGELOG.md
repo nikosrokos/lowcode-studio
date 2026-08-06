@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.50] — 2026-08-06
+
+### Fixed
+- **Activity icons in designer** — inject codicon CSS with a webview-safe `@font-face` URL for `codicon.ttf` (relative `./codicon.ttf` in linked CSS never loaded → empty colored squares in the Activities toolbox / canvas)
+- **Properties after Studio Web Sync** — selection uses `idsEqual` + live node + DOM `data-id` recovery; Sync rematches by type/name/summary when ids rewrite; all selection writers go through `setSelectedNode`
+
 ## [0.6.49] — 2026-08-06
 
 ### Security

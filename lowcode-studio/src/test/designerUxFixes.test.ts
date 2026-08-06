@@ -60,10 +60,29 @@ function run(): void {
   assert.ok(html.includes('showCtxMenu(x, y, activityId, nodeRef)'), 'ctx menu receives live node');
   assert.ok(html.includes("showCtxMenu(e.clientX, e.clientY, node.id, node)"), 'card ctx passes node');
   assert.ok(html.includes('selectedNode'), 'selectedNode kept for SW sync props paint');
+  assert.ok(html.includes('function idsEqual'), 'selection id compare is type-safe');
+  assert.ok(html.includes('.card.selected[data-id]'), 'props recover selection from DOM after Sync');
+  assert.ok(html.includes('rematch by type'), 'Sync rematches selection when ids rewrite');
   assert.ok(html.includes('codicon-'), 'codicon classes for activity icons');
   assert.ok(html.includes('function iconCodiconName'), 'codicon name from catalog $(icon)');
   assert.ok(html.includes('function coercePaintValue'), 'coerce SW ExpressionText before paint');
   assert.ok(!html.includes('ICON_GLYPHS'), 'emoji glyph map replaced by codicons');
+
+  // Font must be webview-absolute — relative ./codicon.ttf in linked CSS does not load
+  const withFont = getDesignerHtml(
+    'nonce',
+    'https://example',
+    createEmptyWorkflow('Main'),
+    getActivityCatalog(),
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    '@font-face{font-family:"codicon";src:url("https://example/codicon.ttf") format("truetype");}'
+  );
+  assert.ok(withFont.includes('url("https://example/codicon.ttf")'), 'codicon @font-face uses injected webview URI');
+  assert.ok(withFont.includes('<style nonce="nonce">'), 'codicon CSS inlined (not broken relative link)');
+  assert.ok(!withFont.includes('codicon.css'), 'does not rely on linked stock codicon.css');
 
   console.log('designerUxFixes.test.ts: ok');
 }
