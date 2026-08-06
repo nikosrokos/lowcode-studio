@@ -284,6 +284,109 @@ export function getDesignerHtml(
       display: flex; flex-direction: column; overflow: hidden;
     }
     .panel.right .panel-scroll { flex: 1; overflow: auto; min-height: 0; }
+    .panel.right { display: flex; flex-direction: column; min-height: 0; }
+    .act-icon {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 22px; height: 22px; border-radius: 6px; flex: 0 0 auto;
+      font-size: 12px; line-height: 1; font-weight: 700;
+      color: #fff; background: var(--ico, #64748B);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+    }
+    .card-head .act-icon { width: 20px; height: 20px; font-size: 11px; }
+    .flow-node .act-icon {
+      width: 18px; height: 18px; font-size: 10px; margin-right: 4px; vertical-align: -3px;
+    }
+    .activity-item .act-icon { width: 20px; height: 20px; font-size: 11px; }
+    .palette-item .act-icon { width: 18px; height: 18px; font-size: 10px; margin-right: 6px; }
+    .minimap-dock {
+      flex: 0 0 auto; border-top: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+      background: color-mix(in srgb, var(--panel) 92%, transparent);
+    }
+    .minimap-dock.collapsed .minimap-body { display: none; }
+    .minimap-dock .minimap-head {
+      display: flex; align-items: center; gap: 8px; width: 100%;
+      padding: 7px 12px; border: none; background: transparent; color: var(--text);
+      font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .04em;
+      text-transform: uppercase; cursor: pointer; color: var(--muted);
+    }
+    .minimap-dock .minimap-head .grow { flex: 1; text-align: left; color: var(--text); }
+    .minimap-dock .minimap-head .count {
+      font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
+      border: 1px solid var(--border);
+    }
+    .minimap-body { padding: 0 10px 10px; }
+    .minimap-stage {
+      position: relative; min-height: 96px; max-height: 140px; overflow: auto;
+      border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+      border-radius: 8px; background:
+        linear-gradient(180deg, color-mix(in srgb, var(--input-bg) 80%, transparent), transparent),
+        var(--board);
+    }
+    .minimap-empty { padding: 28px 10px; text-align: center; font-size: 11px; color: var(--muted); }
+    .minimap-seq { display: flex; flex-direction: column; gap: 3px; padding: 8px; }
+    .mm-bar {
+      appearance: none; border: none; height: 8px; border-radius: 3px; cursor: pointer;
+      opacity: .85; padding: 0; width: 100%;
+    }
+    .mm-bar.selected, .mm-node.selected {
+      outline: 2px solid var(--focus); outline-offset: 1px; opacity: 1;
+    }
+    .mm-bar:hover, .mm-node:hover { opacity: 1; filter: brightness(1.08); }
+    .minimap-flow { position: relative; margin: 8px auto; }
+    .mm-node {
+      position: absolute; width: 14px; height: 10px; border-radius: 3px;
+      border: none; cursor: pointer; padding: 0; opacity: .9;
+    }
+    .assist-live {
+      margin: 0 0 10px; padding: 8px 10px; border-radius: 8px;
+      border: 1px solid color-mix(in srgb, #0ea5e9 45%, var(--border));
+      background: color-mix(in srgb, #0ea5e9 10%, transparent);
+    }
+    .assist-live .al-title {
+      font-size: 11px; font-weight: 750; color: #0284c7; margin-bottom: 6px;
+      display: flex; justify-content: space-between; gap: 8px; align-items: center;
+    }
+    .assist-live .al-item {
+      display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: start;
+      padding: 5px 0; border-top: 1px solid color-mix(in srgb, #0ea5e9 22%, transparent);
+      font-size: 11px;
+    }
+    .assist-live .al-item:first-of-type { border-top: none; }
+    .assist-live .al-label { font-weight: 650; color: var(--text); }
+    .assist-live .al-detail { color: var(--muted); margin-top: 2px; word-break: break-word; }
+    .assist-live .al-apply, .assist-panel .al-apply {
+      border: 1px solid color-mix(in srgb, #0ea5e9 50%, var(--border));
+      background: color-mix(in srgb, #0ea5e9 14%, transparent); color: #0284c7;
+      border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700; cursor: pointer;
+    }
+    .assist-live .al-apply:hover, .assist-panel .al-apply:hover {
+      background: color-mix(in srgb, #0ea5e9 24%, transparent);
+    }
+    .assist-panel-dialog { width: min(560px, 94vw); max-height: min(82vh, 720px); display: flex; flex-direction: column; }
+    .assist-tabs { display: flex; gap: 4px; padding: 0 14px 10px; border-bottom: 1px solid var(--border); }
+    .assist-tabs button {
+      appearance: none; border: 1px solid transparent; background: transparent; color: var(--muted);
+      border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer;
+    }
+    .assist-tabs button.active {
+      color: var(--text); background: var(--hover); border-color: color-mix(in srgb, var(--border) 80%, transparent);
+    }
+    .assist-tab-body { display: none; overflow: auto; padding: 12px 16px 16px; flex: 1; min-height: 0; }
+    .assist-tab-body.active { display: block; }
+    .assist-scaffold-input {
+      width: 100%; min-height: 88px; resize: vertical; font: inherit; font-size: 12px;
+      border-radius: 8px; border: 1px solid var(--input-border); background: var(--input-bg);
+      color: var(--text); padding: 8px 10px; font-family: var(--mono);
+    }
+    .assist-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .assist-proposal-list { margin-top: 12px; display: grid; gap: 6px; }
+    .assist-proposal {
+      border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+      border-radius: 8px; padding: 8px 10px; background: color-mix(in srgb, var(--input-bg) 70%, transparent);
+      font-size: 12px;
+    }
+    .assist-proposal .ap-title { font-weight: 650; }
+    .assist-proposal .ap-meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
     .panel .frame-resize-x {
       position: absolute; top: 0; bottom: 0; width: 5px; cursor: ew-resize;
       z-index: 6; background: transparent;
@@ -848,7 +951,11 @@ export function getDesignerHtml(
     }
     .flow-node.start { border-color: color-mix(in srgb, #22c55e 55%, var(--border)); }
     .flow-node.end { border-color: color-mix(in srgb, #ef4444 45%, var(--border)); }
-    .flow-node .title { font-size: 12px; font-weight: 650; padding-right: 28px; }
+    .flow-node .title {
+      font-size: 12px; font-weight: 650; padding-right: 28px;
+      display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+    }
+    .flow-node.decision .inner .act-icon { display: inline-flex; margin: 0 auto 4px; }
     .flow-node .summary { font-size: 10px; color: var(--muted); margin-top: 4px; }
     .port {
       position: absolute; width: 11px; height: 11px; border-radius: 50%;
@@ -1069,7 +1176,7 @@ export function getDesignerHtml(
       color: var(--muted); padding: 8px 8px 4px;
     }
     .palette-item {
-      display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; align-items: center;
+      display: grid; grid-template-columns: auto 1fr auto; gap: 4px 8px; align-items: center;
       width: 100%; text-align: left; border: 1px solid transparent; border-radius: 8px;
       background: transparent; color: var(--text); padding: 8px 10px; cursor: pointer;
     }
@@ -1101,7 +1208,7 @@ export function getDesignerHtml(
       <div class="spacer"></div>
       <button class="btn" id="btnLink" title="Connect two flowchart nodes" style="display:none">Link</button>
       <button class="btn" id="btnAutoLayout" style="display:none" title="Tidy flowchart layout">Tidy</button>
-      <button class="btn symbol" id="btnAssistHelp" type="button" title="Assist (AI) — how to use" aria-expanded="false">✦</button>
+      <button class="btn symbol" id="btnAssistHelp" type="button" title="Assist — Live propose / Scaffold (F2) / Help" aria-expanded="false">✦</button>
       <button class="btn symbol" id="btnSettings" type="button" title="Settings">⚙</button>
       <button class="btn primary" id="btnSave">Save</button>
     </div>
@@ -1258,99 +1365,128 @@ export function getDesignerHtml(
     </div>
 
     <div class="settings-overlay" id="assistHelpOverlay">
-      <div class="assist-help-dialog" role="dialog" aria-label="Assist help" aria-modal="true">
+      <div class="assist-help-dialog assist-panel-dialog" role="dialog" aria-label="Assist" aria-modal="true">
         <div class="settings-dialog-head">
-          <div class="title">Assist — how to use</div>
+          <div class="title">Assist</div>
           <button class="btn" type="button" id="assistHelpClose">Close</button>
         </div>
-        <div class="assist-help-body">
-          <p class="lead">
-            Assist helpers are <strong>deterministic</strong> (no chat LLM). They run from the
-            Command Palette or Project Explorer and write results to the
-            <strong>LowCode Studio</strong> Output channel.
-          </p>
-
-          <h3>Where to run commands</h3>
-          <ul>
-            <li>Command Palette → type <strong>LowCode Studio</strong> (or <kbd>⌘/Ctrl+Shift+P</kbd>)</li>
-            <li>Editor title bar on a <code>.lcs.json</code> file (Explain)</li>
-            <li>Project Explorer toolbar / title actions</li>
-            <li><strong>Manage Scenarios</strong> → <em>Generate from description…</em></li>
-          </ul>
-
-          <h3>Explain / critique workflow (F0)</h3>
-          <span class="cmd">LowCode Studio: Explain / critique workflow (Assist)</span>
-          <p>
-            Open the workflow in the designer (or select its <code>.lcs.json</code>), run the command.
-            Output shows structure, package/selector critique, and why Studio Web may reject a Save.
-            Read-only — it does not change the workflow.
-          </p>
-
-          <h3>Generate scenarios (F1)</h3>
-          <span class="cmd">LowCode Studio: Generate scenarios from description (Assist)</span>
-          <p>
-            Or: <strong>Manage Scenarios</strong> → <em>Generate from description…</em>.
-            Type a short process description in the input box, for example:
-          </p>
-          <span class="cmd">REFramework queue with HTTP API and login UI</span>
-          <p>
-            Keywords map to templates (<code>queue</code>, <code>http</code>, <code>login</code>,
-            <code>excel</code>, <code>fail</code>, …) and are saved to
-            <code>Data/Test/scenarios.json</code>. Then run with <kbd>Shift+F5</kbd> or Dry Run Scenarios.
-          </p>
-
-          <h3>Scaffold / dry-run-trace repair (F2)</h3>
-          <span class="cmd">LowCode Studio: Scaffold sequence from description (Assist)</span>
-          <p>
-            Describe steps in plain language (split with newlines, <code>;</code>, or <em>then</em>).
-            Keywords map to catalog activities only — no LLM. Example:
-          </p>
-          <span class="cmd">use browser https://example.com then type into then click then log message "done"</span>
-          <span class="cmd">LowCode Studio: Repair from dry-run trace (Assist)</span>
-          <p>
-            Runs a dry-run (or uses the last designer dry-run), then proposes fills for empty required
-            props, TODO selectors, and <code>Imported.*</code> → Comment replacements.
-          </p>
-
-          <h3>Suggest / repair selectors (F3)</h3>
-          <span class="cmd">LowCode Studio: Suggest / repair selectors (Assist)</span>
-          <p>Two modes (propose first — nothing is applied until you confirm):</p>
-          <ul>
-            <li><strong>From HTML / Explorer paste</strong> — paste a DOM snippet, <code>#id</code>, or UI Explorer dump; copy the best classic <code>&lt;html&gt;/&lt;webctrl&gt;</code> into Selector Builder</li>
-            <li><strong>Repair weak selectors</strong> — scans the open workflow for empty / placeholder / weak UI steps; apply all or pick which proposals to write</li>
-          </ul>
-          <span class="cmd">&lt;button id="loginBtn" aria-label="Sign in"&gt;Sign in&lt;/button&gt;</span>
-
-          <h3>Repair VB expressions (F4)</h3>
-          <span class="cmd">LowCode Studio: Repair VB expressions (Assist)</span>
-          <p>
-            Also shown automatically in the Properties panel under expression fields
-            (<span style="color:#ef4444;font-weight:600">red hint + Apply</span>).
-            Right-click an activity → <em>Apply VB repairs</em>. Examples:
-          </p>
-          <ul>
-            <li><code>TRim(name)</code> → <code>name.Trim()</code></li>
-            <li><code>name.toUpperCase()</code> → <code>name.ToUpper()</code></li>
-            <li><code>x == null</code> → <code>x Is Nothing</code> · <code>&amp;&amp;</code> → <code>AndAlso</code></li>
-            <li><code>Len(s)</code> → <code>s.Length</code> · <code>Left(s, 3)</code> → <code>s.Substring(0, 3)</code></li>
-          </ul>
-          <p>Activity actions (move, duplicate, breakpoint, run-to-here) are on the <strong>right-click</strong> menu — card icon buttons were removed.</p>
-
-          <h3>Related dry-run settings (not Assist)</h3>
-          <p>
-            Optional real HTTP / Python live under Settings → VS Code
-            <code>lowcodeStudio.dryRun.*</code> (allow-listed hosts; fixtures always win).
-          </p>
-
-          <h3>Tips</h3>
-          <ul>
-            <li>Always check <strong>View → Output → LowCode Studio</strong> after Assist commands</li>
-            <li>Explain works best with the active project open (package pins + Invoke paths)</li>
-            <li>Scenario names starting with <code>assist-</code> are safe to edit or delete in <code>scenarios.json</code></li>
-          </ul>
+        <div class="assist-tabs" role="tablist">
+          <button type="button" class="active" data-assist-tab="live" role="tab" aria-selected="true">Live</button>
+          <button type="button" data-assist-tab="scaffold" role="tab" aria-selected="false">Scaffold (F2)</button>
+          <button type="button" data-assist-tab="help" role="tab" aria-selected="false">Help</button>
         </div>
-        <div class="settings-dialog-foot">
-          <button class="btn primary" type="button" id="assistHelpDone">Got it</button>
+        <div class="assist-tab-body active" data-assist-body="live" id="assistLiveBody">
+          <p class="lead" style="margin-top:0">
+            Real-time proposals for the open workflow. Nothing is written until you press <strong>Apply</strong>.
+          </p>
+          <div class="assist-actions" style="margin-top:0">
+            <button type="button" class="btn primary" id="assistLiveRefresh">Refresh proposals</button>
+            <button type="button" class="btn" id="assistLiveApplyAll">Apply all</button>
+          </div>
+          <div class="assist-proposal-list" id="assistLiveList"></div>
+        </div>
+        <div class="assist-tab-body" data-assist-body="scaffold" id="assistScaffoldBody">
+          <p class="lead" style="margin-top:0">
+            Describe steps in plain language (newlines, <code>;</code>, or <em>then</em>). Keywords map to catalog activities — no LLM.
+          </p>
+          <textarea class="assist-scaffold-input" id="assistScaffoldInput" placeholder='use browser https://example.com then type into then click then log message "done"'></textarea>
+          <div class="assist-actions">
+            <button type="button" class="btn primary" id="assistScaffoldPropose">Propose</button>
+            <button type="button" class="btn" id="assistScaffoldAppend" disabled>Apply append</button>
+            <button type="button" class="btn" id="assistScaffoldReplace" disabled>Apply replace</button>
+          </div>
+          <div class="assist-proposal-list" id="assistScaffoldList"></div>
+        </div>
+        <div class="assist-tab-body" data-assist-body="help">
+          <div class="assist-help-body">
+            <p class="lead">
+              Assist helpers are <strong>deterministic</strong> (no chat LLM). Live / Scaffold run in the designer;
+              Command Palette helpers also write to the <strong>LowCode Studio</strong> Output channel.
+            </p>
+
+            <h3>Where to run commands</h3>
+            <ul>
+              <li>Designer toolbar <strong>✦</strong> → Live / Scaffold / Help</li>
+              <li>Command Palette → type <strong>LowCode Studio</strong> (or <kbd>⌘/Ctrl+Shift+P</kbd>)</li>
+              <li>Editor title bar on a <code>.lcs.json</code> file (Explain)</li>
+              <li>Project Explorer toolbar / title actions</li>
+              <li><strong>Manage Scenarios</strong> → <em>Generate from description…</em></li>
+            </ul>
+
+            <h3>Explain / critique workflow (F0)</h3>
+            <span class="cmd">LowCode Studio: Explain / critique workflow (Assist)</span>
+            <p>
+              Open the workflow in the designer (or select its <code>.lcs.json</code>), run the command.
+              Output shows structure, package/selector critique, and why Studio Web may reject a Save.
+              Read-only — it does not change the workflow.
+            </p>
+
+            <h3>Generate scenarios (F1)</h3>
+            <span class="cmd">LowCode Studio: Generate scenarios from description (Assist)</span>
+            <p>
+              Or: <strong>Manage Scenarios</strong> → <em>Generate from description…</em>.
+              Type a short process description in the input box, for example:
+            </p>
+            <span class="cmd">REFramework queue with HTTP API and login UI</span>
+            <p>
+              Keywords map to templates (<code>queue</code>, <code>http</code>, <code>login</code>,
+              <code>excel</code>, <code>fail</code>, …) and are saved to
+              <code>Data/Test/scenarios.json</code>. Then run with <kbd>Shift+F5</kbd> or Dry Run Scenarios.
+            </p>
+
+            <h3>Scaffold / dry-run-trace repair (F2)</h3>
+            <span class="cmd">LowCode Studio: Scaffold sequence from description (Assist)</span>
+            <p>
+              Prefer the <strong>Scaffold</strong> tab above for propose → Apply append/replace.
+              Keywords map to catalog activities only — no LLM. Example:
+            </p>
+            <span class="cmd">use browser https://example.com then type into then click then log message "done"</span>
+            <span class="cmd">LowCode Studio: Repair from dry-run trace (Assist)</span>
+            <p>
+              Runs a dry-run (or uses the last designer dry-run), then proposes fills for empty required
+              props, TODO selectors, and <code>Imported.*</code> → Comment replacements.
+            </p>
+
+            <h3>Suggest / repair selectors (F3)</h3>
+            <span class="cmd">LowCode Studio: Suggest / repair selectors (Assist)</span>
+            <p>Two modes (propose first — nothing is applied until you confirm):</p>
+            <ul>
+              <li><strong>From HTML / Explorer paste</strong> — paste a DOM snippet, <code>#id</code>, or UI Explorer dump; copy the best classic <code>&lt;html&gt;/&lt;webctrl&gt;</code> into Selector Builder</li>
+              <li><strong>Repair weak selectors</strong> — scans the open workflow for empty / placeholder / weak UI steps; apply all or pick which proposals to write</li>
+            </ul>
+            <span class="cmd">&lt;button id="loginBtn" aria-label="Sign in"&gt;Sign in&lt;/button&gt;</span>
+
+            <h3>Repair VB expressions (F4)</h3>
+            <span class="cmd">LowCode Studio: Repair VB expressions (Assist)</span>
+            <p>
+              Also shown automatically in the Properties panel under expression fields
+              (<span style="color:#ef4444;font-weight:600">red hint + Apply</span>) and in the
+              <strong>Live</strong> Assist strip. Right-click an activity → <em>Apply VB repairs</em>. Examples:
+            </p>
+            <ul>
+              <li><code>TRim(name)</code> → <code>name.Trim()</code></li>
+              <li><code>name.toUpperCase()</code> → <code>name.ToUpper()</code></li>
+              <li><code>x == null</code> → <code>x Is Nothing</code> · <code>&amp;&amp;</code> → <code>AndAlso</code></li>
+              <li><code>Len(s)</code> → <code>s.Length</code> · <code>Left(s, 3)</code> → <code>s.Substring(0, 3)</code></li>
+            </ul>
+            <p>Activity actions (move, duplicate, breakpoint, run-to-here) are on the <strong>right-click</strong> menu — card icon buttons were removed.</p>
+
+            <h3>Related dry-run settings (not Assist)</h3>
+            <p>
+              Optional real HTTP / Python live under Settings → VS Code
+              <code>lowcodeStudio.dryRun.*</code> (allow-listed hosts; fixtures always win).
+            </p>
+
+            <h3>Tips</h3>
+            <ul>
+              <li>Use <strong>Live</strong> for in-designer propose/apply; check Output for palette-only Assist</li>
+              <li>Explain works best with the active project open (package pins + Invoke paths)</li>
+              <li>Scenario names starting with <code>assist-</code> are safe to edit or delete in <code>scenarios.json</code></li>
+            </ul>
+          </div>
+          <div class="settings-dialog-foot" style="border-top:none;padding:8px 0 0">
+            <button class="btn primary" type="button" id="assistHelpDone">Got it</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1505,6 +1641,16 @@ export function getDesignerHtml(
           <button class="btn danger" id="btnDelete" disabled>Delete activity</button>
         </div>
       </div>
+      <section class="minimap-dock" id="minimapDock" aria-label="Canvas mini-map">
+        <button type="button" class="minimap-head" id="btnToggleMinimap">
+          <span class="chev" id="minimapChev">▾</span>
+          <span class="grow">Mini-map</span>
+          <span class="count" id="minimapCount">0</span>
+        </button>
+        <div class="minimap-body">
+          <div class="minimap-stage" id="minimapStage"></div>
+        </div>
+      </section>
       <div class="frame-resize-y" id="propsResizeY" title="Drag to resize height (float mode)"></div>
       <div class="collapsed-only">
         <button class="btn" id="btnPropsExpand" type="button" title="Expand properties panel">Properties</button>
@@ -1543,6 +1689,9 @@ export function getDesignerHtml(
       settings: ${settingsJson},
       settingsOpen: false,
       assistHelpOpen: false,
+      assistTab: 'live',
+      assistScaffoldProposal: null,
+      minimapCollapsed: false,
       collapsedLeftSections: { project: true, activities: false, variables: true, arguments: true, watch: true, fixtures: true },
       selectedId: null,
       dragType: null,
@@ -1611,6 +1760,12 @@ export function getDesignerHtml(
       settingsOverlay: document.getElementById('settingsOverlay'),
       assistHelpOverlay: document.getElementById('assistHelpOverlay'),
       btnAssistHelp: document.getElementById('btnAssistHelp'),
+      assistLiveList: document.getElementById('assistLiveList'),
+      assistScaffoldList: document.getElementById('assistScaffoldList'),
+      assistScaffoldInput: document.getElementById('assistScaffoldInput'),
+      minimapDock: document.getElementById('minimapDock'),
+      minimapStage: document.getElementById('minimapStage'),
+      minimapCount: document.getElementById('minimapCount'),
       watchView: document.getElementById('watchView'),
       watchCount: document.getElementById('watchCount'),
       fixturesEditor: document.getElementById('fixturesEditor')
@@ -1657,12 +1812,26 @@ export function getDesignerHtml(
       state.settingsOpen = false;
       els.settingsOverlay?.classList.remove('show');
     }
-    function openAssistHelp() {
+    function setAssistTab(tab) {
+      const next = tab === 'scaffold' || tab === 'help' ? tab : 'live';
+      state.assistTab = next;
+      document.querySelectorAll('[data-assist-tab]').forEach((btn) => {
+        const on = btn.getAttribute('data-assist-tab') === next;
+        btn.classList.toggle('active', on);
+        btn.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      document.querySelectorAll('[data-assist-body]').forEach((body) => {
+        body.classList.toggle('active', body.getAttribute('data-assist-body') === next);
+      });
+      if (next === 'live') renderAssistLivePanel();
+    }
+    function openAssistHelp(tab) {
       closeSettings();
       state.assistHelpOpen = true;
       els.assistHelpOverlay?.classList.add('show');
       els.btnAssistHelp?.classList.add('active-assist');
       els.btnAssistHelp?.setAttribute('aria-expanded', 'true');
+      setAssistTab(tab || state.assistTab || 'live');
     }
     function closeAssistHelp() {
       state.assistHelpOpen = false;
@@ -1672,7 +1841,14 @@ export function getDesignerHtml(
     }
     function toggleAssistHelp() {
       if (state.assistHelpOpen) closeAssistHelp();
-      else openAssistHelp();
+      else openAssistHelp('live');
+    }
+    function applyMinimapCollapsed() {
+      const dock = els.minimapDock;
+      if (!dock) return;
+      dock.classList.toggle('collapsed', !!state.minimapCollapsed);
+      const chev = document.getElementById('minimapChev');
+      if (chev) chev.textContent = state.minimapCollapsed ? '▸' : '▾';
     }
     function saveSettingsFromForm() {
       const chk = (id) => !!document.getElementById(id)?.checked;
@@ -1936,6 +2112,36 @@ export function getDesignerHtml(
       return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
     function escapeAttr(s) { return escapeHtml(s).replace(/'/g, '&#39;'); }
+
+    /** Map catalog $(codicon) → compact glyph badge for canvas / palette (no codicon font in webview). */
+    const ICON_GLYPHS = {
+      output: '☰', watch: '⏱', comment: '💬', 'comment-discussion': '💬', terminal: '>_',
+      'file-text': '📄', save: '💾', 'diff-added': '+', search: '⌕', 'new-folder': '📁',
+      files: '📑', trash: '🗑', 'file-symlink-file': '↗', edit: '✎', 'find-replace': '⇄',
+      close: '×', 'symbol-variable': '𝑥', 'symbol-namespace': '{}', code: '</>',
+      error: '!', 'debug-stop': '■', 'debug-breakpoint-conditional': '◆', sync: '↻',
+      'debug-restart': '↺', 'debug-pause': '❚❚', 'debug-continue': '▶', 'list-ordered': '1.',
+      shield: '🛡', 'list-flat': '≡', 'type-hierarchy-sub': '⎇', 'split-horizontal': '◫',
+      'list-tree': '🌳', window: '▢', browser: '🌐', inspect: '🔍', keyboard: '⌨',
+      selection: '▣', eye: '👁', check: '✓', 'list-selection': '☑', 'device-camera': '📷',
+      'symbol-property': '⚙', table: '▦', file: '📄', add: '+', filter: '▽',
+      'arrow-swap': '⇄', 'clear-all': '⊘', export: '↗', 'git-merge': '⑂',
+      'symbol-field': '·', 'arrow-both': '↔', 'symbol-key': '🔑', mail: '✉', globe: '🌐',
+      inbox: '📥', json: '{}', 'bracket-dot': '[.]', 'symbol-misc': '✦', 'file-code': '</>',
+      play: '▶', 'symbol-method': 'ƒ', 'debug-start': '▶', 'run-all': '⇉', key: '🔑',
+      lock: '🔒', checklist: '☑'
+    };
+    function iconGlyph(icon) {
+      const key = String(icon || '').replace(/^\$\(|\)$/g, '');
+      return ICON_GLYPHS[key] || '●';
+    }
+    function activityIconHtml(defOrType, color) {
+      const def = typeof defOrType === 'string' ? findDef(defOrType) : defOrType;
+      const c = color || def?.color || '#64748B';
+      const glyph = iconGlyph(def?.icon);
+      return '<span class="act-icon" style="--ico:' + escapeAttr(c) + ';background:' + escapeAttr(c) + '" title="' +
+        escapeAttr((def?.displayName || '') + (def?.icon ? ' ' + def.icon : '')) + '">' + escapeHtml(glyph) + '</span>';
+    }
 
     function createActivity(type, x, y) {
       const def = findDef(type);
@@ -2519,7 +2725,7 @@ export function getDesignerHtml(
           '<div class="cat-items">' +
           items.map(a => (
             '<div class="activity-item" draggable="true" data-type="' + escapeAttr(a.type) + '" data-tip="' + escapeAttr(a.displayName + ' — ' + a.type) + '">' +
-              '<span class="dot" style="background:' + a.color + '"></span>' +
+              activityIconHtml(a) +
               '<div class="meta"><div class="title">' + escapeHtml(a.displayName) + '</div>' +
               '<div class="type">' + escapeHtml(a.type) + '</div></div></div>'
           )).join('') + '</div></div>';
@@ -2667,6 +2873,7 @@ export function getDesignerHtml(
         (bpOn ? '<span class="card-bp-dot" title="Breakpoint set — right-click or ⋯ to toggle"></span>' : '') +
         '<button type="button" class="card-menu" data-card-menu title="Activity menu">⋯</button>' +
         '<div class="card-head"><span class="step">#' + stepNo + '</span>' +
+        activityIconHtml(def || node.type, color) +
         '<div class="card-title">' + escapeHtml(node.displayName) + '</div></div>' +
         '<div class="card-summary">' + escapeHtml(summary(node)) + '</div>' +
         (selWarn
@@ -2841,10 +3048,11 @@ export function getDesignerHtml(
         const bpDot = bpOn ? '<span class="card-bp-dot" title="Breakpoint set — right-click to toggle"></span>' : '';
         if (bpOn) el.classList.add('has-bp');
         const menuBtn = '<button type="button" class="card-menu" data-card-menu title="Activity menu">⋯</button>';
+        const ico = activityIconHtml(def || node.type, node.color || def?.color);
         if (isDecision) {
-          el.innerHTML = bpDot + menuBtn + '<div class="inner"><div class="title">' + escapeHtml(node.displayName) + '</div><div class="summary">' + escapeHtml(summary(node)) + '</div></div><div class="port" title="Drag to connect"></div>';
+          el.innerHTML = bpDot + menuBtn + '<div class="inner">' + ico + '<div class="title">' + escapeHtml(node.displayName) + '</div><div class="summary">' + escapeHtml(summary(node)) + '</div></div><div class="port" title="Drag to connect"></div>';
         } else {
-          el.innerHTML = bpDot + menuBtn + '<div class="title">' + escapeHtml(node.displayName) + '</div>' +
+          el.innerHTML = bpDot + menuBtn + '<div class="title">' + ico + escapeHtml(node.displayName) + '</div>' +
             (isStart || isEnd ? '' : '<div class="summary">' + escapeHtml(summary(node)) + '</div>') +
             warnHtml +
             (isEnd ? '' : '<div class="port" title="Drag to connect"></div>');
@@ -3278,6 +3486,341 @@ export function getDesignerHtml(
         '</div>';
     }
 
+    function defaultFillForProp(p) {
+      if (p.defaultValue !== undefined && p.defaultValue !== null && String(p.defaultValue).trim() !== '') {
+        return p.defaultValue;
+      }
+      const n = String(p.name || '').toLowerCase();
+      if (n === 'message' || n === 'text') return '"TODO"';
+      if (n === 'condition' || n === 'expression') return 'True';
+      if (n === 'level') return 'Info';
+      if (n === 'method') return 'GET';
+      if (n === 'url' || n === 'urlorpath') return '"https://example.com"';
+      if (n === 'duration' || n === 'durationms') return n === 'durationms' ? 2000 : '00:00:02';
+      if (n === 'selector') return "<html app='chrome.exe' title='*' /><webctrl tag='BUTTON' id='' />";
+      if (n === 'result' || n === 'to' || n === 'item' || n === 'row') return n === 'to' ? 'result' : n;
+      return p.type === 'number' ? 0 : (p.type === 'boolean' ? true : '""');
+    }
+
+    /** Live Assist proposals (selected activity first, then workflow-wide VB / required / selectors). */
+    function collectLiveAssistProposals(opts) {
+      const selectedOnly = !!(opts && opts.selectedOnly);
+      const nodes = selectedOnly && state.selectedId
+        ? (() => {
+            const hit = walkFind(state.workflow.activities, state.selectedId);
+            return hit ? [hit.node] : [];
+          })()
+        : walkCollect(state.workflow.activities);
+      const out = [];
+      for (const node of nodes) {
+        const def = findDef(node.type);
+        for (const r of vbRepairsForActivity(node)) {
+          out.push({
+            id: 'vb:' + node.id + ':' + r.name,
+            kind: 'vb',
+            activityId: node.id,
+            property: r.name,
+            label: 'VB · ' + (node.displayName || node.type),
+            detail: (r.label || r.name) + ': ' + (r.labels[0] || 'fix') + ' → ' + r.proposed,
+            proposed: r.proposed,
+            actionable: true
+          });
+        }
+        for (const p of (def?.properties || [])) {
+          if (!p.required) continue;
+          const cur = node.properties?.[p.name];
+          const empty = cur === undefined || cur === null || String(cur).trim() === '';
+          if (!empty) continue;
+          const proposed = defaultFillForProp(p);
+          out.push({
+            id: 'req:' + node.id + ':' + p.name,
+            kind: 'required',
+            activityId: node.id,
+            property: p.name,
+            label: 'Fill · ' + (node.displayName || node.type),
+            detail: 'Required “' + (p.label || p.name) + '” → ' + String(proposed),
+            proposed,
+            actionable: true
+          });
+        }
+        const sw = selectorCardWarn(node);
+        if (sw && (sw.level === 'empty' || sw.level === 'placeholder' || sw.level === 'weak')) {
+          const proposed = defaultFillForProp({ name: 'selector', type: 'string' });
+          const actionable = sw.level === 'empty' || sw.level === 'placeholder';
+          out.push({
+            id: 'sel:' + node.id,
+            kind: 'selector',
+            activityId: node.id,
+            property: 'selector',
+            label: 'Selector · ' + (node.displayName || node.type),
+            detail: sw.text + (actionable ? ' — Apply inserts a starter classic selector' : ' — tighten Id/aaname in Selector Builder'),
+            proposed,
+            actionable
+          });
+        }
+      }
+      return out;
+    }
+
+    function applyLiveProposal(p) {
+      if (!p || !p.actionable) return false;
+      const hit = walkFind(state.workflow.activities, p.activityId);
+      if (!hit) return false;
+      hit.node.properties = hit.node.properties || {};
+      hit.node.properties[p.property] = p.proposed;
+      return true;
+    }
+
+    function assistLiveStripHtml(node) {
+      if (!node) return '';
+      const props = collectLiveAssistProposals({ selectedOnly: true }).filter((p) => p.activityId === node.id);
+      if (!props.length) return '';
+      return '<div class="assist-live" id="assistLiveStrip">' +
+        '<div class="al-title"><span>Assist live · ' + props.length + ' proposal(s)</span>' +
+        '<button type="button" class="al-apply" id="btnAssistLiveOpen">Open Assist</button></div>' +
+        props.slice(0, 4).map((p) =>
+          '<div class="al-item">' +
+            '<div><div class="al-label">' + escapeHtml(p.label) + '</div>' +
+            '<div class="al-detail">' + escapeHtml(p.detail) + '</div></div>' +
+            (p.actionable
+              ? '<button type="button" class="al-apply" data-al-apply="' + escapeAttr(p.id) + '">Apply</button>'
+              : '<span></span>') +
+          '</div>'
+        ).join('') +
+        (props.length > 4 ? '<div class="al-detail" style="margin-top:6px">+' + (props.length - 4) + ' more in Assist ✦ → Live</div>' : '') +
+        '</div>';
+    }
+
+    function wireAssistLiveStrip(node) {
+      document.getElementById('btnAssistLiveOpen')?.addEventListener('click', () => openAssistHelp('live'));
+      const proposals = collectLiveAssistProposals({ selectedOnly: true });
+      els.props.querySelectorAll('[data-al-apply]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const id = btn.getAttribute('data-al-apply');
+          const p = proposals.find((x) => x.id === id);
+          if (!p || !applyLiveProposal(p)) { toast('Could not apply proposal'); return; }
+          state.selectedId = node.id;
+          persist(true);
+          toast('Applied: ' + p.label);
+        });
+      });
+    }
+
+    function renderAssistLivePanel() {
+      const list = els.assistLiveList;
+      if (!list) return;
+      const proposals = collectLiveAssistProposals({ selectedOnly: false });
+      if (!proposals.length) {
+        list.innerHTML = '<div class="empty">No live proposals — expressions look VB-clean and required fields are set.</div>';
+        return;
+      }
+      list.innerHTML = proposals.map((p) =>
+        '<div class="assist-proposal">' +
+          '<div class="ap-title">' + escapeHtml(p.label) + '</div>' +
+          '<div class="ap-meta">' + escapeHtml(p.detail) + '</div>' +
+          (p.actionable
+            ? '<div class="assist-actions" style="margin-top:8px"><button type="button" class="al-apply" data-al-panel-apply="' +
+              escapeAttr(p.id) + '">Apply</button></div>'
+            : '') +
+        '</div>'
+      ).join('');
+      list.querySelectorAll('[data-al-panel-apply]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-al-panel-apply');
+          const p = proposals.find((x) => x.id === id);
+          if (!p || !applyLiveProposal(p)) { toast('Could not apply proposal'); return; }
+          state.selectedId = p.activityId;
+          persist(true);
+          renderAssistLivePanel();
+          toast('Applied: ' + p.label);
+        });
+      });
+    }
+
+    const SCAFFOLD_RULES = [
+      { test: /\\b(log message|log\\b|write line)\\b/i, type: 'System.LogMessage', props: { level: 'Info', message: '"Hello from Assist scaffold"' } },
+      { test: /\\b(message box|msgbox)\\b/i, type: 'System.MessageBox', props: { text: '"Hello"' } },
+      { test: /\\b(assign|set variable)\\b/i, type: 'Programming.Assign', props: { to: 'result', value: '""' } },
+      { test: /\\b(multiple assign)\\b/i, type: 'Programming.MultipleAssign', props: { assignments: 'a = 1\\nb = 2' } },
+      { test: /\\b(if |condition|branch)\\b/i, type: 'ControlFlow.If', props: { condition: 'True' } },
+      { test: /\\b(while|loop until)\\b/i, type: 'ControlFlow.While', props: { condition: 'True' } },
+      { test: /\\b(for each row|foreach row)\\b/i, type: 'Data.ForEachRow', props: { dataTable: 'dt', row: 'row' } },
+      { test: /\\b(for each|foreach)\\b/i, type: 'ControlFlow.ForEach', props: { values: 'items', item: 'item' } },
+      { test: /\\b(try catch|try\\/catch)\\b/i, type: 'ControlFlow.TryCatch' },
+      { test: /\\b(delay|wait seconds|sleep)\\b/i, type: 'System.Delay', props: { duration: '00:00:02' } },
+      { test: /\\b(use browser|open browser|navigate)\\b/i, type: 'UI.UseApplicationBrowser', props: { mode: 'Browser', urlOrPath: 'https://example.com', browserType: 'Chrome' } },
+      { test: /\\b(open application|use application)\\b/i, type: 'UI.UseApplicationBrowser', props: { mode: 'Application', urlOrPath: 'notepad.exe' } },
+      { test: /\\b(click)\\b/i, type: 'UI.Click', props: { selector: '' } },
+      { test: /\\b(type into|type text|enter text)\\b/i, type: 'UI.TypeInto', props: { selector: '', text: '""' } },
+      { test: /\\b(get text)\\b/i, type: 'UI.GetText', props: { selector: '', result: 'textValue' } },
+      { test: /\\b(element exists|check element)\\b/i, type: 'UI.ElementExists', props: { selector: '', result: 'exists' } },
+      { test: /\\b(http|rest|api request|webhook)\\b/i, type: 'Messaging.HttpRequest', props: { method: 'GET', url: '"https://api.example.com"', result: 'httpResult' } },
+      { test: /\\b(send email|email)\\b/i, type: 'Messaging.SendEmail', props: { to: 'user@example.com', subject: '"Hello"', body: '"Body"' } },
+      { test: /\\b(read csv)\\b/i, type: 'Data.ReadCsv', props: { filePath: 'Data/input.csv', dataTable: 'dt' } },
+      { test: /\\b(write csv)\\b/i, type: 'Data.WriteCsv', props: { filePath: 'Data/output.csv', dataTable: 'dt' } },
+      { test: /\\b(build data table|new data table)\\b/i, type: 'Data.BuildDataTable', props: { dataTable: 'dt' } },
+      { test: /\\b(excel|workbook)\\b/i, type: 'Excel.ExcelApplicationScope', props: { workbookPath: 'Data/Workbook.xlsx' } },
+      { test: /\\b(get queue|queue item|transaction item)\\b/i, type: 'Orchestrator.GetTransactionItem', props: { queueName: 'MainQueue', result: 'TransactionItem' } },
+      { test: /\\b(get asset)\\b/i, type: 'Orchestrator.GetAsset', props: { assetName: 'ConfigAsset', result: 'assetValue' } },
+      { test: /\\b(invoke workflow|call workflow)\\b/i, type: 'REFramework.InvokeWorkflow', props: { workflowPath: 'Framework/Process.lcs.json' } },
+      { test: /\\b(comment|note)\\b/i, type: 'System.Comment', props: { text: 'Assist scaffold note' } }
+    ];
+
+    function scaffoldFromDescription(description) {
+      const text = String(description || '').trim();
+      const chunks = text
+        ? text.split(/\\n+|;|\\bthen\\b|\\band then\\b/i).map((s) => s.trim()).filter(Boolean)
+        : ['log message hello'];
+      const activities = [];
+      const summaryLines = [];
+      const unmatched = [];
+      for (const chunk of chunks) {
+        let matched = false;
+        for (const rule of SCAFFOLD_RULES) {
+          if (!rule.test.test(chunk)) continue;
+          const node = createActivity(rule.type);
+          if (!node) continue;
+          Object.assign(node.properties, rule.props || {});
+          if (node.type === 'System.LogMessage') {
+            const q = chunk.match(/["“]([^"”]+)["”]/);
+            if (q) node.properties.message = '"' + q[1].replace(/"/g, '""') + '"';
+          }
+          if (node.type === 'Messaging.HttpRequest') {
+            const url = chunk.match(/https?:\\/\\/\\S+/i);
+            if (url) node.properties.url = '"' + url[0] + '"';
+          }
+          if (node.type === 'UI.UseApplicationBrowser') {
+            const url = chunk.match(/https?:\\/\\/\\S+/i);
+            if (url) node.properties.urlOrPath = url[0];
+          }
+          activities.push(node);
+          summaryLines.push(node.displayName + ' ← “' + chunk.slice(0, 60) + '”');
+          matched = true;
+          break;
+        }
+        if (!matched) unmatched.push(chunk);
+      }
+      if (!activities.length) {
+        const fallback = createActivity('System.LogMessage');
+        if (fallback) {
+          fallback.properties.message = '"' + (text.slice(0, 80).replace(/"/g, '""') || 'Assist scaffold') + '"';
+          activities.push(fallback);
+          summaryLines.push('Fallback Log Message (no keyword match)');
+        }
+      }
+      return { activities, summary: summaryLines, unmatched };
+    }
+
+    function renderAssistScaffoldPanel() {
+      const list = els.assistScaffoldList;
+      if (!list) return;
+      const proposal = state.assistScaffoldProposal;
+      const appendBtn = document.getElementById('assistScaffoldAppend');
+      const replaceBtn = document.getElementById('assistScaffoldReplace');
+      if (!proposal || !proposal.activities.length) {
+        list.innerHTML = '<div class="empty">Press Propose to preview activities. Nothing is applied until Append or Replace.</div>';
+        if (appendBtn) appendBtn.disabled = true;
+        if (replaceBtn) replaceBtn.disabled = true;
+        return;
+      }
+      if (appendBtn) appendBtn.disabled = false;
+      if (replaceBtn) replaceBtn.disabled = false;
+      list.innerHTML =
+        '<div class="assist-proposal"><div class="ap-title">' + proposal.activities.length +
+        ' activit' + (proposal.activities.length === 1 ? 'y' : 'ies') + '</div>' +
+        proposal.summary.map((s) => '<div class="ap-meta">· ' + escapeHtml(s) + '</div>').join('') +
+        (proposal.unmatched.length
+          ? '<div class="ap-meta" style="margin-top:6px;color:#ef4444">Unmatched: ' +
+            escapeHtml(proposal.unmatched.join('; ')) + '</div>'
+          : '') +
+        '</div>';
+    }
+
+    function proposeAssistScaffold() {
+      const text = els.assistScaffoldInput?.value || '';
+      state.assistScaffoldProposal = scaffoldFromDescription(text);
+      renderAssistScaffoldPanel();
+      toast('Proposed ' + state.assistScaffoldProposal.activities.length + ' activit' +
+        (state.assistScaffoldProposal.activities.length === 1 ? 'y' : 'ies'));
+    }
+
+    function applyAssistScaffold(mode) {
+      const proposal = state.assistScaffoldProposal;
+      if (!proposal || !proposal.activities.length) { toast('Propose a scaffold first'); return; }
+      const clones = proposal.activities.map((a) => JSON.parse(JSON.stringify(a)));
+      for (const n of clones) n.id = newId();
+      if (mode === 'replace') state.workflow.activities = clones;
+      else state.workflow.activities = [...(state.workflow.activities || []), ...clones];
+      state.selectedId = clones[0]?.id || null;
+      state.assistScaffoldProposal = null;
+      if (els.assistScaffoldInput) els.assistScaffoldInput.value = '';
+      renderAssistScaffoldPanel();
+      persist(true);
+      toast((mode === 'replace' ? 'Replaced with ' : 'Appended ') + clones.length + ' scaffolded activit' +
+        (clones.length === 1 ? 'y' : 'ies'));
+      closeAssistHelp();
+    }
+
+    function renderMinimap() {
+      const stage = els.minimapStage;
+      const countEl = els.minimapCount;
+      if (!stage) return;
+      applyMinimapCollapsed();
+      const nodes = walkCollect(state.workflow.activities);
+      if (countEl) countEl.textContent = String(nodes.length);
+      if (!nodes.length) {
+        stage.innerHTML = '<div class="minimap-empty">No activities yet</div>';
+        return;
+      }
+      if (isFlow()) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const n of nodes) {
+          const x = n.x || 0, y = n.y || 0;
+          minX = Math.min(minX, x); minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x + 160); maxY = Math.max(maxY, y + 70);
+        }
+        const pad = 12;
+        const spanX = Math.max(180, maxX - minX + pad * 2);
+        const spanY = Math.max(100, maxY - minY + pad * 2);
+        const scale = Math.min(1, 220 / spanX, 120 / spanY);
+        const w = Math.round(spanX * scale);
+        const h = Math.round(spanY * scale);
+        stage.innerHTML = '<div class="minimap-flow" style="width:' + w + 'px;height:' + h + 'px">' +
+          nodes.map((n) => {
+            const def = findDef(n.type);
+            const color = n.color || def?.color || '#64748B';
+            const left = Math.round(((n.x || 0) - minX + pad) * scale);
+            const top = Math.round(((n.y || 0) - minY + pad) * scale);
+            const sel = state.selectedId === n.id ? ' selected' : '';
+            return '<button type="button" class="mm-node' + sel + '" data-mm-id="' + escapeAttr(n.id) +
+              '" title="' + escapeAttr(n.displayName || n.type) + '" style="left:' + left + 'px;top:' + top +
+              'px;background:' + escapeAttr(color) + '"></button>';
+          }).join('') + '</div>';
+      } else {
+        stage.innerHTML = '<div class="minimap-seq">' +
+          nodes.map((n, i) => {
+            const def = findDef(n.type);
+            const color = n.color || def?.color || '#64748B';
+            const sel = state.selectedId === n.id ? ' selected' : '';
+            return '<button type="button" class="mm-bar' + sel + '" data-mm-id="' + escapeAttr(n.id) +
+              '" title="#' + (i + 1) + ' ' + escapeAttr(n.displayName || n.type) +
+              '" style="background:' + escapeAttr(color) + '"></button>';
+          }).join('') + '</div>';
+      }
+      stage.querySelectorAll('[data-mm-id]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-mm-id');
+          if (!id) return;
+          state.selectedId = id;
+          ensurePropsPanelVisible();
+          persist(true);
+          highlightSearchHit(id);
+        });
+      });
+    }
+
     function renderProps() {
       syncSuggestionVariables();
       const hit = state.selectedId ? walkFind(state.workflow.activities, state.selectedId) : null;
@@ -3401,12 +3944,15 @@ export function getDesignerHtml(
       }
 
       const studioWeb = studioWebChecklistHtml(node, def);
+      const assistStrip = assistLiveStripHtml(node);
 
-      let html = propSection('general', 'General', general);
+      let html = assistStrip;
+      html += propSection('general', 'General', general);
       html += propSection('activity', 'Activity', activity);
       html += propSection('studioWeb', 'Required for Studio Web', studioWeb);
       if (flow) html += propSection('flow', 'Flowchart', flow);
       els.props.innerHTML = html;
+      wireAssistLiveStrip(node);
 
       els.props.querySelectorAll('.prop-section-head').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -3835,11 +4381,13 @@ export function getDesignerHtml(
       renderProjectTree();
       if (isFlow()) renderFlowchart(); else renderSequence();
       renderProps();
+      renderMinimap();
       renderVariables();
       renderArguments();
       renderBreadcrumbs();
       renderConnectionsPanel();
       syncDockActive();
+      if (state.assistHelpOpen && state.assistTab === 'live') renderAssistLivePanel();
     }
 
     function persist(rerender) {
@@ -3849,12 +4397,14 @@ export function getDesignerHtml(
         vscode.postMessage({ type: 'edit', workflow: state.workflow });
         if (rerender) renderAll();
         else if (isFlow()) {
+          renderMinimap();
           renderVariables();
           renderArguments();
           renderBreadcrumbs();
         } else {
           renderSequence();
           renderProps();
+          renderMinimap();
           renderVariables();
           renderArguments();
           renderBreadcrumbs();
@@ -4225,6 +4775,30 @@ export function getDesignerHtml(
     els.btnAssistHelp?.addEventListener('click', () => toggleAssistHelp());
     document.getElementById('assistHelpClose')?.addEventListener('click', () => closeAssistHelp());
     document.getElementById('assistHelpDone')?.addEventListener('click', () => closeAssistHelp());
+    document.querySelectorAll('[data-assist-tab]').forEach((btn) => {
+      btn.addEventListener('click', () => setAssistTab(btn.getAttribute('data-assist-tab')));
+    });
+    document.getElementById('assistLiveRefresh')?.addEventListener('click', () => renderAssistLivePanel());
+    document.getElementById('assistLiveApplyAll')?.addEventListener('click', () => {
+      const proposals = collectLiveAssistProposals({ selectedOnly: false }).filter((p) => p.actionable);
+      let n = 0;
+      for (const p of proposals) {
+        if (applyLiveProposal(p)) n++;
+      }
+      if (!n) { toast('No actionable proposals'); return; }
+      persist(true);
+      renderAssistLivePanel();
+      toast('Applied ' + n + ' Assist proposal(s)');
+    });
+    document.getElementById('assistScaffoldPropose')?.addEventListener('click', () => proposeAssistScaffold());
+    document.getElementById('assistScaffoldAppend')?.addEventListener('click', () => applyAssistScaffold('append'));
+    document.getElementById('assistScaffoldReplace')?.addEventListener('click', () => applyAssistScaffold('replace'));
+    document.getElementById('btnToggleMinimap')?.addEventListener('click', () => {
+      state.minimapCollapsed = !state.minimapCollapsed;
+      applyMinimapCollapsed();
+    });
+    applyMinimapCollapsed();
+    renderAssistScaffoldPanel();
     els.assistHelpOverlay?.addEventListener('click', (e) => {
       if (e.target === els.assistHelpOverlay) closeAssistHelp();
     });
@@ -4381,6 +4955,7 @@ export function getDesignerHtml(
           html += '<div class="palette-section">' + escapeHtml(e.section) + '</div>';
         }
         html += '<div class="palette-item' + (i === state.paletteActive ? ' active' : '') + '" data-palette-idx="' + i + '" data-type="' + escapeAttr(e.def.type) + '" role="option">' +
+          activityIconHtml(e.def) +
           '<div><div class="pi-name">' + escapeHtml(e.def.displayName) + '</div>' +
           '<div class="pi-meta">' + escapeHtml(e.def.category) + ' · ' + escapeHtml(e.def.type) + '</div></div>' +
           '<button type="button" class="pi-pin' + (e.pinned ? ' on' : '') + '" data-pin="' + escapeAttr(e.def.type) + '" title="Pin favorite">' + (e.pinned ? '★' : '☆') + '</button>' +

@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.41] — 2026-08-06
+
+### Added
+- **Mini-map** under Properties (right panel) — sequence bars / flowchart dots; click to select + scroll
+- **Activity icons** on canvas cards, flowchart nodes, Activities toolbox, and Insert palette (same catalog glyphs as the VS Code Activities tree)
+- **Assist Live** (toolbar ✦) — real-time VB / required / selector proposals with **Apply** / **Apply all**
+- **Assist Scaffold (F2)** tab — propose from description, then **Apply append** or **Apply replace** in the designer
+
 ## [0.6.40] — 2026-08-06
 
 ### Added

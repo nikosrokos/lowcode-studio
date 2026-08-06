@@ -1,12 +1,12 @@
 # LowCode Studio
 
-**Version 0.6.40** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.6.41** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.6.40-0ea5e9)
+![version](https://img.shields.io/badge/version-0.6.41-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
@@ -42,10 +42,10 @@ Design on Mac (REFramework)
 1. **Designer** — framed toolbox + properties, sequence board, macOS-style bottom dock  
 2. **Floating frames** — traffic-light controls to float / dock / collapse either side panel  
 
-## What’s in 0.6.40
+## What’s in 0.6.41
 
-- **Deeper import map** — Continue, file move/rename, regex, DataTable helpers, Wait Queue Item, Get Credential, Send Hotkey (fewer `Imported.*`)
-- Leaner Studio Web sync — trash / editor junk never pushed; Open-in guide written once; adopt copies Config only
+- **Mini-map** under Properties + **activity icons** on canvas / toolbox / Insert palette
+- **Assist ✦** — Live propose/apply (VB, required fills, selectors) and Scaffold (F2) append/replace in the designer
 
 Full history: [CHANGELOG.md](CHANGELOG.md)
 
@@ -60,7 +60,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.40.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.41.vsix` → reload.
 
 ## Easy path
 
@@ -167,12 +167,13 @@ See [docs/ACTIVITIES.md](docs/ACTIVITIES.md). Invoke Code / UI steps are dry-run
 - **A2** File IO + FlowSwitch import map (fewer `Imported.*`)
 - **C2** Opt-in real HTTP / Python dry-run runners
 - **F0–F4** Assist: Explain, scenarios, **F2 scaffold + dry-run-trace repair**, selectors, VB repairs
+- Designer **Assist Live / Scaffold** tabs with propose → Apply
 
 ### Next (5)
 1. Richer F2 scaffolds (containers/branches from description)
 2. Marketplace publish packaging
 3. Optional Orchestrator publish path (explore; don’t promise)
-4. Deeper Assist F2/F4 UX (multi-file scaffold, bulk VB pass)
+4. Multi-file Assist scaffold + bulk VB pass across project
 5. More Studio Web aliases (Integration Service / Testing pack)
 
 ## License
