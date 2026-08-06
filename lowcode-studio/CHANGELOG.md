@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.48] — 2026-08-06
+
+### Fixed
+- **Studio Web–edited activity Properties** — import now reads `VisualBasicValue` / `ExpressionText` (and Literals), so Message / Assign values from Studio Web Sync populate Properties instead of blank fields
+- Properties paint coerces leftover expression objects (no more `[object Object]`)
+
+### Changed
+- Activities toolbox, canvas cards, flowchart nodes, and mini-map use the same **codicon** glyphs as the VS Code Activities tree (`media/codicons`)
+
 ## [0.6.47] — 2026-08-06
 
 ### Fixed

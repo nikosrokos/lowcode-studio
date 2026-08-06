@@ -60,6 +60,10 @@ function run(): void {
   assert.ok(html.includes('showCtxMenu(x, y, activityId, nodeRef)'), 'ctx menu receives live node');
   assert.ok(html.includes("showCtxMenu(e.clientX, e.clientY, node.id, node)"), 'card ctx passes node');
   assert.ok(html.includes('selectedNode'), 'selectedNode kept for SW sync props paint');
+  assert.ok(html.includes('codicon-'), 'codicon classes for activity icons');
+  assert.ok(html.includes('function iconCodiconName'), 'codicon name from catalog $(icon)');
+  assert.ok(html.includes('function coercePaintValue'), 'coerce SW ExpressionText before paint');
+  assert.ok(!html.includes('ICON_GLYPHS'), 'emoji glyph map replaced by codicons');
 
   console.log('designerUxFixes.test.ts: ok');
 }

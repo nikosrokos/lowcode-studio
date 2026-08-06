@@ -186,6 +186,19 @@ function run(): void {
     assert.strictEqual(doc.activities[0].properties.message, '"x"');
   }
 
+  {
+    const node = normalizeActivityNode({
+      id: 'expr',
+      type: 'System.LogMessage',
+      displayName: 'Log Message',
+      properties: {
+        message: { ExpressionText: '"from object"' },
+        level: 'Info'
+      }
+    } as any);
+    assert.strictEqual(node.properties.message, '"from object"');
+  }
+
   console.log('activityNormalize.test.ts OK');
 }
 

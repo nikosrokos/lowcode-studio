@@ -95,11 +95,20 @@ const ALIASES: Record<string, Record<string, string>> = {
 };
 
 /** Unwrap Studio Web / XAML expression objects into plain editable values. */
-function coercePropValue(value: unknown): unknown {
+export function coercePropValue(value: unknown): unknown {
   if (value == null || typeof value !== 'object' || Array.isArray(value)) {
     return value;
   }
   const o = value as Record<string, unknown>;
+  if (o.ExpressionText != null && String(o.ExpressionText).trim() !== '') {
+    return String(o.ExpressionText);
+  }
+  if (o.expressionText != null && String(o.expressionText).trim() !== '') {
+    return String(o.expressionText);
+  }
+  if (o['@_ExpressionText'] != null && String(o['@_ExpressionText']).trim() !== '') {
+    return String(o['@_ExpressionText']);
+  }
   if (o.Expression != null) {
     return String(o.Expression);
   }
@@ -111,6 +120,15 @@ function coercePropValue(value: unknown): unknown {
   }
   if (typeof o.value === 'string' || typeof o.value === 'number' || typeof o.value === 'boolean') {
     return o.value;
+  }
+  // Nested VisualBasicValue / Literal
+  for (const [k, v] of Object.entries(o)) {
+    if (/VisualBasicValue|Literal|InArgument|CSharpValue/i.test(k) && v && typeof v === 'object') {
+      const inner = coercePropValue(v);
+      if (inner != null && typeof inner !== 'object') {
+        return inner;
+      }
+    }
   }
   return value;
 }

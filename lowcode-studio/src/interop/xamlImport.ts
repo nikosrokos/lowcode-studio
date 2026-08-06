@@ -1678,7 +1678,8 @@ function extractArgument(raw: Record<string, unknown>, name: string): unknown {
   if (typeof direct === 'string' || typeof direct === 'number') {
     return direct;
   }
-  const nested = raw[`${Object.keys(raw).find((k) => k.endsWith('.' + name)) || ''}`];
+  const nestedKey = Object.keys(raw).find((k) => k.endsWith('.' + name));
+  const nested = nestedKey ? raw[nestedKey] : undefined;
   const candidates = [direct, nested, raw[`Assign.${name}`], raw[name]];
   for (const c of candidates) {
     if (c == null) {
@@ -1688,23 +1689,34 @@ function extractArgument(raw: Record<string, unknown>, name: string): unknown {
       return c;
     }
     if (typeof c === 'object') {
-      const obj = c as Record<string, unknown>;
-      if (obj['#text'] != null) {
-        return obj['#text'];
+      // Prefer full unwrap (ExpressionText / VisualBasicValue) before #text
+      const unwrapped = argumentValue(c);
+      if (unwrapped != null && String(unwrapped).trim() !== '') {
+        return unwrapped;
       }
+      const obj = c as Record<string, unknown>;
       if (obj.InArgument) {
-        return argumentValue(obj.InArgument);
+        const v = argumentValue(obj.InArgument);
+        if (v != null && String(v).trim() !== '') {
+          return v;
+        }
       }
       if (obj.OutArgument) {
-        return argumentValue(obj.OutArgument);
+        const v = argumentValue(obj.OutArgument);
+        if (v != null && String(v).trim() !== '') {
+          return v;
+        }
       }
       if (obj.InOutArgument) {
-        return argumentValue(obj.InOutArgument);
+        const v = argumentValue(obj.InOutArgument);
+        if (v != null && String(v).trim() !== '') {
+          return v;
+        }
       }
       // Assign.To style
       for (const v of Object.values(obj)) {
         const inner = argumentValue(v);
-        if (inner != null) {
+        if (inner != null && String(inner).trim() !== '') {
           return inner;
         }
       }
@@ -1717,18 +1729,57 @@ function argumentValue(node: unknown): unknown {
   if (node == null) {
     return undefined;
   }
-  if (typeof node === 'string' || typeof node === 'number') {
+  if (typeof node === 'string' || typeof node === 'number' || typeof node === 'boolean') {
     return node;
   }
   if (Array.isArray(node)) {
-    return argumentValue(node[0]);
+    for (const item of node) {
+      const hit = argumentValue(item);
+      if (hit != null && String(hit).trim() !== '') {
+        return hit;
+      }
+    }
+    return undefined;
   }
   if (typeof node === 'object') {
     const obj = node as Record<string, unknown>;
-    if (obj['#text'] != null) {
+    // Studio Web edited expressions: VisualBasicValue / Literal with ExpressionText
+    const exprText =
+      obj['@_ExpressionText'] ??
+      obj.ExpressionText ??
+      obj.expressionText ??
+      obj['@_Expression'] ??
+      obj.Expression ??
+      obj.expression;
+    if (exprText != null && String(exprText).trim() !== '') {
+      return exprText;
+    }
+    const litVal = obj['@_Value'] ?? obj.Value ?? obj.value;
+    if (
+      (typeof litVal === 'string' || typeof litVal === 'number' || typeof litVal === 'boolean') &&
+      String(litVal).trim() !== ''
+    ) {
+      return litVal;
+    }
+    // Nested InArgument / VisualBasicValue / Literal under any key
+    for (const [k, v] of Object.entries(obj)) {
+      if (k === '#text' || k.startsWith('@_')) {
+        continue;
+      }
+      if (
+        /VisualBasicValue|VisualBasicReference|Literal|InArgument|OutArgument|InOutArgument|CSharpValue/i.test(k) ||
+        (v && typeof v === 'object')
+      ) {
+        const inner = argumentValue(v);
+        if (inner != null && String(inner).trim() !== '') {
+          return inner;
+        }
+      }
+    }
+    if (obj['#text'] != null && String(obj['#text']).trim() !== '') {
       return obj['#text'];
     }
-    if (obj['@_'] != null) {
+    if (obj['@_'] != null && String(obj['@_']).trim() !== '') {
       return obj['@_'];
     }
   }

@@ -1121,6 +1121,9 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
     const docPath = document?.uri.fsPath || this.activeDocument?.uri.fsPath || '';
     const projectRoot = docPath ? findProjectRoot(path.dirname(docPath)) : undefined;
     const suggestions = buildPropertySuggestions(projectRoot, workflow);
+    const codiconCss = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.context.extensionUri, 'media', 'codicons', 'codicon.css')
+    );
     return getDesignerHtml(
       nonce,
       webview.cspSource,
@@ -1129,7 +1132,8 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
       suggestions,
       this.getPaletteState(),
       this.buildProjectTree(),
-      this.readDesignerSettings()
+      this.readDesignerSettings(),
+      codiconCss.toString()
     );
   }
 

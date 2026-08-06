@@ -46,7 +46,8 @@ export function getDesignerHtml(
   },
   palette: ActivityPaletteState = { favorites: [], recent: [] },
   projects: DesignerProjectEntry[] = [],
-  settings: DesignerSettings = DEFAULT_DESIGNER_SETTINGS
+  settings: DesignerSettings = DEFAULT_DESIGNER_SETTINGS,
+  codiconCssHref = ''
 ): string {
   const workflowJson = JSON.stringify(workflow).replace(/</g, '\\u003c');
   const catalogJson = JSON.stringify(catalog).replace(/</g, '\\u003c');
@@ -55,14 +56,18 @@ export function getDesignerHtml(
   const paletteJson = JSON.stringify(palette).replace(/</g, '\\u003c');
   const projectsJson = JSON.stringify(projects).replace(/</g, '\\u003c');
   const settingsJson = JSON.stringify(settings).replace(/</g, '\\u003c');
+  const codiconLink = codiconCssHref
+    ? `<link rel="stylesheet" href="${codiconCssHref}" />`
+    : '';
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource}; script-src 'nonce-${nonce}';" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LowCode Studio Designer</title>
+  ${codiconLink}
   <style>
     :root {
       --bg: var(--vscode-editor-background);
@@ -323,12 +328,24 @@ export function getDesignerHtml(
       color: #fff; background: var(--ico, #64748B);
       box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
     }
+    .act-icon.codicon {
+      font-family: codicon !important; font-weight: normal; font-size: 14px;
+      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+    }
     .card-head .act-icon { width: 20px; height: 20px; font-size: 11px; }
+    .card-head .act-icon.codicon { font-size: 13px; }
     .flow-node .act-icon {
       width: 18px; height: 18px; font-size: 10px; margin-right: 4px; vertical-align: -3px;
     }
+    .flow-node .act-icon.codicon { font-size: 12px; }
     .activity-item .act-icon { width: 20px; height: 20px; font-size: 11px; }
+    .activity-item .act-icon.codicon { font-size: 13px; }
     .palette-item .act-icon { width: 18px; height: 18px; font-size: 10px; margin-right: 6px; }
+    .palette-item .act-icon.codicon { font-size: 12px; }
+    .mm-ico.codicon {
+      font-family: codicon !important; font-weight: normal; font-size: 11px;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
     .minimap-dock {
       flex: 0 0 auto; border-top: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
       background: color-mix(in srgb, var(--panel) 92%, transparent);
@@ -2433,34 +2450,31 @@ export function getDesignerHtml(
     }
     function escapeAttr(s) { return escapeHtml(s).replace(/'/g, '&#39;'); }
 
-    /** Map catalog $(codicon) → compact glyph badge for canvas / palette (no codicon font in webview). */
-    const ICON_GLYPHS = {
-      output: '☰', watch: '⏱', comment: '💬', 'comment-discussion': '💬', terminal: '>_',
-      'file-text': '📄', save: '💾', 'diff-added': '+', search: '⌕', 'new-folder': '📁',
-      files: '📑', trash: '🗑', 'file-symlink-file': '↗', edit: '✎', 'find-replace': '⇄',
-      close: '×', 'symbol-variable': '𝑥', 'symbol-namespace': '{}', code: '</>',
-      error: '!', 'debug-stop': '■', 'debug-breakpoint-conditional': '◆', sync: '↻',
-      'debug-restart': '↺', 'debug-pause': '❚❚', 'debug-continue': '▶', 'list-ordered': '1.',
-      shield: '🛡', 'list-flat': '≡', 'type-hierarchy-sub': '⎇', 'split-horizontal': '◫',
-      'list-tree': '🌳', window: '▢', browser: '🌐', inspect: '🔍', keyboard: '⌨',
-      selection: '▣', eye: '👁', check: '✓', 'list-selection': '☑', 'device-camera': '📷',
-      'symbol-property': '⚙', table: '▦', file: '📄', add: '+', filter: '▽',
-      'arrow-swap': '⇄', 'clear-all': '⊘', export: '↗', 'git-merge': '⑂',
-      'symbol-field': '·', 'arrow-both': '↔', 'symbol-key': '🔑', mail: '✉', globe: '🌐',
-      inbox: '📥', json: '{}', 'bracket-dot': '[.]', 'symbol-misc': '✦', 'file-code': '</>',
-      play: '▶', 'symbol-method': 'ƒ', 'debug-start': '▶', 'run-all': '⇉', key: '🔑',
-      lock: '🔒', checklist: '☑'
-    };
-    function iconGlyph(icon) {
-      const key = String(icon || '').replace(/^\$\(|\)$/g, '');
-      return ICON_GLYPHS[key] || '●';
+    /** Same codicon names as the VS Code Activities tree ($(output) → codicon-output). */
+    function iconCodiconName(icon) {
+      return String(icon || '').replace(/^\$\(|\)$/g, '').trim();
     }
     function activityIconHtml(defOrType, color) {
       const def = typeof defOrType === 'string' ? findDef(defOrType) : defOrType;
       const c = color || def?.color || '#64748B';
-      const glyph = iconGlyph(def?.icon);
-      return '<span class="act-icon" style="--ico:' + escapeAttr(c) + ';background:' + escapeAttr(c) + '" title="' +
-        escapeAttr((def?.displayName || '') + (def?.icon ? ' ' + def.icon : '')) + '">' + escapeHtml(glyph) + '</span>';
+      const name = iconCodiconName(def?.icon);
+      const title = escapeAttr((def?.displayName || '') + (def?.icon ? ' ' + def.icon : ''));
+      if (name) {
+        return '<span class="act-icon codicon codicon-' + escapeAttr(name) + '" style="--ico:' +
+          escapeAttr(c) + ';background:' + escapeAttr(c) + '" title="' + title + '"></span>';
+      }
+      return '<span class="act-icon" style="--ico:' + escapeAttr(c) + ';background:' + escapeAttr(c) +
+        '" title="' + title + '">●</span>';
+    }
+    function coercePaintValue(val) {
+      if (val == null || typeof val !== 'object' || Array.isArray(val)) return val;
+      if (val.ExpressionText != null && String(val.ExpressionText).trim() !== '') return String(val.ExpressionText);
+      if (val.expressionText != null && String(val.expressionText).trim() !== '') return String(val.expressionText);
+      if (val.Expression != null) return String(val.Expression);
+      if (val.expression != null) return String(val.expression);
+      if (typeof val.Value === 'string' || typeof val.Value === 'number' || typeof val.Value === 'boolean') return val.Value;
+      if (typeof val.value === 'string' || typeof val.value === 'number' || typeof val.value === 'boolean') return val.value;
+      try { return JSON.stringify(val); } catch (_) { return String(val); }
     }
 
     /** Variable-binding props — leave empty on add (user creates / picks vars). */
@@ -4430,12 +4444,15 @@ export function getDesignerHtml(
             const def = findDef(n.type);
             const color = n.color || def?.color || '#64748B';
             const sel = state.selectedId === n.id ? ' selected' : '';
-            const glyph = iconGlyph(def?.icon);
+            const icoName = iconCodiconName(def?.icon);
+            const icoHtml = icoName
+              ? '<span class="mm-ico codicon codicon-' + escapeAttr(icoName) + '" style="background:' + escapeAttr(color) + '"></span>'
+              : '<span class="mm-ico" style="background:' + escapeAttr(color) + '">●</span>';
             const name = n.displayName || n.type || 'Activity';
             return '<button type="button" class="mm-row' + sel + '" data-mm-id="' + escapeAttr(n.id) +
               '" title="#' + (i + 1) + ' ' + escapeAttr(name) + '">' +
               '<span class="mm-accent" style="background:' + escapeAttr(color) + '"></span>' +
-              '<span class="mm-ico" style="background:' + escapeAttr(color) + '">' + escapeHtml(glyph) + '</span>' +
+              icoHtml +
               '<span class="mm-label"><span class="mm-step">#' + (i + 1) + '</span>' +
               escapeHtml(name) + '</span></button>';
           }).join('') + '</div>';
@@ -4487,8 +4504,12 @@ export function getDesignerHtml(
       const selectorProps = [];
       const mode = String(node.properties?.mode || 'Browser');
       const catalogPropNames = new Set((def?.properties || []).map((p) => p.name));
-      // Studio Web PascalCase leftovers → catalog keys (in-memory, before paint)
+      // Studio Web leftovers → catalog keys (coerce ExpressionText objects first)
       node.properties = node.properties || {};
+      for (const [k, v] of Object.entries(node.properties)) {
+        const coerced = coercePaintValue(v);
+        if (coerced !== v) node.properties[k] = coerced;
+      }
       const pascalHints = {
         Message: 'message', Text: 'message', Level: 'level',
         Condition: 'condition', To: 'to', Value: 'value',
@@ -4499,11 +4520,11 @@ export function getDesignerHtml(
         WorkflowFileName: 'workflowPath'
       };
       for (const [from, to] of Object.entries(pascalHints)) {
-        if (
-          (node.properties[to] === undefined || node.properties[to] === null || String(node.properties[to]).trim() === '') &&
-          node.properties[from] != null && String(node.properties[from]).trim() !== ''
-        ) {
-          node.properties[to] = node.properties[from];
+        const fromVal = coercePaintValue(node.properties[from]);
+        const toVal = node.properties[to];
+        const toEmpty = toVal === undefined || toVal === null || String(toVal).trim() === '';
+        if (toEmpty && fromVal != null && String(fromVal).trim() !== '' && typeof fromVal !== 'object') {
+          node.properties[to] = fromVal;
         }
         if (node.properties[to] !== undefined && from !== to) delete node.properties[from];
       }
