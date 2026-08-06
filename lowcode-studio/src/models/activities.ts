@@ -333,6 +333,177 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     ]
   },
   {
+    type: 'System.MoveFile',
+    displayName: 'Move File',
+    category: 'System',
+    description: 'Moves a file to a destination path.',
+    icon: '$(file-symlink-file)',
+    color: '#64748B',
+    properties: [
+      {
+        name: 'path',
+        label: 'Source',
+        type: 'expression',
+        defaultValue: '"in.txt"',
+        required: true
+      },
+      {
+        name: 'destination',
+        label: 'Destination',
+        type: 'expression',
+        defaultValue: '"out.txt"',
+        required: true
+      },
+      {
+        name: 'overwrite',
+        label: 'Overwrite',
+        type: 'boolean',
+        defaultValue: true
+      }
+    ]
+  },
+  {
+    type: 'System.RenameFile',
+    displayName: 'Rename File',
+    category: 'System',
+    description: 'Renames a file (optionally moving it).',
+    icon: '$(edit)',
+    color: '#64748B',
+    properties: [
+      {
+        name: 'path',
+        label: 'File',
+        type: 'expression',
+        defaultValue: '"old.txt"',
+        required: true
+      },
+      {
+        name: 'newName',
+        label: 'New Name',
+        type: 'expression',
+        defaultValue: '"new.txt"',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'System.Matches',
+    displayName: 'Matches',
+    category: 'System',
+    description: 'Finds all regex matches in a text (dry-run returns match strings).',
+    icon: '$(search)',
+    color: '#3B82F6',
+    properties: [
+      {
+        name: 'input',
+        label: 'Input',
+        type: 'expression',
+        defaultValue: 'text',
+        required: true
+      },
+      {
+        name: 'pattern',
+        label: 'Pattern',
+        type: 'expression',
+        defaultValue: '"\\\\w+"',
+        required: true
+      },
+      {
+        name: 'result',
+        label: 'Result',
+        type: 'expression',
+        defaultValue: 'matches',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'System.IsMatch',
+    displayName: 'Is Match',
+    category: 'System',
+    description: 'Tests whether text matches a regex pattern.',
+    icon: '$(search)',
+    color: '#3B82F6',
+    properties: [
+      {
+        name: 'input',
+        label: 'Input',
+        type: 'expression',
+        defaultValue: 'text',
+        required: true
+      },
+      {
+        name: 'pattern',
+        label: 'Pattern',
+        type: 'expression',
+        defaultValue: '"\\\\d+"',
+        required: true
+      },
+      {
+        name: 'result',
+        label: 'Result',
+        type: 'expression',
+        defaultValue: 'isMatch',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'System.Replace',
+    displayName: 'Replace',
+    category: 'System',
+    description: 'Regex replace in a text string.',
+    icon: '$(find-replace)',
+    color: '#3B82F6',
+    properties: [
+      {
+        name: 'input',
+        label: 'Input',
+        type: 'expression',
+        defaultValue: 'text',
+        required: true
+      },
+      {
+        name: 'pattern',
+        label: 'Pattern',
+        type: 'expression',
+        defaultValue: '"\\\\s+"',
+        required: true
+      },
+      {
+        name: 'replacement',
+        label: 'Replacement',
+        type: 'expression',
+        defaultValue: '" "',
+        required: true
+      },
+      {
+        name: 'result',
+        label: 'Result',
+        type: 'expression',
+        defaultValue: 'replaced',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'System.KillProcess',
+    displayName: 'Kill Process',
+    category: 'System',
+    description: 'Terminates a process by name (simulated in dry-run).',
+    icon: '$(close)',
+    color: '#EF4444',
+    properties: [
+      {
+        name: 'processName',
+        label: 'Process Name',
+        type: 'expression',
+        defaultValue: '"notepad"',
+        required: true
+      }
+    ]
+  },
+  {
     type: 'Programming.Assign',
     displayName: 'Assign',
     category: 'Programming',
@@ -531,6 +702,15 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     category: 'Control Flow',
     description: 'Exits the nearest loop.',
     icon: '$(debug-pause)',
+    color: '#F59E0B',
+    properties: []
+  },
+  {
+    type: 'ControlFlow.Continue',
+    displayName: 'Continue',
+    category: 'Control Flow',
+    description: 'Skips to the next iteration of the nearest loop.',
+    icon: '$(debug-continue)',
     color: '#F59E0B',
     properties: []
   },
@@ -954,6 +1134,43 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         type: 'multiline',
         defaultValue: '',
         required: true
+      },
+      {
+        name: 'selectorModern',
+        label: 'Modern Selector',
+        type: 'multiline',
+        defaultValue: ''
+      },
+      {
+        name: 'timeoutMs',
+        label: 'Timeout (ms)',
+        type: 'number',
+        defaultValue: 30000
+      },
+      { ...UI_INPUT_METHOD_PROP }
+    ]
+  },
+  {
+    type: 'UI.SendHotkey',
+    displayName: 'Send Hotkey',
+    category: 'UI Automation',
+    description: 'Sends a keyboard shortcut (Send Hotkey / Keyboard Shortcuts).',
+    icon: '$(keyboard)',
+    color: '#10B981',
+    properties: [
+      {
+        name: 'key',
+        label: 'Key / Shortcut',
+        type: 'expression',
+        defaultValue: '"enter"',
+        required: true,
+        description: 'e.g. enter, tab, ctrl+s, or a Keyboard Shortcuts string'
+      },
+      {
+        name: 'selector',
+        label: 'Selector (optional)',
+        type: 'multiline',
+        defaultValue: ''
       },
       {
         name: 'selectorModern',
@@ -1397,6 +1614,147 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         label: 'Result',
         type: 'expression',
         defaultValue: 'tableText',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Data.MergeDataTable',
+    displayName: 'Merge Data Table',
+    category: 'Data',
+    description: 'Merges a source DataTable into a destination DataTable.',
+    icon: '$(git-merge)',
+    color: '#06B6D4',
+    properties: [
+      {
+        name: 'destination',
+        label: 'Destination',
+        type: 'expression',
+        defaultValue: 'dt',
+        required: true
+      },
+      {
+        name: 'source',
+        label: 'Source',
+        type: 'expression',
+        defaultValue: 'dtSource',
+        required: true
+      },
+      {
+        name: 'missingSchemaAction',
+        label: 'Missing Schema Action',
+        type: 'enum',
+        options: ['Add', 'Ignore', 'Error', 'AddWithKey'],
+        defaultValue: 'Add'
+      }
+    ]
+  },
+  {
+    type: 'Data.RemoveDataRow',
+    displayName: 'Remove Data Row',
+    category: 'Data',
+    description: 'Removes a row from a DataTable by index.',
+    icon: '$(trash)',
+    color: '#06B6D4',
+    properties: [
+      {
+        name: 'dataTable',
+        label: 'DataTable',
+        type: 'expression',
+        defaultValue: 'dt',
+        required: true
+      },
+      {
+        name: 'rowIndex',
+        label: 'Row Index',
+        type: 'expression',
+        defaultValue: '0',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Data.RemoveDataColumn',
+    displayName: 'Remove Data Column',
+    category: 'Data',
+    description: 'Removes a column from a DataTable by name.',
+    icon: '$(trash)',
+    color: '#06B6D4',
+    properties: [
+      {
+        name: 'dataTable',
+        label: 'DataTable',
+        type: 'expression',
+        defaultValue: 'dt',
+        required: true
+      },
+      {
+        name: 'columnName',
+        label: 'Column Name',
+        type: 'string',
+        defaultValue: 'Column1',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Data.GetRowItem',
+    displayName: 'Get Row Item',
+    category: 'Data',
+    description: 'Reads a cell value from a DataRow.',
+    icon: '$(symbol-field)',
+    color: '#06B6D4',
+    properties: [
+      {
+        name: 'row',
+        label: 'Row',
+        type: 'expression',
+        defaultValue: 'row',
+        required: true
+      },
+      {
+        name: 'columnName',
+        label: 'Column',
+        type: 'string',
+        defaultValue: 'Column1',
+        required: true
+      },
+      {
+        name: 'result',
+        label: 'Result',
+        type: 'expression',
+        defaultValue: 'cellValue',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Data.UpdateRowItem',
+    displayName: 'Update Row Item',
+    category: 'Data',
+    description: 'Writes a cell value on a DataRow.',
+    icon: '$(edit)',
+    color: '#06B6D4',
+    properties: [
+      {
+        name: 'row',
+        label: 'Row',
+        type: 'expression',
+        defaultValue: 'row',
+        required: true
+      },
+      {
+        name: 'columnName',
+        label: 'Column',
+        type: 'string',
+        defaultValue: 'Column1',
+        required: true
+      },
+      {
+        name: 'value',
+        label: 'Value',
+        type: 'expression',
+        defaultValue: '""',
         required: true
       }
     ]
@@ -2238,6 +2596,42 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     ]
   },
   {
+    type: 'Orchestrator.WaitQueueItem',
+    displayName: 'Wait Queue Item',
+    category: 'Orchestrator',
+    description: 'Waits for the next queue item (timeout in dry-run uses fixtures).',
+    icon: '$(watch)',
+    color: '#8B5CF6',
+    properties: [
+      {
+        name: 'queueName',
+        label: 'Queue Name',
+        type: 'string',
+        defaultValue: 'MainQueue',
+        required: true
+      },
+      {
+        name: 'folderPath',
+        label: 'Folder Path',
+        type: 'string',
+        defaultValue: ''
+      },
+      {
+        name: 'timeoutMs',
+        label: 'Timeout (ms)',
+        type: 'number',
+        defaultValue: 60000
+      },
+      {
+        name: 'result',
+        label: 'Transaction Item',
+        type: 'expression',
+        defaultValue: 'TransactionItem',
+        required: true
+      }
+    ]
+  },
+  {
     type: 'Orchestrator.AddQueueItem',
     displayName: 'Add Queue Item',
     category: 'Orchestrator',
@@ -2306,6 +2700,43 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
         label: 'Result',
         type: 'expression',
         defaultValue: 'assetValue',
+        required: true
+      }
+    ]
+  },
+  {
+    type: 'Orchestrator.GetCredential',
+    displayName: 'Get Credential',
+    category: 'Orchestrator',
+    description: 'Reads an Orchestrator credential asset (username/password; simulated in dry-run).',
+    icon: '$(lock)',
+    color: '#8B5CF6',
+    properties: [
+      {
+        name: 'assetName',
+        label: 'Credential Name',
+        type: 'string',
+        defaultValue: 'Credential',
+        required: true
+      },
+      {
+        name: 'folderPath',
+        label: 'Folder Path',
+        type: 'string',
+        defaultValue: ''
+      },
+      {
+        name: 'username',
+        label: 'Username',
+        type: 'expression',
+        defaultValue: 'username',
+        required: true
+      },
+      {
+        name: 'password',
+        label: 'Password',
+        type: 'expression',
+        defaultValue: 'password',
         required: true
       }
     ]

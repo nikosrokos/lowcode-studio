@@ -22,6 +22,37 @@ export const STUDIO_WEB_LOCAL_URL = 'https://studio.uipath.com';
 /** Kept under the LCS project — overwritten .lcs.json / .xaml copies before sync. */
 export const SYNC_TRASH_DIR = '.lcs-sync-trash';
 const MAX_TRASH_GENERATIONS = 10;
+const OPEN_IN_GUIDE = 'OPEN_IN_STUDIO_WEB_LOCAL.md';
+
+/** Write the Local Workspace guide once — never rewrite on every sync/adopt. */
+function ensureOpenInGuide(solutionDir: string): void {
+  const guidePath = path.join(solutionDir, OPEN_IN_GUIDE);
+  if (fs.existsSync(guidePath)) {
+    return;
+  }
+  fs.writeFileSync(
+    guidePath,
+    `# Open in Studio Web Local Workspace
+
+This folder is a **UiPath solution** linked from LowCode Studio.
+
+1. Go to [${STUDIO_WEB_LOCAL_URL}](${STUDIO_WEB_LOCAL_URL})
+2. Open **Local Workspace**
+3. **Open solution** → select this folder (\`${path.basename(solutionDir)}\`)
+4. Allow the browser to edit files when prompted
+
+**Bidirectional sync on Save:**
+- Edits in LowCode Studio → push \`.xaml\` into this folder
+- Edits in Studio Web → pulled back into \`.lcs.json\` when you Save (or run **Pull from Studio Web Local**)
+- Overwritten copies land in the LCS project under \`.lcs-sync-trash/\`
+
+The linked project uses \`targetFramework: Portable\` so Studio Web can open it on Mac.
+
+No \`.uip\` export is required for this loop.
+`,
+    'utf8'
+  );
+}
 
 export interface StudioWebFileFingerprint {
   lcsHash?: string;
@@ -453,8 +484,8 @@ export function adoptStudioWebSolutionAsLcsProject(
     };
   }
 
-  // Helpful assets
-  for (const rel of ['Data/Config.xlsx', 'Data/Config.json', 'README.md', '.gitignore']) {
+  // Only Config assets help REF dry-run — skip README/.gitignore to keep LCS lean
+  for (const rel of ['Data/Config.xlsx', 'Data/Config.json']) {
     const src = path.join(rpa.projectDir, rel);
     if (fs.existsSync(src) && fs.statSync(src).isFile()) {
       const destRel = rel.replace(/Config\.xlsx$/i, 'Config.imported.xlsx');
@@ -532,28 +563,7 @@ export function adoptStudioWebSolutionAsLcsProject(
   }
   fs.writeFileSync(uipxPath, JSON.stringify(data, null, 2) + '\n', 'utf8');
 
-  fs.writeFileSync(
-    path.join(solutionDir, 'OPEN_IN_STUDIO_WEB_LOCAL.md'),
-    `# Open in Studio Web Local Workspace
-
-This folder is a **UiPath solution** linked from LowCode Studio.
-
-1. Go to [${STUDIO_WEB_LOCAL_URL}](${STUDIO_WEB_LOCAL_URL})
-2. Open **Local Workspace**
-3. **Open solution** → select this folder (\`${path.basename(solutionDir)}\`)
-4. Allow the browser to edit files when prompted
-
-**Bidirectional sync on Save:**
-- Edits in LowCode Studio → push \`.xaml\` into this folder
-- Edits in Studio Web → pulled back into \`.lcs.json\` when you Save (or run **Pull from Studio Web Local**)
-- Overwritten copies land in the LCS project under \`.lcs-sync-trash/\`
-
-The linked project uses \`targetFramework: Portable\` so Studio Web can open it on Mac.
-
-No \`.uip\` export is required for this loop.
-`,
-    'utf8'
-  );
+  ensureOpenInGuide(solutionDir);
 
   const mainWorkflowAbs = path.join(lcsProjectDir, mainWorkflow);
   return {
@@ -677,29 +687,7 @@ export function linkStudioWebLocalWorkspace(
   writeLcsManifest(lcsProjectDir, manifest);
   recordPushFingerprints(lcsProjectDir, projectDir);
 
-  // Guide next to solution for first open
-  fs.writeFileSync(
-    path.join(solutionDir, 'OPEN_IN_STUDIO_WEB_LOCAL.md'),
-    `# Open in Studio Web Local Workspace
-
-This folder is a **UiPath solution** linked from LowCode Studio.
-
-1. Go to [${STUDIO_WEB_LOCAL_URL}](${STUDIO_WEB_LOCAL_URL})
-2. Open **Local Workspace**
-3. **Open solution** → select this folder (\`${path.basename(solutionDir)}\`)
-4. Allow the browser to edit files when prompted
-
-**Bidirectional sync on Save:**
-- Edits in LowCode Studio → push \`.xaml\` into this folder
-- Edits in Studio Web → pulled back into \`.lcs.json\` when you Save (or run **Pull from Studio Web Local**)
-- Overwritten copies land in the LCS project under \`.lcs-sync-trash/\`
-
-The linked project uses \`targetFramework: Portable\` so Studio Web can open it on Mac.
-
-No \`.uip\` export is required for this loop.
-`,
-    'utf8'
-  );
+  ensureOpenInGuide(solutionDir);
 
   return {
     ...exported,
@@ -1261,7 +1249,11 @@ function listLcsWorkflowRels(lcsProjectDir: string): string[] {
         entry.name === '.git' ||
         entry.name === 'bin' ||
         entry.name === 'obj' ||
-        entry.name === 'out'
+        entry.name === 'out' ||
+        entry.name === '.cursor' ||
+        entry.name === '.lcs-sync-trash' ||
+        entry.name === '.vs' ||
+        entry.name === '.vscode'
       ) {
         continue;
       }

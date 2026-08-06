@@ -74,6 +74,11 @@ const MAP: Array<{
     xamlNamespace: 'default'
   },
   {
+    lcsType: 'ControlFlow.Continue',
+    xamlLocalNames: ['Continue'],
+    xamlNamespace: 'default'
+  },
+  {
     lcsType: 'UI.Click',
     xamlLocalNames: ['Click', 'NClick', 'TargetAwareClick', 'ClickImage'],
     xamlNamespace: 'uia'
@@ -101,6 +106,11 @@ const MAP: Array<{
   {
     lcsType: 'UI.Hover',
     xamlLocalNames: ['Hover', 'NHover'],
+    xamlNamespace: 'uia'
+  },
+  {
+    lcsType: 'UI.SendHotkey',
+    xamlLocalNames: ['SendHotkey', 'KeyboardShortcuts', 'NKeyboardShortcuts'],
     xamlNamespace: 'uia'
   },
   {
@@ -268,6 +278,31 @@ const MAP: Array<{
     xamlNamespace: 'python'
   },
   {
+    lcsType: 'Data.MergeDataTable',
+    xamlLocalNames: ['MergeDataTable'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Data.RemoveDataRow',
+    xamlLocalNames: ['RemoveDataRow'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Data.RemoveDataColumn',
+    xamlLocalNames: ['RemoveDataColumn'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Data.GetRowItem',
+    xamlLocalNames: ['GetRowItem'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Data.UpdateRowItem',
+    xamlLocalNames: ['UpdateRowItem'],
+    xamlNamespace: 'ui'
+  },
+  {
     lcsType: 'Data.JoinDataTable',
     xamlLocalNames: ['JoinDataTables', 'JoinDataTable'],
     xamlNamespace: 'ui'
@@ -339,6 +374,16 @@ const MAP: Array<{
     xamlNamespace: 'ui'
   },
   {
+    lcsType: 'Orchestrator.GetCredential',
+    xamlLocalNames: ['GetCredential', 'GetOrchestratorCredential'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'Orchestrator.WaitQueueItem',
+    xamlLocalNames: ['WaitQueueItem'],
+    xamlNamespace: 'ui'
+  },
+  {
     lcsType: 'Orchestrator.SetAsset',
     xamlLocalNames: ['SetAsset'],
     xamlNamespace: 'ui'
@@ -381,6 +426,36 @@ const MAP: Array<{
   {
     lcsType: 'System.DeleteFile',
     xamlLocalNames: ['DeleteFile'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'System.MoveFile',
+    xamlLocalNames: ['MoveFile'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'System.RenameFile',
+    xamlLocalNames: ['RenameFile'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'System.Matches',
+    xamlLocalNames: ['Matches'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'System.IsMatch',
+    xamlLocalNames: ['IsMatch'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'System.Replace',
+    xamlLocalNames: ['Replace'],
+    xamlNamespace: 'ui'
+  },
+  {
+    lcsType: 'System.KillProcess',
+    xamlLocalNames: ['KillProcess'],
     xamlNamespace: 'ui'
   },
   {

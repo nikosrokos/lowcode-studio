@@ -271,7 +271,12 @@ export function writeUiPathProjectToDir(
   );
   const workflowRels = [
     ...new Set([...(manifest.workflows || []), ...discovered, ...Object.keys(options.contentOverrides || {})])
-  ].filter((rel) => rel.endsWith('.lcs.json'));
+  ].filter(
+    (rel) =>
+      rel.endsWith('.lcs.json') &&
+      !rel.split(/[/\\]/).includes('.lcs-sync-trash') &&
+      !rel.split(/[/\\]/).includes('node_modules')
+  );
 
   const written: string[] = [];
   const docs: WorkflowDocument[] = [];
@@ -482,7 +487,18 @@ function listFiles(root: string, predicate: (file: string) => boolean): string[]
     for (const entry of entries) {
       const full = path.join(current, entry.name);
       if (entry.isDirectory()) {
-        if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'bin' || entry.name === 'obj') {
+        // Never sync trash / VCS / build / editor junk into Studio Web
+        if (
+          entry.name === 'node_modules' ||
+          entry.name === '.git' ||
+          entry.name === 'bin' ||
+          entry.name === 'obj' ||
+          entry.name === 'out' ||
+          entry.name === '.cursor' ||
+          entry.name === '.lcs-sync-trash' ||
+          entry.name === '.vs' ||
+          entry.name === '.vscode'
+        ) {
           continue;
         }
         stack.push(full);

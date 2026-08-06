@@ -1,12 +1,12 @@
 # LowCode Studio — Activity coverage
 
-Generated for **v0.6.39** from the extension activity catalog.
+Generated for **v0.6.40** from the extension activity catalog.
 
 This list is what you can design in VS Code / Cursor, dry-run locally, and best-effort import/export with UiPath Studio / Studio Web.
 
 > Not every property of every UiPath activity is modeled. Selectors for UI activities round-trip via `selector` / `selectorModern` / `selectorXml`.
 
-**Total activities:** 81
+**Total activities:** 96
 
 ## By category
 
@@ -17,6 +17,7 @@ UiPath package (typical): `UiPath.System.Activities (WF)`
 | Activity | Type id | Container | Key properties |
 |---|---|---|---|
 | Break | `ControlFlow.Break` | No | — |
+| Continue | `ControlFlow.Continue` | No | — |
 | Do While | `ControlFlow.DoWhile` | Yes | condition |
 | For Each | `ControlFlow.ForEach` | Yes | item, values |
 | If | `ControlFlow.If` | Yes | condition |
@@ -41,11 +42,16 @@ UiPath package (typical): `UiPath.System.Activities`
 | Clear Data Table | `Data.ClearDataTable` | No | dataTable |
 | Filter Data Table | `Data.FilterDataTable` | No | dataTable, columnName, operator, value, result |
 | For Each Row | `Data.ForEachRow` | Yes | dataTable, row |
+| Get Row Item | `Data.GetRowItem` | No | row, columnName, result |
 | Join Data Tables | `Data.JoinDataTable` | No | dataTable1, dataTable2, joinType, column1, column2, result |
 | Lookup Data Table | `Data.LookupDataTable` | No | dataTable, lookupColumn, lookupValue, targetColumn, result |
+| Merge Data Table | `Data.MergeDataTable` | No | destination, source, missingSchemaAction |
 | Output Data Table | `Data.OutputDataTable` | No | dataTable, result |
 | Read CSV | `Data.ReadCsv` | No | path, result, hasHeaders |
+| Remove Data Column | `Data.RemoveDataColumn` | No | dataTable, columnName |
+| Remove Data Row | `Data.RemoveDataRow` | No | dataTable, rowIndex |
 | Sort Data Table | `Data.SortDataTable` | No | dataTable, columnName, order, result |
+| Update Row Item | `Data.UpdateRowItem` | No | row, columnName, value |
 | Write CSV | `Data.WriteCsv` | No | path, data |
 
 ### Excel
@@ -93,8 +99,10 @@ UiPath package (typical): `—`
 |---|---|---|---|
 | Add Queue Item | `Orchestrator.AddQueueItem` | No | queueName, folderPath, reference, itemInformation, priority |
 | Get Asset | `Orchestrator.GetAsset` | No | assetName, folderPath, result |
+| Get Credential | `Orchestrator.GetCredential` | No | assetName, folderPath, username, password |
 | Get Transaction Item | `Orchestrator.GetTransactionItem` | No | queueName, folderPath, reference, result |
 | Set Asset | `Orchestrator.SetAsset` | No | assetName, value, folderPath |
+| Wait Queue Item | `Orchestrator.WaitQueueItem` | No | queueName, folderPath, timeoutMs, result |
 
 ### Programming
 
@@ -139,10 +147,16 @@ UiPath package (typical): `UiPath.System.Activities`
 | Create Directory | `System.CreateDirectory` | No | path |
 | Delay | `System.Delay` | No | durationMs |
 | Delete File | `System.DeleteFile` | No | path |
+| Is Match | `System.IsMatch` | No | input, pattern, result |
+| Kill Process | `System.KillProcess` | No | processName |
 | Log Message | `System.LogMessage` | No | message, level |
+| Matches | `System.Matches` | No | input, pattern, result |
 | Message Box | `System.MessageBox` | No | text, title |
+| Move File | `System.MoveFile` | No | path, destination, overwrite |
 | Path Exists | `System.PathExists` | No | path, pathType, result |
 | Read Text File | `System.ReadTextFile` | No | fileName, result |
+| Rename File | `System.RenameFile` | No | path, newName |
+| Replace | `System.Replace` | No | input, pattern, replacement, result |
 | Terminate Workflow | `System.TerminateWorkflow` | No | reason |
 | Throw | `System.Throw` | No | exceptionType, message |
 | Write Line | `System.WriteLine` | No | text |
@@ -163,6 +177,7 @@ UiPath package (typical): `UiPath.UIAutomation.Activities`
 | Hover | `UI.Hover` | No | selector, selectorModern, timeoutMs, inputMethod |
 | Open Application | `UI.OpenApplication` | No | pathOrUrl, arguments |
 | Select Item | `UI.SelectItem` | No | selector, selectorModern, item, inputMethod |
+| Send Hotkey | `UI.SendHotkey` | No | key, selector, selectorModern, timeoutMs, inputMethod |
 | Take Screenshot | `UI.TakeScreenshot` | No | selector, filePath |
 | Type Into | `UI.TypeInto` | No | selector, selectorModern, text, emptyField, timeoutMs, inputMethod |
 | Use Application/Browser | `UI.UseApplicationBrowser` | Yes | mode, urlOrPath, browserType, inputMethod, selector, open… |

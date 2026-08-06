@@ -899,6 +899,117 @@ function executeStub(
       }
       break;
     }
+    case 'System.MoveFile': {
+      const src = String(
+        resolveExpression(String(activity.properties.path ?? ''), variables) ?? ''
+      ).replace(/^"|"$/g, '');
+      const dest = String(
+        resolveExpression(String(activity.properties.destination ?? ''), variables) ?? ''
+      ).replace(/^"|"$/g, '');
+      const absSrc = resolveProjectPath(src, projectDir);
+      const absDest = resolveProjectPath(dest, projectDir);
+      if (absSrc && absDest && fs.existsSync(absSrc)) {
+        fs.mkdirSync(path.dirname(absDest), { recursive: true });
+        fs.renameSync(absSrc, absDest);
+        log.push(`${indent}MoveFile ${src} -> ${dest} (real)`);
+      } else {
+        log.push(`${indent}MoveFile ${src} -> ${dest} (simulated)`);
+        warning = warning || `${activity.displayName}: source missing`;
+      }
+      break;
+    }
+    case 'System.RenameFile': {
+      const src = String(
+        resolveExpression(String(activity.properties.path ?? ''), variables) ?? ''
+      ).replace(/^"|"$/g, '');
+      const newName = String(
+        resolveExpression(String(activity.properties.newName ?? ''), variables) ?? ''
+      ).replace(/^"|"$/g, '');
+      const absSrc = resolveProjectPath(src, projectDir);
+      if (absSrc && fs.existsSync(absSrc) && newName) {
+        const absDest = path.isAbsolute(newName)
+          ? newName
+          : path.join(path.dirname(absSrc), newName);
+        fs.renameSync(absSrc, absDest);
+        log.push(`${indent}RenameFile ${src} -> ${newName} (real)`);
+      } else {
+        log.push(`${indent}RenameFile ${src} -> ${newName} (simulated)`);
+        warning = warning || `${activity.displayName}: source missing`;
+      }
+      break;
+    }
+    case 'System.Matches': {
+      const inputKey = String(activity.properties.input ?? 'text').replace(/^\[|\]$/g, '');
+      const input = String(
+        resolveExpression(inputKey, variables) ?? variables[inputKey] ?? inputKey
+      );
+      const pattern = String(
+        resolveExpression(String(activity.properties.pattern ?? ''), variables) ??
+          activity.properties.pattern ??
+          ''
+      ).replace(/^"|"$/g, '');
+      const result = String(activity.properties.result || 'matches');
+      try {
+        const re = new RegExp(pattern, 'g');
+        variables[result] = input.match(re) || [];
+        log.push(`${indent}Matches /${pattern}/ -> ${result} (${(variables[result] as string[]).length})`);
+      } catch {
+        variables[result] = [];
+        warning = warning || `${activity.displayName}: invalid pattern`;
+        log.push(`${indent}Matches /${pattern}/ -> ${result} (error)`);
+      }
+      break;
+    }
+    case 'System.IsMatch': {
+      const inputKey = String(activity.properties.input ?? 'text').replace(/^\[|\]$/g, '');
+      const input = String(
+        resolveExpression(inputKey, variables) ?? variables[inputKey] ?? inputKey
+      );
+      const pattern = String(
+        resolveExpression(String(activity.properties.pattern ?? ''), variables) ??
+          activity.properties.pattern ??
+          ''
+      ).replace(/^"|"$/g, '');
+      const result = String(activity.properties.result || 'isMatch');
+      try {
+        variables[result] = new RegExp(pattern).test(input);
+        log.push(`${indent}IsMatch /${pattern}/ -> ${result}=${variables[result]}`);
+      } catch {
+        variables[result] = false;
+        warning = warning || `${activity.displayName}: invalid pattern`;
+        log.push(`${indent}IsMatch /${pattern}/ -> ${result}=false (error)`);
+      }
+      break;
+    }
+    case 'System.Replace': {
+      const inputKey = String(activity.properties.input ?? 'text').replace(/^\[|\]$/g, '');
+      const input = String(
+        resolveExpression(inputKey, variables) ?? variables[inputKey] ?? inputKey
+      );
+      const pattern = String(
+        resolveExpression(String(activity.properties.pattern ?? ''), variables) ??
+          activity.properties.pattern ??
+          ''
+      ).replace(/^"|"$/g, '');
+      const replacement = String(
+        resolveExpression(String(activity.properties.replacement ?? ''), variables) ??
+          activity.properties.replacement ??
+          ''
+      ).replace(/^"|"$/g, '');
+      const result = String(activity.properties.result || 'replaced');
+      try {
+        variables[result] = input.replace(new RegExp(pattern, 'g'), replacement);
+        log.push(`${indent}Replace /${pattern}/ -> ${result}`);
+      } catch {
+        variables[result] = input;
+        warning = warning || `${activity.displayName}: invalid pattern`;
+        log.push(`${indent}Replace /${pattern}/ -> ${result} (error)`);
+      }
+      break;
+    }
+    case 'System.KillProcess':
+      log.push(`${indent}KillProcess ${activity.properties.processName} (simulated)`);
+      break;
     case 'System.DeleteFile': {
       const p = String(
         resolveExpression(String(activity.properties.path ?? ''), variables) ?? ''
@@ -951,6 +1062,89 @@ function executeStub(
     case 'ControlFlow.Break':
       log.push(`${indent}Break`);
       break;
+    case 'ControlFlow.Continue':
+      log.push(`${indent}Continue`);
+      break;
+    case 'Data.MergeDataTable': {
+      const destName = String(activity.properties.destination || 'dt');
+      const srcName = String(activity.properties.source || 'dtSource');
+      const dest = (variables[destName] || { columns: [], rows: [] }) as DataTableLike;
+      const src = (variables[srcName] || { columns: [], rows: [] }) as DataTableLike;
+      const columns = dest.columns?.length ? dest.columns : src.columns || [];
+      const rows = [...(dest.rows || []), ...(src.rows || [])];
+      variables[destName] = { columns, rows };
+      log.push(`${indent}MergeDataTable ${srcName} -> ${destName} (${rows.length} rows)`);
+      break;
+    }
+    case 'Data.RemoveDataRow': {
+      const dtName = String(activity.properties.dataTable || 'dt');
+      const dt = (variables[dtName] || { columns: [], rows: [] }) as DataTableLike;
+      const idx = Number(
+        resolveExpression(String(activity.properties.rowIndex ?? '0'), variables) ?? 0
+      );
+      const rows = [...(dt.rows || [])];
+      if (idx >= 0 && idx < rows.length) {
+        rows.splice(idx, 1);
+      }
+      variables[dtName] = { columns: dt.columns || [], rows };
+      log.push(`${indent}RemoveDataRow ${dtName}[${idx}]`);
+      break;
+    }
+    case 'Data.RemoveDataColumn': {
+      const dtName = String(activity.properties.dataTable || 'dt');
+      const dt = (variables[dtName] || { columns: [], rows: [] }) as DataTableLike;
+      const col = String(activity.properties.columnName || '');
+      const columns = [...(dt.columns || [])];
+      const colIdx = columns.indexOf(col);
+      if (colIdx >= 0) {
+        columns.splice(colIdx, 1);
+        const rows = (dt.rows || []).map((r) => {
+          const next = [...r];
+          next.splice(colIdx, 1);
+          return next;
+        });
+        variables[dtName] = { columns, rows };
+      }
+      log.push(`${indent}RemoveDataColumn ${dtName}.${col}`);
+      break;
+    }
+    case 'Data.GetRowItem': {
+      const result = String(activity.properties.result || 'cellValue');
+      variables[result] = '';
+      log.push(`${indent}GetRowItem ${activity.properties.columnName} -> ${result}`);
+      break;
+    }
+    case 'Data.UpdateRowItem':
+      log.push(
+        `${indent}UpdateRowItem ${activity.properties.columnName}=${activity.properties.value}`
+      );
+      break;
+    case 'UI.SendHotkey':
+      log.push(
+        `${indent}SendHotkey ${activity.properties.key} selector=${JSON.stringify(activity.properties.selector || '')}`
+      );
+      break;
+    case 'Orchestrator.WaitQueueItem': {
+      const result = String(activity.properties.result || 'TransactionItem');
+      const queue = String(activity.properties.queueName || 'MainQueue');
+      const list = fixtures.queueItems?.[queue];
+      if (list && list.length) {
+        variables[result] = list.shift();
+        log.push(`${indent}WaitQueueItem ${queue} -> ${result} (fixture)`);
+      } else {
+        variables[result] = { Reference: 'waited-item' };
+        log.push(`${indent}WaitQueueItem ${queue} -> ${result}`);
+      }
+      break;
+    }
+    case 'Orchestrator.GetCredential': {
+      const user = String(activity.properties.username || 'username');
+      const pass = String(activity.properties.password || 'password');
+      variables[user] = 'demo-user';
+      variables[pass] = '***';
+      log.push(`${indent}GetCredential ${activity.properties.assetName} -> ${user}/${pass}`);
+      break;
+    }
     case 'Python.PythonScope':
       log.push(
         `${indent}PythonScope path=${activity.properties.path || '(default)'} target=${activity.properties.target || 'x64'}`
@@ -1609,7 +1803,12 @@ export function classifyExecutionKind(activityType: string): DryRunExecutionKind
     activityType === 'System.PathExists' ||
     activityType === 'System.CreateDirectory' ||
     activityType === 'System.CopyFile' ||
+    activityType === 'System.MoveFile' ||
+    activityType === 'System.RenameFile' ||
     activityType === 'System.DeleteFile' ||
+    activityType === 'System.Matches' ||
+    activityType === 'System.IsMatch' ||
+    activityType === 'System.Replace' ||
     activityType.startsWith('ControlFlow.') ||
     activityType.startsWith('Data.') ||
     activityType === 'Messaging.DeserializeJson' ||

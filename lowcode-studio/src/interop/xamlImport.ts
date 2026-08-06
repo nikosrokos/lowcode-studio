@@ -400,6 +400,15 @@ function mapActivity(
     };
   }
 
+  if (localName === 'Continue') {
+    return {
+      id: newId(),
+      type: 'ControlFlow.Continue',
+      displayName,
+      properties: {}
+    };
+  }
+
   if (localName === 'MessageBox') {
     return {
       id: newId(),
@@ -824,6 +833,51 @@ function mapActivity(
         assetName: cleanExpr(raw['@_AssetName'] || extractArgument(raw, 'AssetName') || 'AssetName'),
         folderPath: cleanExpr(raw['@_FolderPath'] || extractArgument(raw, 'FolderPath') || ''),
         result: stripBrackets(cleanExpr(raw['@_Value'] || extractArgument(raw, 'Value') || 'assetValue'))
+      }
+    };
+  }
+
+  if (localName === 'GetCredential' || localName === 'GetOrchestratorCredential') {
+    return {
+      id: newId(),
+      type: 'Orchestrator.GetCredential',
+      displayName,
+      properties: {
+        assetName: cleanExpr(
+          raw['@_AssetName'] ||
+            raw['@_CredentialName'] ||
+            extractArgument(raw, 'AssetName') ||
+            extractArgument(raw, 'CredentialName') ||
+            'Credential'
+        ),
+        folderPath: cleanExpr(raw['@_FolderPath'] || extractArgument(raw, 'FolderPath') || ''),
+        username: stripBrackets(
+          cleanExpr(raw['@_Username'] || extractArgument(raw, 'Username') || 'username')
+        ),
+        password: stripBrackets(
+          cleanExpr(raw['@_Password'] || extractArgument(raw, 'Password') || 'password')
+        )
+      }
+    };
+  }
+
+  if (localName === 'WaitQueueItem') {
+    return {
+      id: newId(),
+      type: 'Orchestrator.WaitQueueItem',
+      displayName,
+      properties: {
+        queueName: cleanExpr(raw['@_QueueName'] || extractArgument(raw, 'QueueName') || 'MainQueue'),
+        folderPath: cleanExpr(raw['@_FolderPath'] || extractArgument(raw, 'FolderPath') || ''),
+        timeoutMs: Number(raw['@_TimeoutMS'] || raw['@_Timeout'] || extractArgument(raw, 'TimeoutMS') || 60000),
+        result: stripBrackets(
+          cleanExpr(
+            raw['@_TransactionItem'] ||
+              raw['@_Result'] ||
+              extractArgument(raw, 'TransactionItem') ||
+              'TransactionItem'
+          )
+        )
       }
     };
   }
@@ -1449,12 +1503,111 @@ function pickCommonProps(
   if (mapped === 'System.CreateDirectory' || mapped === 'System.DeleteFile') {
     props.path = cleanExpr(raw['@_Path'] || extractArgument(raw, 'Path') || url || '"path"');
   }
-  if (mapped === 'System.CopyFile') {
+  if (mapped === 'System.CopyFile' || mapped === 'System.MoveFile') {
     props.path = cleanExpr(raw['@_Path'] || extractArgument(raw, 'Path') || '"in.txt"');
     props.destination = cleanExpr(
       raw['@_Destination'] || extractArgument(raw, 'Destination') || '"out.txt"'
     );
     props.overwrite = String(raw['@_Overwrite'] ?? 'True') !== 'False';
+  }
+  if (mapped === 'System.RenameFile') {
+    props.path = cleanExpr(raw['@_Path'] || extractArgument(raw, 'Path') || '"old.txt"');
+    props.newName = cleanExpr(
+      raw['@_NewName'] ||
+        raw['@_Destination'] ||
+        extractArgument(raw, 'NewName') ||
+        extractArgument(raw, 'Destination') ||
+        '"new.txt"'
+    );
+  }
+  if (mapped === 'System.Matches' || mapped === 'System.IsMatch' || mapped === 'System.Replace') {
+    props.input = stripBrackets(
+      cleanExpr(raw['@_Input'] || extractArgument(raw, 'Input') || text || 'text')
+    );
+    // Patterns arrive as ["\d+"] — store quoted expression; dry-run strips quotes for RegExp
+    const rawPattern = raw['@_Pattern'] || raw['@_Regex'] || extractArgument(raw, 'Pattern') || '"\\w+"';
+    const pat = fromVbStringArgument(rawPattern);
+    props.pattern = `"${pat.replace(/"/g, '""')}"`;
+    props.result = stripBrackets(
+      cleanExpr(
+        raw['@_Result'] ||
+          result ||
+          extractArgument(raw, 'Result') ||
+          (mapped === 'System.IsMatch'
+            ? 'isMatch'
+            : mapped === 'System.Replace'
+              ? 'replaced'
+              : 'matches')
+      )
+    );
+    if (mapped === 'System.Replace') {
+      const rawRepl = raw['@_Replacement'] || extractArgument(raw, 'Replacement') || '" "';
+      const repl = fromVbStringArgument(rawRepl);
+      props.replacement = `"${repl.replace(/"/g, '""')}"`;
+    }
+  }
+  if (mapped === 'System.KillProcess') {
+    props.processName = cleanExpr(
+      raw['@_ProcessName'] || extractArgument(raw, 'ProcessName') || '"notepad"'
+    );
+  }
+  if (mapped === 'Data.MergeDataTable') {
+    props.destination = stripBrackets(
+      cleanExpr(raw['@_Destination'] || extractArgument(raw, 'Destination') || 'dt')
+    );
+    props.source = stripBrackets(
+      cleanExpr(raw['@_Source'] || extractArgument(raw, 'Source') || 'dtSource')
+    );
+    props.missingSchemaAction = String(
+      raw['@_MissingSchemaAction'] || extractArgument(raw, 'MissingSchemaAction') || 'Add'
+    ).replace('MissingSchemaAction.', '');
+  }
+  if (mapped === 'Data.RemoveDataRow') {
+    props.dataTable = stripBrackets(
+      cleanExpr(raw['@_DataTable'] || extractArgument(raw, 'DataTable') || 'dt')
+    );
+    props.rowIndex = cleanExpr(
+      raw['@_RowIndex'] || raw['@_Index'] || extractArgument(raw, 'RowIndex') || '0'
+    );
+  }
+  if (mapped === 'Data.RemoveDataColumn') {
+    props.dataTable = stripBrackets(
+      cleanExpr(raw['@_DataTable'] || extractArgument(raw, 'DataTable') || 'dt')
+    );
+    props.columnName = cleanExpr(
+      raw['@_ColumnName'] || extractArgument(raw, 'ColumnName') || 'Column1'
+    );
+  }
+  if (mapped === 'Data.GetRowItem' || mapped === 'Data.UpdateRowItem') {
+    props.row = stripBrackets(cleanExpr(raw['@_Row'] || extractArgument(raw, 'Row') || 'row'));
+    props.columnName = cleanExpr(
+      raw['@_ColumnName'] ||
+        raw['@_Column'] ||
+        extractArgument(raw, 'ColumnName') ||
+        extractArgument(raw, 'Column') ||
+        'Column1'
+    );
+    if (mapped === 'Data.GetRowItem') {
+      props.result = stripBrackets(
+        cleanExpr(raw['@_Result'] || result || extractArgument(raw, 'Result') || 'cellValue')
+      );
+    } else {
+      props.value = cleanExpr(raw['@_Value'] || extractArgument(raw, 'Value') || '""');
+    }
+  }
+  if (mapped === 'UI.SendHotkey') {
+    const rawKey =
+      raw['@_Key'] ||
+      raw['@_Shortcuts'] ||
+      raw['@_Text'] ||
+      extractArgument(raw, 'Key') ||
+      extractArgument(raw, 'Shortcuts') ||
+      '"enter"';
+    props.key = `"${fromVbStringArgument(rawKey).replace(/"/g, '""')}"`;
+    const interaction = fromXamlInteractionMode(String(raw['@_InteractionMode'] || ''));
+    if (interaction) {
+      props.inputMethod = interaction;
+    }
   }
   if (mapped === 'Flowchart.FlowSwitch') {
     props.expression = cleanExpr(

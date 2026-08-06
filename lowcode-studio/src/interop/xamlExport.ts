@@ -379,6 +379,21 @@ ${pad}</ui:ForEachRow>`;
     return `${pad}<ui:FilterDataTable DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" FilterRowsDataTable="[${escapeAttr(String(activity.properties.result || 'filteredDt'))}]" ColumnName="${escapeAttr(String(activity.properties.columnName || 'Status'))}" Operator="${escapeAttr(String(activity.properties.operator || '='))}" Value="[${escapeAttr(String(activity.properties.value ?? '""'))}]" />`;
   }
 
+  if (activity.type === 'Data.MergeDataTable') {
+    return `${pad}<ui:MergeDataTable DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Destination="[${escapeAttr(String(activity.properties.destination || 'dt'))}]" Source="[${escapeAttr(String(activity.properties.source || 'dtSource'))}]" MissingSchemaAction="${escapeAttr(String(activity.properties.missingSchemaAction || 'Add'))}" />`;
+  }
+  if (activity.type === 'Data.RemoveDataRow') {
+    return `${pad}<ui:RemoveDataRow DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" RowIndex="[${escapeAttr(String(activity.properties.rowIndex ?? '0'))}]" />`;
+  }
+  if (activity.type === 'Data.RemoveDataColumn') {
+    return `${pad}<ui:RemoveDataColumn DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" DataTable="[${escapeAttr(String(activity.properties.dataTable || 'dt'))}]" ColumnName="${escapeAttr(String(activity.properties.columnName || 'Column1'))}" />`;
+  }
+  if (activity.type === 'Data.GetRowItem') {
+    return `${pad}<ui:GetRowItem DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Row="[${escapeAttr(String(activity.properties.row || 'row'))}]" ColumnName="${escapeAttr(String(activity.properties.columnName || 'Column1'))}" Result="[${escapeAttr(String(activity.properties.result || 'cellValue'))}]" />`;
+  }
+  if (activity.type === 'Data.UpdateRowItem') {
+    return `${pad}<ui:UpdateRowItem DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Row="[${escapeAttr(String(activity.properties.row || 'row'))}]" ColumnName="${escapeAttr(String(activity.properties.columnName || 'Column1'))}" Value="[${escapeAttr(String(activity.properties.value ?? '""'))}]" />`;
+  }
   if (activity.type === 'Data.JoinDataTable') {
     return `${pad}<ui:JoinDataTables DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" DataTable1="[${escapeAttr(String(activity.properties.dataTable1 || 'dtLeft'))}]" DataTable2="[${escapeAttr(String(activity.properties.dataTable2 || 'dtRight'))}]" JoinType="${escapeAttr(String(activity.properties.joinType || 'Inner'))}" Column1="${escapeAttr(String(activity.properties.column1 || 'Id'))}" Column2="${escapeAttr(String(activity.properties.column2 || 'Id'))}" DataTable="[${escapeAttr(String(activity.properties.result || 'joinedDt'))}]" />`;
   }
@@ -465,6 +480,24 @@ ${argsXml}${pad}</ui:InvokeWorkflowFile>`;
   if (activity.type === 'System.CopyFile') {
     return `${pad}<ui:CopyFile DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Path="[${escapeAttr(toVbStringArgument(activity.properties.path))}]" Destination="[${escapeAttr(toVbStringArgument(activity.properties.destination))}]" Overwrite="${activity.properties.overwrite === false ? 'False' : 'True'}" />`;
   }
+  if (activity.type === 'System.MoveFile') {
+    return `${pad}<ui:MoveFile DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Path="[${escapeAttr(toVbStringArgument(activity.properties.path))}]" Destination="[${escapeAttr(toVbStringArgument(activity.properties.destination))}]" Overwrite="${activity.properties.overwrite === false ? 'False' : 'True'}" />`;
+  }
+  if (activity.type === 'System.RenameFile') {
+    return `${pad}<ui:RenameFile DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Path="[${escapeAttr(toVbStringArgument(activity.properties.path))}]" NewName="[${escapeAttr(toVbStringArgument(activity.properties.newName))}]" />`;
+  }
+  if (activity.type === 'System.Matches') {
+    return `${pad}<ui:Matches DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Input="[${escapeAttr(String(activity.properties.input || 'text'))}]" Pattern="[${escapeAttr(toVbStringArgument(activity.properties.pattern))}]" Result="[${escapeAttr(String(activity.properties.result || 'matches'))}]" />`;
+  }
+  if (activity.type === 'System.IsMatch') {
+    return `${pad}<ui:IsMatch DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Input="[${escapeAttr(String(activity.properties.input || 'text'))}]" Pattern="[${escapeAttr(toVbStringArgument(activity.properties.pattern))}]" Result="[${escapeAttr(String(activity.properties.result || 'isMatch'))}]" />`;
+  }
+  if (activity.type === 'System.Replace') {
+    return `${pad}<ui:Replace DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Input="[${escapeAttr(String(activity.properties.input || 'text'))}]" Pattern="[${escapeAttr(toVbStringArgument(activity.properties.pattern))}]" Replacement="[${escapeAttr(toVbStringArgument(activity.properties.replacement))}]" Result="[${escapeAttr(String(activity.properties.result || 'replaced'))}]" />`;
+  }
+  if (activity.type === 'System.KillProcess') {
+    return `${pad}<ui:KillProcess DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" ProcessName="[${escapeAttr(toVbStringArgument(activity.properties.processName))}]" />`;
+  }
   if (activity.type === 'System.DeleteFile') {
     if (isPortableExport()) {
       return `${pad}<ui:Comment DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Text="${escapeAttr('Delete File is Windows-only — replace with a Portable Delete / file activity in Studio Web, or export as Windows. Path: ' + String(activity.properties.path || ''))}" />`;
@@ -547,6 +580,21 @@ ${pad}</ui:TimeoutScope>`;
   if (activity.type === 'ControlFlow.Break') {
     return `${pad}<Break DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" />`;
   }
+  if (activity.type === 'ControlFlow.Continue') {
+    return `${pad}<Continue DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" />`;
+  }
+
+  if (activity.type === 'UI.SendHotkey') {
+    const props = applyWindowsSelectorsToActivityProps(activity.properties || {});
+    const key = String(props.key || 'enter');
+    const selector = String(props.selector || '').trim();
+    const selAttr = selector ? ` Selector="${escapeAttr(selector)}"` : '';
+    let inputAttr = interactionModeAttribute(props, 'Simulate');
+    if (isPortableExport() && /InteractionMode="(WindowMessages|HardwareEvents|Background)"/.test(inputAttr)) {
+      inputAttr = ' InteractionMode="Simulate"';
+    }
+    return `${pad}<uia:NKeyboardShortcuts DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Shortcuts="[${escapeAttr(toVbStringArgument(key))}]"${selAttr}${inputAttr} />`;
+  }
 
   if (activity.type === 'UI.UseApplicationBrowser') {
     return renderUseApplicationBrowser(activity, pad, indent);
@@ -608,6 +656,13 @@ ${pad}</ui:TimeoutScope>`;
     return `${pad}<ui:GetQueueItem DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" QueueName="${escapeAttr(String(activity.properties.queueName || 'MainQueue'))}"${folderAttr}${refAttr} TransactionItem="[${escapeAttr(String(activity.properties.result || 'TransactionItem'))}]" />`;
   }
 
+  if (activity.type === 'Orchestrator.WaitQueueItem') {
+    const folder = String(activity.properties.folderPath || '');
+    const folderAttr = folder ? ` FolderPath="${escapeAttr(folder)}"` : '';
+    const timeout = Number(activity.properties.timeoutMs ?? 60000);
+    return `${pad}<ui:WaitQueueItem DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" QueueName="${escapeAttr(String(activity.properties.queueName || 'MainQueue'))}"${folderAttr} TimeoutMS="${timeout}" TransactionItem="[${escapeAttr(String(activity.properties.result || 'TransactionItem'))}]" />`;
+  }
+
   if (activity.type === 'Orchestrator.AddQueueItem') {
     const folder = String(activity.properties.folderPath || '');
     const folderAttr = folder ? ` FolderPath="${escapeAttr(folder)}"` : '';
@@ -618,6 +673,12 @@ ${pad}</ui:TimeoutScope>`;
     const folder = String(activity.properties.folderPath || '');
     const folderAttr = folder ? ` FolderPath="${escapeAttr(folder)}"` : '';
     return `${pad}<ui:GetRobotAsset DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" AssetName="${escapeAttr(String(activity.properties.assetName || 'AssetName'))}"${folderAttr} Value="[${escapeAttr(String(activity.properties.result || 'assetValue'))}]" />`;
+  }
+
+  if (activity.type === 'Orchestrator.GetCredential') {
+    const folder = String(activity.properties.folderPath || '');
+    const folderAttr = folder ? ` FolderPath="${escapeAttr(folder)}"` : '';
+    return `${pad}<ui:GetCredential DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" AssetName="${escapeAttr(String(activity.properties.assetName || 'Credential'))}"${folderAttr} Username="[${escapeAttr(String(activity.properties.username || 'username'))}]" Password="[${escapeAttr(String(activity.properties.password || 'password'))}]" />`;
   }
 
   if (activity.type === 'Orchestrator.SetAsset') {
