@@ -233,7 +233,7 @@ export function activate(context: vscode.ExtensionContext): void {
     if (visible) {
       lcsContainerVisible = true;
       if (wasHidden && preferHomeOnContainerShow()) {
-        void homeProvider.focusSidebar();
+        void homeProvider.openHome();
       } else {
         homeProvider.refresh();
       }
@@ -428,7 +428,7 @@ export function activate(context: vscode.ExtensionContext): void {
       repairFromDryRunTraceCommand()
     ),
     vscode.commands.registerCommand('lowcodeStudio.openHome', () =>
-      homeProvider.focusSidebar()
+      homeProvider.openHome()
     ),
     vscode.commands.registerCommand('lowcodeStudio.openHomePanel', () =>
       homeProvider.showPanel()
@@ -708,7 +708,7 @@ export function activate(context: vscode.ExtensionContext): void {
     .getConfiguration('lowcodeStudio')
     .get<boolean>('openHomeOnStartup', true);
   if (openHome) {
-    void homeProvider.focusSidebar();
+    void homeProvider.openHome();
   }
   if (!context.globalState.get('lowcodeStudio.welcomeShown')) {
     void context.globalState.update('lowcodeStudio.welcomeShown', true);

@@ -224,8 +224,10 @@ export function parseWorkflow(text: string): WorkflowDocument {
 }
 
 function normalizeActivity(a: ActivityNode): ActivityNode {
+  const id = String(a?.id || '').trim() || newId();
   return {
     ...a,
+    id,
     x: typeof a.x === 'number' ? a.x : undefined,
     y: typeof a.y === 'number' ? a.y : undefined,
     color: typeof a.color === 'string' && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(a.color)

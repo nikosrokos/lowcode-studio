@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.43] — 2026-08-06
+
+### Fixed
+- **Home** — Open Home focuses sidebar with retries and falls back to an editor-tab Home; title action opens the full Home tab
+- **Studio Web activities** — missing activity `id`s are healed on parse/normalize/select so Properties work when clicking imported Log Message (etc.)
+- Flowchart selection expands Properties (same as sequence cards)
+
+### Changed
+- **T5** — Fit + Align live in the canvas bar (not buried); Find ↑↓ stays next to search
+- Expression expand dialog: head **✦ Assist** replaces Close (Cancel + Apply remain in the footer)
+
 ## [0.6.42] — 2026-08-06
 
 ### Added

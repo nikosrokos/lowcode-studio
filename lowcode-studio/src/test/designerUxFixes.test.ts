@@ -32,10 +32,14 @@ function run(): void {
   assert.ok(html.includes('refreshExprVbAssist'), 'expression editor VB Assist');
   assert.ok(html.includes('id="exprVbAssist"'), 'VB Assist strip in expression dialog');
   assert.ok(html.includes('fitCanvasView'), 'canvas fit content / selection');
+  assert.ok(html.includes('id="btnFitCanvas"'), 'Fit button in canvas bar');
   assert.ok(html.includes('runWorkflowSearch'), 'search next / prev in workflow');
   assert.ok(html.includes('alignSelectedFlowNodes'), 'flowchart align');
   assert.ok(html.includes('assist-filter'), 'cleaner Assist live filters');
   assert.ok(html.includes('assist-help-link'), 'Assist help demoted to ? link');
+  assert.ok(html.includes('id="exprDialogAssist"'), 'Assist button in expression dialog');
+  assert.ok(html.includes('function selectActivity'), 'selectActivity heals Studio Web selection');
+  assert.ok(html.includes('ensureActivityIds'), 'missing activity ids healed');
 
   console.log('designerUxFixes.test.ts: ok');
 }
