@@ -941,6 +941,7 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
     const framework = cfg.get<string>('uipathTargetFramework', 'Windows');
     const canvasStyle = cfg.get<string>('canvasStyle', 'plain');
     const zoom = Number(cfg.get<number>('defaultZoom', 1));
+    const theme = cfg.get<string>('designerTheme', 'auto');
     return {
       showLineNumbers: cfg.get<boolean>('showLineNumbers', true),
       defaultWorkflowType: workflowType === 'Flowchart' ? 'Flowchart' : 'Sequence',
@@ -952,7 +953,8 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
       compactCards: cfg.get<boolean>('compactCards', false),
       showConnectors: cfg.get<boolean>('showConnectors', true),
       defaultZoom: zoom === 0.75 || zoom === 1.25 ? zoom : 1,
-      openHomeOnStartup: cfg.get<boolean>('openHomeOnStartup', true)
+      openHomeOnStartup: cfg.get<boolean>('openHomeOnStartup', true),
+      designerTheme: theme === 'light' || theme === 'dark' ? theme : 'auto'
     };
   }
 
@@ -974,7 +976,8 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
       ['compactCards', patch.compactCards],
       ['showConnectors', patch.showConnectors],
       ['defaultZoom', patch.defaultZoom],
-      ['openHomeOnStartup', patch.openHomeOnStartup]
+      ['openHomeOnStartup', patch.openHomeOnStartup],
+      ['designerTheme', patch.designerTheme]
     ];
     for (const [key, value] of entries) {
       if (value === undefined) {

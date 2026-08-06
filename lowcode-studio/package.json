@@ -2,7 +2,7 @@
   "name": "lowcode-studio",
   "displayName": "LowCode Studio",
   "description": "Mac-first low-code RPA for VS Code/Cursor: REFramework design, scenario dry-runs (Shift+F5), and the easiest Connect to Studio Web handoff for Orchestrator publish.",
-  "version": "0.6.55",
+  "version": "0.7.1",
   "publisher": "lowcode-studio",
   "engines": {
     "vscode": "^1.85.0"
@@ -662,6 +662,21 @@
             "dots"
           ],
           "description": "Designer canvas background: plain board or subtle dot grid."
+        },
+        "lowcodeStudio.designerTheme": {
+          "type": "string",
+          "default": "auto",
+          "enum": [
+            "auto",
+            "light",
+            "dark"
+          ],
+          "enumDescriptions": [
+            "Follow the VS Code / Cursor color theme",
+            "Force LowCode Studio light chrome",
+            "Force LowCode Studio dark chrome"
+          ],
+          "description": "Designer appearance theme. Toggle from the toolbar sun/moon button or Settings → Appearance."
         },
         "lowcodeStudio.showCardSummaries": {
           "type": "boolean",
