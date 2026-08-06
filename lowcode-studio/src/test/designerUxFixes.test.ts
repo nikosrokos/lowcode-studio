@@ -24,9 +24,18 @@ function run(): void {
   assert.ok(html.includes('function renderMinimap'), 'mini-map renderer');
   assert.ok(html.includes('activityIconHtml'), 'canvas / palette activity icons');
   assert.ok(html.includes('assistLiveStripHtml'), 'live Assist strip in Properties');
-  assert.ok(html.includes('data-assist-tab="scaffold"'), 'Assist Scaffold (F2) tab');
+  assert.ok(html.includes('data-assist-tab="scaffold"'), 'Assist Scaffold tab');
   assert.ok(html.includes('assistScaffoldPropose'), 'Assist scaffold propose button');
   assert.ok(html.includes('collectLiveAssistProposals'), 'live Assist proposals');
+  assert.ok(html.includes('invokeMapEditorHtml'), 'Invoke argument mapping editor');
+  assert.ok(html.includes('loadWorkflowArguments'), 'host load for target workflow args');
+  assert.ok(html.includes('refreshExprVbAssist'), 'expression editor VB Assist');
+  assert.ok(html.includes('id="exprVbAssist"'), 'VB Assist strip in expression dialog');
+  assert.ok(html.includes('fitCanvasView'), 'canvas fit content / selection');
+  assert.ok(html.includes('runWorkflowSearch'), 'search next / prev in workflow');
+  assert.ok(html.includes('alignSelectedFlowNodes'), 'flowchart align');
+  assert.ok(html.includes('assist-filter'), 'cleaner Assist live filters');
+  assert.ok(html.includes('assist-help-link'), 'Assist help demoted to ? link');
 
   console.log('designerUxFixes.test.ts: ok');
 }

@@ -2,18 +2,18 @@
 
 **Goal:** Make LowCode Studio the place you **design, test, and iterate** most RPA work — so you choose it over Studio Web for the daily loop — while **every solution stays continuously synced with Studio Web Local Workspace as-is** (Portable `.uipx` / `.xaml` on disk). Studio Web remains the path to **publish / Orchestrator**, not the place you finish ordinary workflow work.
 
-> Living document. Priorities follow real end-to-end friction (designer → dry-run → Save sync → open in Studio Web → publish). Version at time of writing: **0.6.41**.
+> Living document. Priorities follow real end-to-end friction (designer → dry-run → Save sync → open in Studio Web → publish). Version at time of writing: **0.6.42**.
 
 ---
 
-## Milestone (0.6.41)
+## Milestone (0.6.42)
 
 We have a credible Mac-first Studio loop:
 
 | Layer | Status |
 |---|---|
-| Designer UX | Sequence + Flowchart, Maestro frames/dock, mini-map, activity icons, Home |
-| Assist | F0–F4 deterministic helpers + Live propose/apply + in-designer Scaffold (F2) |
+| Designer UX | Sequence + Flowchart, Maestro frames/dock, mini-map, icons, Fit/Find/Align, Home |
+| Assist | F0–F4 + compact Live/Scaffold popup + expr VB Assist + Invoke mapping UI |
 | Sync | Studio Web Local Workspace ↔ Save, adopt/open, leaner sync footprint |
 | Catalog / import | Core UI / data / HTTP / REF + deeper import map (fewer `Imported.*`) |
 | Dry-run | Scenarios (Shift+F5), step-through, fixtures, opt-in real HTTP/Python |
@@ -85,10 +85,10 @@ Make “I never needed Studio Web until publish” the default experience.
 - **Bulk Assist** across the open project (VB pass, empty required, weak selectors) with propose → Apply
 - Keep explorer / designer / Local Workspace paths aligned (one mental model)
 
-### T2. Workflow contracts (still the biggest “finish in Studio Web” gap)
-- **Arguments** polish: clear In/Out/InOut editing, defaults, validation
-- **Invoke Workflow** argument mapping UI + faithful XAML export/import (not path-only)
-- Cross-workflow chips (“missing Out: `out_TransactionItem`”) before Save sync
+### T2. Workflow contracts — **partially shipped (0.6.42)**
+- **Arguments** polish: clear In/Out/InOut editing, defaults, duplicate-name warning — **shipped**
+- **Invoke Workflow** argument mapping UI + Out/InOut XAML export/import — **shipped**
+- Cross-workflow chips (“missing Out: …”) in Invoke checklist — **shipped**; project-wide gate still T3
 
 ### T3. Publish-ready gate in LCS
 - One command / dock action: **Ready for Studio Web?** (packages, Portable, selectors, required props, `Imported.*`, Windows TODO)
@@ -104,16 +104,17 @@ Make “I never needed Studio Web until publish” the default experience.
 
 ## Theme 2 — Designer UX that beats Studio Web for editing
 
-### T5. Canvas & navigation — **partially shipped (0.6.41)**
+### T5. Canvas & navigation — **shipped core (0.6.41–0.6.42)**
 - Mini-map — **shipped**
-- Fit selection / zoom-to-activity; tidy / align for flowchart (deeper)
-- Search-in-workflow — keep improving hit quality + replace/next
+- Fit content / selection (⤢), zoom-to-activity on search — **shipped**
+- Search-in-workflow next/prev (↑↓ / Enter) — **shipped**
+- Flowchart Align to selection — **shipped**; deeper distribute later
 - Breadcrumbs for nested containers — keep investing
 - Clearer drop ghosts / reorder affordances
 
-### T6. Properties & expressions
-- Larger expression editor (Maestro-style expand) with VB Assist inline
-- Typed editors (DataTable columns, dictionary, secret-as-variable)
+### T6. Properties & expressions — **partially shipped (0.6.42)**
+- Expression editor with **VB Assist inline** (propose → Apply in dialog) — **shipped**
+- Typed editors (DataTable columns, dictionary, secret-as-variable) — later
 - “Required for Studio Web” checklist — **shipped**; keep tying it to T3 gate
 
 ### T7. Onboarding & empty states
@@ -155,7 +156,8 @@ Make “I never needed Studio Web until publish” the default experience.
 
 Deterministic, propose→Apply. **F0–F4 + Live/Scaffold shipped through 0.6.41.**
 
-### T12. Deeper Assist UX
+### T12. Deeper Assist UX — **popup UX shipped (0.6.42)**
+- Compact Assist dialog (Live filters, Scaffold examples, Help as ?) — **shipped**
 - Richer F2 scaffolds (containers / branches / nested Use Browser from description)
 - Multi-file scaffold + project-wide VB / selector pass
 - Assist results that respect Local Workspace sync (never emit LCS-only types that become `Imported.*` after Save)
@@ -190,17 +192,18 @@ Deterministic, propose→Apply. **F0–F4 + Live/Scaffold shipped through 0.6.41
 ## Suggested sequencing (impact × fit)
 
 ```
-T2  Arguments + Invoke mapping          ← biggest “finish in Studio Web” hole
 T3  Ready-for-Studio-Web gate           ← E2E confidence before publish
 T1  Multi-file / project-wide Assist    ← daily-path speed
 T4  Sync conflict clarity               ← trust Local Workspace as-is
-T6  Expression editor + VB Assist       ← editing comfort vs Studio Web
 T8  Next import-map slice               ← fewer Imported.*
 T10 Dry-run breakpoints + watch         ← stay in Cursor to verify
 T12 Richer scaffolds / multi-file F2    ← Assist depth
 T9  Excel / Orchestrator parity         ← fewer Studio Web activity adds
 T13 Publish reveal / deep link          ← last mile
+T6  Typed property editors              ← remaining expression UX
 ```
+
+Shipped recently: T2 Invoke mapping · T5 Fit/Find/Align · T6 VB in expr editor · Assist popup cleanup (0.6.42)
 
 ---
 

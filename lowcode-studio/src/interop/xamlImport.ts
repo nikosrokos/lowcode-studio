@@ -242,7 +242,11 @@ function extractInvokeArgumentMappings(raw: Record<string, unknown>): string {
   if (!bag || typeof bag !== 'object') {
     return '';
   }
-  const mappings: Array<{ name: string; expression: string }> = [];
+  const mappings: Array<{
+    name: string;
+    expression: string;
+    direction?: 'In' | 'Out' | 'InOut';
+  }> = [];
   const visit = (node: unknown) => {
     if (!node || typeof node !== 'object') {
       return;
@@ -254,6 +258,8 @@ function extractInvokeArgumentMappings(raw: Record<string, unknown>): string {
     const obj = node as Record<string, unknown>;
     for (const [key, value] of Object.entries(obj)) {
       if (key === 'InArgument' || key === 'OutArgument' || key === 'InOutArgument') {
+        const direction =
+          key === 'OutArgument' ? 'Out' : key === 'InOutArgument' ? 'InOut' : 'In';
         for (const arg of asArray(value) as Array<Record<string, unknown> | string>) {
           if (typeof arg === 'string') {
             continue;
@@ -263,7 +269,11 @@ function extractInvokeArgumentMappings(raw: Record<string, unknown>): string {
             continue;
           }
           const expr = cleanExpr(argumentValue(arg) ?? arg['#text'] ?? '');
-          mappings.push({ name, expression: String(expr || '""') });
+          mappings.push({
+            name,
+            expression: String(expr || '""'),
+            direction
+          });
         }
       } else if (!key.startsWith('@_')) {
         visit(value);

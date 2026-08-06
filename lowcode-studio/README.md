@@ -1,12 +1,12 @@
 # LowCode Studio
 
-**Version 0.6.41** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.6.42** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
 > Not an official UiPath product.
 
-![version](https://img.shields.io/badge/version-0.6.41-0ea5e9)
+![version](https://img.shields.io/badge/version-0.6.42-0ea5e9)
 ![platform](https://img.shields.io/badge/platform-Mac%20%7C%20Windows%20%7C%20Linux-22c55e)
 ![vscode](https://img.shields.io/badge/VS%20Code%20%2F%20Cursor-1.85%2B-3b82f6)
 
@@ -42,10 +42,10 @@ Design on Mac (REFramework)
 1. **Designer** — framed toolbox + properties, sequence board, macOS-style bottom dock  
 2. **Floating frames** — traffic-light controls to float / dock / collapse either side panel  
 
-## What’s in 0.6.41
+## What’s in 0.6.42
 
-- **Mini-map** under Properties + **activity icons** on canvas / toolbox / Insert palette
-- **Assist ✦** — Live propose/apply (VB, required fills, selectors) and Scaffold (F2) append/replace in the designer
+- **Invoke argument mapping** UI + Out/InOut export; expression editor **VB Assist**; canvas **Fit / Find next / Align**
+- **Assist ✦** popup cleaned up — compact Live filters, Scaffold examples, Help as **?**
 
 Full history: [CHANGELOG.md](CHANGELOG.md)
 
@@ -60,7 +60,7 @@ npm test
 npm run package
 ```
 
-In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.41.vsix` → reload.
+In Cursor / VS Code: **Extensions: Install from VSIX…** → `lowcode-studio-0.6.42.vsix` → reload.
 
 ## Easy path
 
@@ -168,13 +168,14 @@ See [docs/ACTIVITIES.md](docs/ACTIVITIES.md). Invoke Code / UI steps are dry-run
 - **C2** Opt-in real HTTP / Python dry-run runners
 - **F0–F4** Assist: Explain, scenarios, **F2 scaffold + dry-run-trace repair**, selectors, VB repairs
 - Designer **Assist Live / Scaffold** tabs with propose → Apply
+- **Invoke argument mapping**, expr **VB Assist**, canvas Fit/Find/Align, cleaner Assist popup
 
 ### Next (5) — E2E UX, Local Workspace as-is
-1. **Invoke / Arguments mapping** — stop finishing contracts in Studio Web
-2. **Ready for Studio Web?** gate (project-wide Assist + packages + selectors)
-3. Multi-file Assist (bulk VB / required / selectors) + richer F2 scaffolds
-4. Sync conflict clarity when Studio Web edits the same solution
-5. Next import-map / Excel–Orchestrator parity (fewer `Imported.*`)
+1. **Ready for Studio Web?** gate (project-wide Assist + packages + selectors)
+2. Multi-file Assist (bulk VB / required / selectors) + richer F2 scaffolds
+3. Sync conflict clarity when Studio Web edits the same solution
+4. Next import-map / Excel–Orchestrator parity (fewer `Imported.*`)
+5. Dry-run breakpoints + watch panel
 
 Full plan: [docs/ROADMAP.md](docs/ROADMAP.md)
 
