@@ -20,6 +20,13 @@ function run(): void {
   assert.ok(html.includes('ensurePropsPanelVisible'), 'auto-expand properties on select');
   assert.ok(html.includes('Unknown / imported type'), 'imported type banner in props');
   assert.ok(html.includes('extraKeys'), 'orphan property keys rendered');
+  assert.ok(html.includes('id="minimapDock"'), 'mini-map dock in properties panel');
+  assert.ok(html.includes('function renderMinimap'), 'mini-map renderer');
+  assert.ok(html.includes('activityIconHtml'), 'canvas / palette activity icons');
+  assert.ok(html.includes('assistLiveStripHtml'), 'live Assist strip in Properties');
+  assert.ok(html.includes('data-assist-tab="scaffold"'), 'Assist Scaffold (F2) tab');
+  assert.ok(html.includes('assistScaffoldPropose'), 'Assist scaffold propose button');
+  assert.ok(html.includes('collectLiveAssistProposals'), 'live Assist proposals');
 
   console.log('designerUxFixes.test.ts: ok');
 }
