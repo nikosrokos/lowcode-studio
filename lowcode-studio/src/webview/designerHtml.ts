@@ -17,6 +17,8 @@ export type DesignerSettings = {
   showConnectors: boolean;
   defaultZoom: number;
   openHomeOnStartup: boolean;
+  /** Designer chrome theme — auto follows VS Code; light/dark force LCS tokens. */
+  designerTheme: 'auto' | 'light' | 'dark';
 };
 
 const DEFAULT_DESIGNER_SETTINGS: DesignerSettings = {
@@ -30,7 +32,8 @@ const DEFAULT_DESIGNER_SETTINGS: DesignerSettings = {
   compactCards: false,
   showConnectors: true,
   defaultZoom: 1,
-  openHomeOnStartup: true
+  openHomeOnStartup: true,
+  designerTheme: 'auto'
 };
 
 export function getDesignerHtml(
@@ -99,6 +102,52 @@ export function getDesignerHtml(
       --props-width: 300px;
       --activity-column-width: 480px;
       --flow-node-width: 148px;
+      --tip-bg: color-mix(in srgb, var(--panel) 92%, var(--text) 8%);
+      --tip-border: color-mix(in srgb, var(--border) 80%, var(--text) 20%);
+    }
+    /* Forced light — cool slate, not cream/terracotta */
+    html[data-theme="light"] {
+      --bg: #f3f5f8;
+      --panel: #ffffff;
+      --border: #cfd6e0;
+      --text: #1a2332;
+      --muted: #5b6575;
+      --accent: #0284c7;
+      --accent-fg: #ffffff;
+      --input-bg: #ffffff;
+      --input-border: #b8c0cc;
+      --hover: #e8eef5;
+      --focus: #0284c7;
+      --card: #ffffff;
+      --board: #eef1f5;
+      --shadow: 0 1px 2px rgba(26,35,50,.06), 0 4px 14px rgba(26,35,50,.08);
+      --shadow-sm: 0 1px 2px rgba(26,35,50,.07);
+      --shadow-frame: 0 12px 36px rgba(26,35,50,.14), 0 2px 8px rgba(26,35,50,.08);
+      --spine: color-mix(in srgb, #5b6575 35%, transparent);
+      --tip-bg: #ffffff;
+      --tip-border: #aeb8c6;
+    }
+    /* Forced dark — stable tokens independent of host theme */
+    html[data-theme="dark"] {
+      --bg: #1a1d23;
+      --panel: #22262e;
+      --border: #3a4150;
+      --text: #e6e9ef;
+      --muted: #9aa3b2;
+      --accent: #0ea5e9;
+      --accent-fg: #041018;
+      --input-bg: #161920;
+      --input-border: #3a4150;
+      --hover: #2a303a;
+      --focus: #38bdf8;
+      --card: #262b34;
+      --board: #1e2229;
+      --shadow: 0 1px 2px rgba(0,0,0,.28), 0 6px 18px rgba(0,0,0,.22);
+      --shadow-sm: 0 1px 2px rgba(0,0,0,.22);
+      --shadow-frame: 0 14px 40px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.24);
+      --spine: color-mix(in srgb, #9aa3b2 38%, transparent);
+      --tip-bg: #2a303a;
+      --tip-border: #4a5568;
     }
     * { box-sizing: border-box; }
     html, body {
@@ -138,8 +187,8 @@ export function getDesignerHtml(
       gap: 10px;
       min-height: 48px;
       padding: 0 14px;
-      border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-      background: color-mix(in srgb, var(--panel) 78%, transparent);
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+      background: color-mix(in srgb, var(--panel) 88%, transparent);
       backdrop-filter: blur(14px) saturate(1.2);
     }
     .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; min-width: 170px; }
@@ -161,6 +210,14 @@ export function getDesignerHtml(
     .toolbar .btn.symbol {
       min-width: 36px; min-height: 34px; padding: 6px 10px;
       font-size: 16px; line-height: 1;
+      border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+    }
+    .toolbar .btn.symbol:hover {
+      border-color: color-mix(in srgb, var(--focus) 45%, var(--border));
+    }
+    .toolbar .btn.symbol.active-theme {
+      border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
     }
     .sync-pill {
       display: none; align-items: center; gap: 6px;
@@ -252,7 +309,7 @@ export function getDesignerHtml(
     }
     .panel.frame-docked {
       margin: 8px 0 8px 8px;
-      border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+      border: 1px solid color-mix(in srgb, var(--border) 92%, var(--text) 8%);
       border-radius: var(--radius-frame);
       box-shadow: var(--shadow-sm);
       background: color-mix(in srgb, var(--panel) 96%, transparent);
@@ -260,8 +317,8 @@ export function getDesignerHtml(
     }
     .panel.right.frame-docked {
       margin: 8px 8px 8px 0;
-      border-right: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-      border-left: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+      border-right: 1px solid color-mix(in srgb, var(--border) 92%, var(--text) 8%);
+      border-left: 1px solid color-mix(in srgb, var(--border) 92%, var(--text) 8%);
     }
     .left-stack {
       display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden;
@@ -939,7 +996,7 @@ export function getDesignerHtml(
     .card.has-bp .card-bp.on { /* already styled */ }
     .card {
       position: relative; background: var(--card);
-      border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+      border: 1px solid color-mix(in srgb, var(--border) 92%, var(--text) 8%);
       border-radius: var(--radius); box-shadow: var(--shadow-sm);
       padding: 9px 10px 9px 12px; cursor: grab;
       transition: border-color .14s ease, background .14s ease, box-shadow .14s ease, transform .14s ease;
@@ -1272,7 +1329,7 @@ export function getDesignerHtml(
     .selector-builder .field { margin-bottom: 0; }
     .hover-tip {
       position: fixed; z-index: 20; max-width: 280px; pointer-events: none;
-      background: var(--panel); color: var(--text); border: 1px solid var(--border);
+      background: var(--tip-bg); color: var(--text); border: 1px solid var(--tip-border);
       border-radius: 8px; padding: 8px 10px; font-size: 11px; line-height: 1.4;
       box-shadow: var(--shadow); opacity: 0; transform: translateY(4px);
       transition: opacity .12s ease, transform .12s ease;
@@ -1380,10 +1437,11 @@ export function getDesignerHtml(
       <button class="btn" id="btnLink" title="Connect two flowchart nodes" style="display:none">Link</button>
       <button class="btn" id="btnAutoLayout" style="display:none" title="Tidy flowchart layout">Tidy</button>
       <button class="btn" id="btnSync" type="button" title="Pull changes from Studio Web Local (no reopen)" style="display:none">↻ Sync</button>
-      <button class="btn symbol" id="btnHome" type="button" title="Home">⌂</button>
+      <button class="btn symbol" id="btnThemeToggle" type="button" title="Toggle light / dark theme" aria-label="Toggle theme">☽</button>
+      <button class="btn symbol" id="btnHome" type="button" title="Home — projects &amp; templates">⌂</button>
       <button class="btn symbol" id="btnAssistHelp" type="button" title="Assist — Live proposals / Scaffold" aria-expanded="false">✦</button>
-      <button class="btn symbol" id="btnSettings" type="button" title="Settings">⚙</button>
-      <button class="btn primary" id="btnSave">Save</button>
+      <button class="btn symbol" id="btnSettings" type="button" title="Settings — canvas, theme, sync">⚙</button>
+      <button class="btn primary" id="btnSave" title="Save workflow (⌘/Ctrl+S)">Save</button>
     </div>
     <div class="sync-alert" id="syncAlert" role="status">
       <span class="sync-alert-text" id="syncAlertText"></span>
@@ -1645,6 +1703,20 @@ export function getDesignerHtml(
           <button class="btn" type="button" id="settingsDialogCancel">Close</button>
         </div>
         <div class="settings-dialog-body">
+          <div class="settings-section">
+            <h3>Appearance</h3>
+            <div class="settings-row">
+              <div class="label">
+                <span class="name">Theme</span>
+                <span class="hint">Auto follows VS Code · Light / Dark force LowCode Studio colors</span>
+              </div>
+              <select id="set_designerTheme">
+                <option value="auto">Auto</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+            </div>
+          </div>
           <div class="settings-section">
             <h3>Canvas</h3>
             <div class="settings-row">
@@ -1939,7 +2011,10 @@ export function getDesignerHtml(
       syncAlertText: document.getElementById('syncAlertText'),
       btnSync: document.getElementById('btnSync'),
       btnSyncNow: document.getElementById('btnSyncNow'),
-      btnSyncDismiss: document.getElementById('btnSyncDismiss')
+      btnSyncDismiss: document.getElementById('btnSyncDismiss'),
+      btnThemeToggle: document.getElementById('btnThemeToggle'),
+      btnHome: document.getElementById('btnHome'),
+      btnSettings: document.getElementById('btnSettings')
     };
 
     function applySyncStatus(msg) {
@@ -2014,11 +2089,57 @@ export function getDesignerHtml(
         state.zoom = s.defaultZoom;
         applyZoom();
       }
+      applyDesignerTheme();
+    }
+    function effectiveDesignerTheme() {
+      const t = state.settings?.designerTheme;
+      if (t === 'light' || t === 'dark') return t;
+      // Auto: infer from computed body background (follows VS Code tokens)
+      try {
+        const bg = getComputedStyle(document.body).backgroundColor || '';
+        const m = bg.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/i);
+        if (m) {
+          const lum = (0.299 * Number(m[1]) + 0.587 * Number(m[2]) + 0.114 * Number(m[3])) / 255;
+          return lum > 0.55 ? 'light' : 'dark';
+        }
+      } catch (_) {}
+      return 'dark';
+    }
+    function applyDesignerTheme() {
+      const mode = state.settings?.designerTheme === 'light' || state.settings?.designerTheme === 'dark'
+        ? state.settings.designerTheme
+        : 'auto';
+      if (mode === 'auto') {
+        document.documentElement.removeAttribute('data-theme');
+      } else {
+        document.documentElement.setAttribute('data-theme', mode);
+      }
+      const shown = mode === 'auto' ? effectiveDesignerTheme() : mode;
+      const btn = els.btnThemeToggle;
+      if (btn) {
+        // Show the action: sun = switch to light, moon = switch to dark
+        btn.textContent = shown === 'light' ? '☽' : '☀';
+        btn.title = mode === 'auto'
+          ? ('Theme: Auto (' + shown + ') — click for ' + (shown === 'light' ? 'dark' : 'light'))
+          : ('Theme: ' + (shown === 'light' ? 'Light' : 'Dark') + ' — click to toggle · Settings for Auto');
+        btn.setAttribute('aria-label', btn.title);
+        btn.classList.toggle('active-theme', mode !== 'auto');
+      }
+    }
+    function toggleDesignerTheme() {
+      const shown = effectiveDesignerTheme();
+      const next = shown === 'light' ? 'dark' : 'light';
+      state.settings = Object.assign({}, state.settings, { designerTheme: next });
+      applyDesignerTheme();
+      vscode.postMessage({ type: 'updateSettings', settings: { designerTheme: next } });
+      toast(next === 'light' ? 'Light theme' : 'Dark theme');
     }
     function fillSettingsForm() {
       const s = state.settings || {};
       const setChk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
       const setSel = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+      const theme = s.designerTheme === 'light' || s.designerTheme === 'dark' ? s.designerTheme : 'auto';
+      setSel('set_designerTheme', theme);
       setChk('set_showLineNumbers', s.showLineNumbers !== false);
       setSel('set_canvasStyle', s.canvasStyle === 'dots' ? 'dots' : 'plain');
       setChk('set_showCardSummaries', s.showCardSummaries !== false);
@@ -2095,7 +2216,11 @@ export function getDesignerHtml(
         autoOpenDesigner: chk('set_autoOpenDesigner'),
         openHomeOnStartup: chk('set_openHomeOnStartup'),
         syncStudioWebOnSave: chk('set_syncStudioWebOnSave'),
-        uipathTargetFramework: sel('set_uipathTargetFramework') === 'Portable' ? 'Portable' : 'Windows'
+        uipathTargetFramework: sel('set_uipathTargetFramework') === 'Portable' ? 'Portable' : 'Windows',
+        designerTheme: (() => {
+          const t = sel('set_designerTheme');
+          return t === 'light' || t === 'dark' ? t : 'auto';
+        })()
       };
       state.settings = Object.assign({}, state.settings, next);
       state._zoomUserTouched = false;
@@ -5796,6 +5921,7 @@ export function getDesignerHtml(
     document.getElementById('btnHome')?.addEventListener('click', () => {
       vscode.postMessage({ type: 'openHome' });
     });
+    els.btnThemeToggle?.addEventListener('click', () => toggleDesignerTheme());
     document.getElementById('btnSettings')?.addEventListener('click', () => openSettings());
     document.getElementById('settingsDialogCancel')?.addEventListener('click', () => closeSettings());
     document.getElementById('settingsDialogDismiss')?.addEventListener('click', () => closeSettings());

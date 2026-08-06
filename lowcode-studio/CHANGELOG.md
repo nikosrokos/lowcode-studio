@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.7.1] — 2026-08-06
+
+### Added
+- **Light theme** for the designer — cool slate light chrome (not cream)
+- **Theme toggle** (☀ / ☽) on the top-right toolbar; also **Settings → Appearance** (Auto / Light / Dark)
+- Setting `lowcodeStudio.designerTheme` (persists with other designer prefs)
+
+### Changed
+- Minor UI polish: clearer panel/card borders, tip contrast, toolbar button borders and tooltips
+
 ## [0.6.55] — 2026-08-06
 
 ### Fixed

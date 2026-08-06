@@ -95,6 +95,14 @@ function run(): void {
   assert.ok(html.includes('function iconCodiconName'), 'codicon name helper for glyph map');
   assert.ok(html.includes('function coercePaintValue'), 'coerce SW ExpressionText before paint');
   assert.ok(html.includes('font-src') && html.includes('data:'), 'CSP allows data: font for embedded codicon');
+  assert.ok(html.includes('id="btnThemeToggle"'), 'toolbar theme toggle');
+  assert.ok(html.includes('function toggleDesignerTheme'), 'theme toggle handler');
+  assert.ok(html.includes('function applyDesignerTheme'), 'applies data-theme');
+  assert.ok(html.includes('html[data-theme="light"]'), 'forced light theme tokens');
+  assert.ok(html.includes('html[data-theme="dark"]'), 'forced dark theme tokens');
+  assert.ok(html.includes('id="set_designerTheme"'), 'settings Appearance theme select');
+  assert.ok(html.includes('designerTheme'), 'designerTheme setting wired');
+  assert.ok(html.includes('--tip-border'), 'tooltip border token');
 
   console.log('designerUxFixes.test.ts: ok');
 }
