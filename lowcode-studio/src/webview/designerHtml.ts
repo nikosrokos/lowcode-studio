@@ -103,7 +103,7 @@ export function getDesignerHtml(
     .app {
       display: grid;
       grid-template-columns: var(--left-width, 280px) 1fr var(--props-width, 300px);
-      grid-template-rows: 48px 1fr;
+      grid-template-rows: auto 1fr;
       height: 100%;
       gap: 0;
       background:
@@ -118,16 +118,21 @@ export function getDesignerHtml(
     .app.left-collapsed.props-floating { grid-template-columns: 40px 1fr 0; }
     .app.left-floating.props-collapsed { grid-template-columns: 0 1fr 40px; }
     .app.left-collapsed.props-collapsed { grid-template-columns: 40px 1fr 40px; }
-    .toolbar {
+    .top-chrome {
       grid-column: 1 / -1;
+      display: flex;
+      flex-direction: column;
+      z-index: 20;
+    }
+    .toolbar {
       display: flex;
       align-items: center;
       gap: 10px;
+      min-height: 48px;
       padding: 0 14px;
       border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
       background: color-mix(in srgb, var(--panel) 78%, transparent);
       backdrop-filter: blur(14px) saturate(1.2);
-      z-index: 20;
     }
     .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; min-width: 170px; }
     .brand-mark {
@@ -148,6 +153,32 @@ export function getDesignerHtml(
     .toolbar .btn.symbol {
       min-width: 36px; min-height: 34px; padding: 6px 10px;
       font-size: 16px; line-height: 1;
+    }
+    .sync-pill {
+      display: none; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+      border: 1px solid var(--border); color: var(--muted); max-width: 220px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sync-pill.show { display: inline-flex; }
+    .sync-pill.ok { color: #059669; border-color: color-mix(in srgb, #10b981 50%, var(--border)); }
+    .sync-pill.warn {
+      color: #b45309; border-color: color-mix(in srgb, #f59e0b 55%, var(--border));
+      background: color-mix(in srgb, #f59e0b 12%, transparent);
+    }
+    .sync-alert {
+      display: none; align-items: center; gap: 12px; flex-wrap: wrap;
+      padding: 8px 14px;
+      border-bottom: 1px solid color-mix(in srgb, #f59e0b 45%, var(--border));
+      background: color-mix(in srgb, #f59e0b 14%, var(--panel));
+      color: var(--text); font-size: 12px;
+    }
+    .sync-alert.show { display: flex; }
+    .sync-alert .sync-alert-text { flex: 1; min-width: 160px; line-height: 1.35; }
+    .sync-alert .sync-alert-text strong { font-weight: 700; }
+    .toolbar #btnSync.pulse {
+      border-color: #f59e0b; color: #b45309;
+      box-shadow: 0 0 0 1px color-mix(in srgb, #f59e0b 40%, transparent);
     }
     .var-block, .arg-block { margin-bottom: 8px; }
     .var-row, .arg-row {
@@ -1313,16 +1344,25 @@ export function getDesignerHtml(
 </head>
 <body>
   <div class="app">
+    <div class="top-chrome">
     <div class="toolbar">
       <div class="brand"><div class="brand-mark"></div><span>LowCode Studio</span></div>
       <input class="workflow-name" id="workflowName" />
       <span class="mode-pill" id="workflowType">Sequence</span>
+      <span class="sync-pill" id="syncPill" title="Studio Web Local sync status"></span>
       <div class="spacer"></div>
       <button class="btn" id="btnLink" title="Connect two flowchart nodes" style="display:none">Link</button>
       <button class="btn" id="btnAutoLayout" style="display:none" title="Tidy flowchart layout">Tidy</button>
+      <button class="btn" id="btnSync" type="button" title="Pull changes from Studio Web Local (no reopen)" style="display:none">↻ Sync</button>
       <button class="btn symbol" id="btnAssistHelp" type="button" title="Assist — Live proposals / Scaffold" aria-expanded="false">✦</button>
       <button class="btn symbol" id="btnSettings" type="button" title="Settings">⚙</button>
       <button class="btn primary" id="btnSave">Save</button>
+    </div>
+    <div class="sync-alert" id="syncAlert" role="status">
+      <span class="sync-alert-text" id="syncAlertText"></span>
+      <button class="btn primary" id="btnSyncNow" type="button">Sync now</button>
+      <button class="btn" id="btnSyncDismiss" type="button">Dismiss</button>
+    </div>
     </div>
 
     <aside class="panel left-rail frame-docked" id="toolbox">
@@ -1789,6 +1829,11 @@ export function getDesignerHtml(
       zoom: 1,
       collapsedCats: {},
       collapsedPropSections: { studioWeb: true },
+      syncLinked: false,
+      syncNeedsPull: false,
+      syncDismissedKey: '',
+      syncStatusKey: '',
+      syncBusy: false,
       propsMode: 'docked',
       propsWidth: 300,
       propsHeight: Math.round(window.innerHeight * 0.7),
@@ -1860,8 +1905,73 @@ export function getDesignerHtml(
       btnAlignSelection: document.getElementById('btnAlignSelection'),
       watchView: document.getElementById('watchView'),
       watchCount: document.getElementById('watchCount'),
-      fixturesEditor: document.getElementById('fixturesEditor')
+      fixturesEditor: document.getElementById('fixturesEditor'),
+      syncPill: document.getElementById('syncPill'),
+      syncAlert: document.getElementById('syncAlert'),
+      syncAlertText: document.getElementById('syncAlertText'),
+      btnSync: document.getElementById('btnSync'),
+      btnSyncNow: document.getElementById('btnSyncNow'),
+      btnSyncDismiss: document.getElementById('btnSyncDismiss')
     };
+
+    function applySyncStatus(msg) {
+      if (!msg) return;
+      state.syncLinked = !!msg.linked;
+      state.syncNeedsPull = !!msg.needsPull;
+      const btn = els.btnSync;
+      const pill = els.syncPill;
+      const alert = els.syncAlert;
+      if (btn) {
+        btn.style.display = msg.linked ? '' : 'none';
+        btn.classList.toggle('pulse', !!msg.needsPull);
+        btn.disabled = !!state.syncBusy;
+        btn.title = msg.linked
+          ? (msg.needsPull
+            ? 'Studio Web has newer changes — click to pull & reload'
+            : 'Pull from Studio Web Local Workspace')
+          : 'Not linked';
+      }
+      if (pill) {
+        if (!msg.linked) {
+          pill.classList.remove('show', 'ok', 'warn');
+          pill.textContent = '';
+        } else if (msg.inSync) {
+          pill.classList.add('show', 'ok');
+          pill.classList.remove('warn');
+          pill.textContent = '↔ ' + (msg.solutionLabel || 'Studio Web');
+          pill.title = msg.summary || 'In sync';
+        } else {
+          pill.classList.add('show', 'warn');
+          pill.classList.remove('ok');
+          const n = msg.xamlNewerCount || 0;
+          pill.textContent = n ? ('Studio Web newer · ' + n) : 'Out of sync';
+          pill.title = msg.summary || 'Out of sync';
+        }
+      }
+      if (alert && els.syncAlertText) {
+        const key = (msg.summary || '') + '|' + (msg.xamlNewerCount || 0) + '|' + (msg.needsPull ? '1' : '0');
+        state.syncStatusKey = key;
+        const show = msg.linked && msg.needsPull && state.syncDismissedKey !== key;
+        alert.classList.toggle('show', show);
+        if (show) {
+          const label = msg.solutionLabel ? (' “' + msg.solutionLabel + '”') : '';
+          els.syncAlertText.innerHTML = '<strong>Studio Web changed</strong> — pull' +
+            escapeHtml(label) + ' into this designer without closing the project. ' +
+            '<span style="opacity:.8">' + escapeHtml(msg.summary || '') + '</span>';
+        }
+      }
+    }
+    function requestStudioWebPull(opts) {
+      if (state.syncBusy) return;
+      state.syncBusy = true;
+      if (els.btnSync) els.btnSync.disabled = true;
+      if (els.btnSyncNow) els.btnSyncNow.disabled = true;
+      vscode.postMessage({
+        type: 'pullStudioWeb',
+        wholeProject: !!(opts && opts.wholeProject),
+        force: !!(opts && opts.force)
+      });
+    }
 
     function applyDesignerSettings() {
       const s = state.settings || {};
@@ -5549,6 +5659,22 @@ export function getDesignerHtml(
       if (msg.type === 'dryRunDone' && msg.result?.warnings?.length) {
         toast(msg.result.warnings.length + ' dry-run warning(s) — see Output');
       }
+      if (msg.type === 'syncStatus') {
+        applySyncStatus(msg);
+      }
+      if (msg.type === 'syncPullResult') {
+        state.syncBusy = false;
+        if (els.btnSync) els.btnSync.disabled = false;
+        if (els.btnSyncNow) els.btnSyncNow.disabled = false;
+        if (msg.ok) state.syncDismissedKey = '';
+      }
+    });
+
+    els.btnSync?.addEventListener('click', () => requestStudioWebPull({ wholeProject: true }));
+    els.btnSyncNow?.addEventListener('click', () => requestStudioWebPull({ wholeProject: true }));
+    els.btnSyncDismiss?.addEventListener('click', () => {
+      state.syncDismissedKey = state.syncStatusKey || 'dismissed';
+      els.syncAlert?.classList.remove('show');
     });
 
     function syncSuggestionVariables() {
