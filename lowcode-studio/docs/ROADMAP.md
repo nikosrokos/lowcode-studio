@@ -49,11 +49,12 @@ Highest leverage for *not opening Studio Web to finish work*.
 - **Invoke Workflow** argument mapping (today: path only → bare `InvokeWorkflowFile`)
 - Cross-workflow argument chips / validation (“missing Out: `out_TransactionItem`”)
 
-### A2. Import / export fidelity — **shipped in 0.6.29 (File IO + FlowSwitch)**
-- Shrink `Imported.*` → real LCS types for top Studio Web activities — File IO + FlowSwitch mapped
+### A2. Import / export fidelity — **shipped in 0.6.29 + 0.6.40**
+- Shrink `Imported.*` → real LCS types for top Studio Web activities — File IO + FlowSwitch (0.6.29); Continue, Move/Rename, regex, DataTable row helpers, Wait Queue Item, Get Credential, Send Hotkey (0.6.40)
 - Preserve more properties on round-trip (HTTP, Excel, UI modern fields) — ongoing
 - Flowchart: FlowSwitch / multi-branch fidelity; fewer Comment placeholders — FlowSwitch mapped + dry-run case edges
 - Keep Studio Web-only triggers out of designer (already partially done)
+- Sync footprint: never push `.lcs-sync-trash` into Studio Web; Open-in guide once; adopt Config-only copies
 
 ### A3. Selectors that ship — **shipped in 0.6.27**
 - Stronger Selector Builder: specificity score, Decode paste, copy from sibling

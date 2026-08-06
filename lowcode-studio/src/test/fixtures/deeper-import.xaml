@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Activity mc:Ignorable="sap sap2010"
+  xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities"
+  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation"
+  xmlns:sap2010="http://schemas.microsoft.com/netfx/2010/xaml/activities/presentation"
+  xmlns:ui="http://schemas.uipath.com/workflow/activities"
+  xmlns:uia="http://schemas.uipath.com/workflow/activities/uipath.uiautomation.next"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  x:Class="DeeperImport">
+  <Sequence DisplayName="DeeperImport">
+    <Continue DisplayName="Skip rest" />
+    <ui:MoveFile DisplayName="Move" Path="[&quot;a.txt&quot;]" Destination="[&quot;b.txt&quot;]" Overwrite="True" />
+    <ui:RenameFile DisplayName="Rename" Path="[&quot;b.txt&quot;]" NewName="[&quot;c.txt&quot;]" />
+    <ui:Matches DisplayName="Find words" Input="[text]" Pattern="[&quot;\w+&quot;]" Result="[matches]" />
+    <ui:IsMatch DisplayName="Has digit" Input="[text]" Pattern="[&quot;\d+&quot;]" Result="[isMatch]" />
+    <ui:Replace DisplayName="Collapse space" Input="[text]" Pattern="[&quot;\s+&quot;]" Replacement="[&quot; &quot;]" Result="[replaced]" />
+    <ui:KillProcess DisplayName="Kill notepad" ProcessName="[&quot;notepad&quot;]" />
+    <ui:MergeDataTable DisplayName="Merge" Destination="[dt]" Source="[dtSource]" MissingSchemaAction="Add" />
+    <ui:RemoveDataRow DisplayName="Drop row" DataTable="[dt]" RowIndex="[0]" />
+    <ui:RemoveDataColumn DisplayName="Drop col" DataTable="[dt]" ColumnName="Column1" />
+    <ui:GetRowItem DisplayName="Cell" Row="[row]" ColumnName="Id" Result="[cellValue]" />
+    <ui:UpdateRowItem DisplayName="Set cell" Row="[row]" ColumnName="Id" Value="[&quot;9&quot;]" />
+    <ui:WaitQueueItem DisplayName="Wait Q" QueueName="MainQueue" TimeoutMS="60000" TransactionItem="[TransactionItem]" />
+    <ui:GetCredential DisplayName="Cred" AssetName="Credential" Username="[username]" Password="[password]" />
+    <uia:NKeyboardShortcuts DisplayName="Hotkey" Shortcuts="[&quot;ctrl+s&quot;]" InteractionMode="Simulate" />
+  </Sequence>
+</Activity>

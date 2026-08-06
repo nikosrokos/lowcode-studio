@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.40] — 2026-08-06
+
+### Added
+- **Deeper Studio Web import map** — Continue, Move/Rename File, Matches/IsMatch/Replace, Kill Process, Merge/Remove/Get/Update DataTable row helpers, Wait Queue Item, Get Credential, Send Hotkey / Keyboard Shortcuts (fewer `Imported.*`)
+
+### Fixed
+- Sync discovery **skips `.lcs-sync-trash`** (and editor/build junk) so trash backups never push into Studio Web as workflows
+- `OPEN_IN_STUDIO_WEB_LOCAL.md` written **once** (not rewritten on every link/adopt)
+- Adopt copies only Config assets into LCS (no README / `.gitignore` clutter)
+
 ## [0.6.39] — 2026-08-05
 
 ### Added
