@@ -65,13 +65,18 @@ function run(): void {
   assert.ok(html.includes('rematch soft'), 'Sync rematches selection when ids rewrite');
   assert.ok(html.includes('ICON_GLYPHS'), 'visible glyph fallbacks for activity icons');
   assert.ok(html.includes('act-fb'), 'glyph fallback span always painted');
+  assert.ok(html.includes("output: 'LG'"), 'ASCII Log Message badge (not emoji tofu)');
+  assert.ok(!html.includes("'●'"), 'must not use white-circle ● fallback');
   assert.ok(
-    html.includes('font-family: system-ui') && html.includes('.act-icon .act-fb'),
-    'glyph badges use system font (not broken codicon inherit)'
+    html.includes('font-family: ui-monospace') && html.includes('.act-icon .act-fb'),
+    'glyph badges use monospace (readable ASCII)'
   );
   assert.ok(!html.includes('codicon-ready .act-fb'), 'must not hide glyph badges when font loads');
   assert.ok(html.includes('pointerdown'), 'select on pointerdown so draggable cards paint props');
   assert.ok(html.includes('Optimistic paint'), 'selectActivity paints props before walk races');
+  assert.ok(html.includes('liveTreeNode'), 'prop edits target tree-backed node');
+  assert.ok(html.includes('persistPropEdit'), 'prop edits persist without full re-render wipe');
+  assert.ok(html.includes('SW reopen orphans broke edits') || html.includes('liveTreeNode()'), 'SW reopen edit path');
   assert.ok(html.includes('selectActivity(keepNode.id'), 'Save/Sync reload re-selects via selectActivity');
   assert.ok(html.includes('id="btnHome"'), 'Home button in top toolbar');
   assert.ok(html.includes("type: 'openHome'"), 'Home posts openHome to host');

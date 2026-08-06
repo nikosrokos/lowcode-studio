@@ -334,9 +334,9 @@ export function getDesignerHtml(
     }
     /* Glyphs must NOT inherit codicon — that font has no ☰/⏱/💬 → empty tofu squares */
     .act-icon .act-fb {
-      font-family: system-ui, -apple-system, "Segoe UI", sans-serif !important;
-      font-size: 12px; font-weight: 700; line-height: 1; color: #fff;
-      display: inline-block;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+      font-size: 9px; font-weight: 800; line-height: 1; color: #fff;
+      display: inline-block; letter-spacing: -0.02em;
     }
     .card-head .act-icon { width: 20px; height: 20px; font-size: 11px; }
     .card-head .act-icon .act-fb { font-size: 11px; }
@@ -2369,10 +2369,8 @@ export function getDesignerHtml(
           return true;
         }
       }
-      // Click passed a live node that is already in the tree — prefer that object
-      if (hit && opts && opts.node && idsEqual(hit.node.id, opts.node.id)) {
-        hit = { node: opts.node, list: hit.list, index: hit.index };
-      }
+      // Click passed a live node — only use it when the tree walk missed (orphan / mid-heal).
+      // When walkFind hits, ALWAYS keep the tree node so property edits persist into state.workflow.
       if (!hit) {
         if (!(opts && opts.node)) setSelectedNode(null);
         if (heal) persist(false);
@@ -2487,39 +2485,45 @@ export function getDesignerHtml(
     function escapeAttr(s) { return escapeHtml(s).replace(/'/g, '&#39;'); }
 
     /**
-     * Catalog $(codicon) → compact glyph badge. Always paint a visible character —
-     * webview codicon fonts are unreliable (empty colored squares if ::before fails).
+     * Catalog $(codicon) → ASCII-safe badge text.
+     * Emoji / exotic Unicode often renders as a white tofu circle in Electron webviews.
      */
     const ICON_GLYPHS = {
-      output: '☰', watch: '⏱', comment: '💬', 'comment-discussion': '💬', terminal: '>_',
-      'file-text': '📄', save: '💾', 'diff-added': '+', search: '⌕', 'new-folder': '📁',
-      files: '📑', trash: '🗑', 'file-symlink-file': '↗', edit: '✎', 'find-replace': '⇄',
-      close: '×', 'symbol-variable': '𝑥', 'symbol-namespace': '{}', code: '</>',
-      error: '!', 'debug-stop': '■', 'debug-breakpoint-conditional': '◆', sync: '↻',
-      'debug-restart': '↺', 'debug-pause': '❚❚', 'debug-continue': '▶', 'list-ordered': '1.',
-      shield: '🛡', 'list-flat': '≡', 'type-hierarchy-sub': '⎇', 'split-horizontal': '◫',
-      'list-tree': '🌳', window: '▢', browser: '🌐', inspect: '🔍', keyboard: '⌨',
-      selection: '▣', eye: '👁', check: '✓', 'list-selection': '☑', 'device-camera': '📷',
-      'symbol-property': '⚙', table: '▦', file: '📄', add: '+', filter: '▽',
-      'arrow-swap': '⇄', 'clear-all': '⊘', export: '↗', 'git-merge': '⑂',
-      'symbol-field': '·', 'arrow-both': '↔', 'symbol-key': '🔑', mail: '✉', globe: '🌐',
-      inbox: '📥', json: '{}', 'bracket-dot': '[.]', 'symbol-misc': '✦', 'file-code': '</>',
-      play: '▶', 'symbol-method': 'ƒ', 'debug-start': '▶', 'run-all': '⇉', key: '🔑',
-      lock: '🔒', checklist: '☑'
+      output: 'LG', watch: 'T', comment: 'C', 'comment-discussion': 'MB', terminal: '>_',
+      'file-text': 'F', save: 'S', 'diff-added': '+', search: '?', 'new-folder': 'D',
+      files: 'Fs', trash: 'X', 'file-symlink-file': '>', edit: 'E', 'find-replace': 'R',
+      close: 'x', 'symbol-variable': 'v', 'symbol-namespace': '{}', code: '</>',
+      error: '!', 'debug-stop': '[]', 'debug-breakpoint-conditional': '?', sync: '@',
+      'debug-restart': '@', 'debug-pause': '||', 'debug-continue': '>', 'list-ordered': '1.',
+      shield: 'Sh', 'list-flat': '=', 'type-hierarchy-sub': 'Y', 'split-horizontal': 'H',
+      'list-tree': 'Tr', window: 'W', browser: 'Br', inspect: 'i', keyboard: 'Kb',
+      selection: 'Se', eye: 'Ey', check: 'ok', 'list-selection': 'ok', 'device-camera': 'Cam',
+      'symbol-property': 'P', table: 'Tb', file: 'F', add: '+', filter: 'Fi',
+      'arrow-swap': '<>', 'clear-all': 'Cl', export: '^', 'git-merge': 'M',
+      'symbol-field': '.', 'arrow-both': '<>', 'symbol-key': 'K', mail: '@', globe: 'G',
+      inbox: 'In', json: '{}', 'bracket-dot': '[.]', 'symbol-misc': '*', 'file-code': '</>',
+      play: '>', 'symbol-method': 'f', 'debug-start': '>', 'run-all': '>>', key: 'K',
+      lock: 'Lk', checklist: 'ok'
     };
     function iconCodiconName(icon) {
       return String(icon || '').replace(/^\$\(|\)$/g, '').trim();
     }
     function iconGlyph(icon) {
       const key = iconCodiconName(icon);
-      return ICON_GLYPHS[key] || '●';
+      if (key && ICON_GLYPHS[key]) return ICON_GLYPHS[key];
+      // Derive 1–2 letter badge from icon name or activity — never a circle tofu
+      if (key) {
+        const parts = key.split(/[-_]/).filter(Boolean);
+        if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+        return key.slice(0, 2).toUpperCase();
+      }
+      return '?';
     }
     function activityIconHtml(defOrType, color) {
       const def = typeof defOrType === 'string' ? findDef(defOrType) : defOrType;
       const c = color || def?.color || '#64748B';
-      const glyph = iconGlyph(def?.icon);
+      const glyph = iconGlyph(def?.icon || (typeof defOrType === 'string' ? defOrType : def?.type));
       const title = escapeAttr((def?.displayName || '') + (def?.icon ? ' ' + def.icon : ''));
-      // Plain system-font glyph — do not put codicon class on the wrapper (hides ☰/⏱ as tofu)
       return '<span class="act-icon" style="--ico:' + escapeAttr(c) + ';background:' + escapeAttr(c) +
         '" title="' + title + '"><span class="act-fb" aria-hidden="true">' + escapeHtml(glyph) +
         '</span></span>';
@@ -4547,7 +4551,32 @@ export function getDesignerHtml(
       }
       ensurePropsPanelVisible();
       // Do NOT force-expand sections here — that broke expand/collapse. selectActivity opens them once.
-      const node = hit.node;
+      /** Tree-backed node for edits (never a detached SW reopen orphan). */
+      function liveTreeNode() {
+        const sel = state.selectedId != null ? String(state.selectedId) : '';
+        if (sel) {
+          const t = walkFind(state.workflow.activities, sel);
+          if (t) return t.node;
+        }
+        if (hit.list != null && hit.node) return hit.node;
+        return null;
+      }
+      /** Persist prop edits without full renderAll (keeps focus; updates card chrome). */
+      function persistPropEdit(target) {
+        vscode.postMessage({ type: 'edit', workflow: state.workflow });
+        const id = target && target.id;
+        document.querySelectorAll('.card[data-id], .flow-node[data-id]').forEach((el) => {
+          if (!idsEqual(el.getAttribute('data-id'), id)) return;
+          const sum = el.querySelector('.card-summary');
+          if (sum) sum.textContent = summary(target);
+          const title = el.querySelector('.card-title');
+          if (title && target.displayName) title.textContent = target.displayName;
+        });
+        renderBreadcrumbs();
+        renderMinimap();
+      }
+      const node = liveTreeNode() || hit.node;
+      setSelectedNode(node);
       node.properties = node.properties || {};
       const def = findDef(node.type);
       const currentColor = node.color || def?.color || '#64748B';
@@ -4701,25 +4730,31 @@ export function getDesignerHtml(
       });
 
       document.getElementById('prop_displayName')?.addEventListener('change', (e) => {
-        node.displayName = e.target.value || node.displayName;
-        persist(true);
+        const target = liveTreeNode() || node;
+        target.displayName = e.target.value || target.displayName;
+        setSelectedNode(target);
+        persistPropEdit(target);
       });
       const applyColor = (value) => {
         if (!value || !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value)) return;
-        node.color = value;
+        const target = liveTreeNode() || node;
+        target.color = value;
         const hex = document.getElementById('prop_color_hex');
         const picker = document.getElementById('prop_color');
         if (hex) hex.value = value;
         if (picker) picker.value = value.length === 4
           ? '#' + value.slice(1).split('').map(ch => ch + ch).join('')
           : value;
-        persist(true);
+        setSelectedNode(target);
+        persistPropEdit(target);
       };
       document.getElementById('prop_color')?.addEventListener('input', (e) => applyColor(e.target.value));
       document.getElementById('prop_color_hex')?.addEventListener('change', (e) => applyColor(e.target.value.trim()));
       document.getElementById('btnResetColor')?.addEventListener('click', () => {
-        delete node.color;
-        persist(true);
+        const target = liveTreeNode() || node;
+        delete target.color;
+        setSelectedNode(target);
+        persistPropEdit(target);
       });
       els.props.querySelectorAll('[data-color]').forEach(btn => {
         btn.addEventListener('click', () => applyColor(btn.getAttribute('data-color')));
@@ -4728,34 +4763,39 @@ export function getDesignerHtml(
         const apply = () => {
           const key = input.getAttribute('data-prop');
           if (!key) return;
-          node.properties = node.properties || {};
+          // Always mutate the node that lives in state.workflow (SW reopen orphans broke edits)
+          const target = liveTreeNode() || walkFind(state.workflow.activities, node.id)?.node || node;
+          target.properties = target.properties || {};
           let value = input.value;
           const pdef = def?.properties?.find(p => p.name === key);
           if (pdef?.type === 'number' || input.getAttribute('type') === 'number') value = Number(value);
-          if (pdef?.type === 'boolean' || (input.tagName === 'SELECT' && (value === 'true' || value === 'false') && typeof (node.properties[key]) === 'boolean')) {
+          if (pdef?.type === 'boolean' || (input.tagName === 'SELECT' && (value === 'true' || value === 'false') && typeof (target.properties[key]) === 'boolean')) {
             value = value === 'true';
           }
-          node.properties[key] = value;
-          if (node.type === 'REFramework.InvokeWorkflow' && key === 'workflowPath') {
+          target.properties[key] = value;
+          setSelectedNode(target);
+          if (target.type === 'REFramework.InvokeWorkflow' && key === 'workflowPath') {
             const path = String(value || '').trim();
             delete state.targetArgsByPath[path];
             delete state.targetArgsStatus[path];
             if (path) requestTargetArguments(path);
           }
-          persist(true);
+          persistPropEdit(target);
         };
         input.addEventListener('change', apply);
         input.addEventListener('blur', apply);
-        // Keep in-memory state current while typing so Cmd+S / Save flush latest values
+        // Keep in-memory tree current while typing so Cmd+S / Save flush latest values
         input.addEventListener('input', () => {
           const key = input.getAttribute('data-prop');
           if (!key) return;
-          node.properties = node.properties || {};
+          const target = liveTreeNode() || walkFind(state.workflow.activities, node.id)?.node || node;
+          target.properties = target.properties || {};
           let value = input.value;
           const pdef = def?.properties?.find(p => p.name === key);
           if (pdef?.type === 'number' || input.getAttribute('type') === 'number') value = Number(value);
           if (pdef?.type === 'boolean') value = value === 'true';
-          node.properties[key] = value;
+          target.properties[key] = value;
+          setSelectedNode(target);
         });
       });
       document.getElementById('btnSetStart')?.addEventListener('click', () => {
