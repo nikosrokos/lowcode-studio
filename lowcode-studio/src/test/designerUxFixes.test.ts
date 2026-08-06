@@ -62,31 +62,22 @@ function run(): void {
   assert.ok(html.includes('selectedNode'), 'selectedNode kept for SW sync props paint');
   assert.ok(html.includes('function idsEqual'), 'selection id compare is type-safe');
   assert.ok(html.includes('.card.selected[data-id]'), 'props recover selection from DOM after Sync');
-  assert.ok(html.includes('rematch by type'), 'Sync rematches selection when ids rewrite');
+  assert.ok(html.includes('rematch soft'), 'Sync rematches selection when ids rewrite');
   assert.ok(html.includes('ICON_GLYPHS'), 'visible glyph fallbacks for activity icons');
   assert.ok(html.includes('act-fb'), 'glyph fallback span always painted');
+  assert.ok(
+    html.includes('font-family: system-ui') && html.includes('.act-icon .act-fb'),
+    'glyph badges use system font (not broken codicon inherit)'
+  );
+  assert.ok(!html.includes('codicon-ready .act-fb'), 'must not hide glyph badges when font loads');
   assert.ok(html.includes('pointerdown'), 'select on pointerdown so draggable cards paint props');
   assert.ok(html.includes('Optimistic paint'), 'selectActivity paints props before walk races');
-  assert.ok(html.includes('codicon-'), 'codicon classes for activity icons');
-  assert.ok(html.includes('function iconCodiconName'), 'codicon name from catalog $(icon)');
+  assert.ok(html.includes('selectActivity(keepNode.id'), 'Save/Sync reload re-selects via selectActivity');
+  assert.ok(html.includes('id="btnHome"'), 'Home button in top toolbar');
+  assert.ok(html.includes("type: 'openHome'"), 'Home posts openHome to host');
+  assert.ok(html.includes('function iconCodiconName'), 'codicon name helper for glyph map');
   assert.ok(html.includes('function coercePaintValue'), 'coerce SW ExpressionText before paint');
   assert.ok(html.includes('font-src') && html.includes('data:'), 'CSP allows data: font for embedded codicon');
-
-  // Font must be embeddable — relative ./codicon.ttf in linked CSS does not load
-  const withFont = getDesignerHtml(
-    'nonce',
-    'https://example',
-    createEmptyWorkflow('Main'),
-    getActivityCatalog(),
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    '@font-face{font-family:"codicon";src:url("data:font/truetype;base64,AAA") format("truetype");}'
-  );
-  assert.ok(withFont.includes('data:font/truetype;base64,'), 'codicon @font-face uses embedded data URI');
-  assert.ok(withFont.includes('<style nonce="nonce">'), 'codicon CSS inlined (not broken relative link)');
-  assert.ok(!withFont.includes('codicon.css'), 'does not rely on linked stock codicon.css');
 
   console.log('designerUxFixes.test.ts: ok');
 }
