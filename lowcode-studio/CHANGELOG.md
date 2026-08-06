@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.44] — 2026-08-06
+
+### Fixed
+- **Studio Web Properties (existing projects)** — on designer open, migrate `.lcs.json` on disk (heal missing ids, PascalCase props, unwrap singleton Sequence); selection uses live node refs so clicks always paint Properties — **no need to recreate in Studio Web**
+- Right-click menu flips upward near the bottom of the canvas and scrolls if tall
+
+### Changed
+- Mini-map shows **#step + icon + name** (not color bars only); flowchart dots include a short label
+- Activity column width **560 → 480** for more left/right canvas space
+
 ## [0.6.43] — 2026-08-06
 
 ### Fixed

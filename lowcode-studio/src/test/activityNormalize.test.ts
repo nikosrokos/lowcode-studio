@@ -1,7 +1,9 @@
 import assert from 'assert';
 import {
   normalizeActivityNode,
-  normalizeWorkflowDocument
+  normalizeWorkflowDocument,
+  migrateWorkflowDocument,
+  rawWorkflowHasMissingIds
 } from '../interop/activityNormalize';
 import { parseWorkflow, stringifyWorkflow } from '../models/workflow';
 
@@ -127,6 +129,47 @@ function run(): void {
     );
     assert.ok(doc.activities[0].id, 'parseWorkflow assigns id when Studio Web omitted it');
     assert.strictEqual(doc.activities[0].properties.message, '"from studio web"');
+  }
+
+  {
+    assert.strictEqual(
+      rawWorkflowHasMissingIds(
+        JSON.stringify({
+          schemaVersion: '1.0',
+          activities: [{ type: 'System.LogMessage', displayName: 'Log', properties: {} }]
+        })
+      ),
+      true
+    );
+    const wrapped = {
+      schemaVersion: '1.0' as const,
+      name: 'W',
+      description: '',
+      type: 'Sequence' as const,
+      variables: [],
+      arguments: [],
+      activities: [
+        {
+          id: 'seq1',
+          type: 'ControlFlow.Sequence',
+          displayName: 'Sequence',
+          properties: {},
+          children: [
+            {
+              id: 'log1',
+              type: 'System.LogMessage',
+              displayName: 'Log Message',
+              properties: { Message: '"x"', Level: 'Info' }
+            }
+          ]
+        }
+      ],
+      metadata: {}
+    };
+    const { doc, changed } = migrateWorkflowDocument(wrapped as any);
+    assert.ok(changed, 'singleton Sequence unwrap changes doc');
+    assert.strictEqual(doc.activities[0].type, 'System.LogMessage');
+    assert.strictEqual(doc.activities[0].properties.message, '"x"');
   }
 
   console.log('activityNormalize.test.ts OK');

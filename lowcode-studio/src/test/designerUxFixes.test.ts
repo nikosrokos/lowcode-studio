@@ -40,6 +40,9 @@ function run(): void {
   assert.ok(html.includes('id="exprDialogAssist"'), 'Assist button in expression dialog');
   assert.ok(html.includes('function selectActivity'), 'selectActivity heals Studio Web selection');
   assert.ok(html.includes('ensureActivityIds'), 'missing activity ids healed');
+  assert.ok(html.includes('mm-row'), 'minimap shows labeled rows');
+  assert.ok(html.includes('--activity-column-width: 480px'), 'narrower activity column');
+  assert.ok(html.includes('max-height: min(70vh, 420px)'), 'context menu scrolls when near bottom');
 
   console.log('designerUxFixes.test.ts: ok');
 }
