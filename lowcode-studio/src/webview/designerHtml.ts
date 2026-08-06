@@ -328,34 +328,33 @@ export function getDesignerHtml(
       display: inline-flex; align-items: center; justify-content: center;
       width: 22px; height: 22px; border-radius: 6px; flex: 0 0 auto;
       font-size: 12px; line-height: 1; font-weight: 700;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
       color: #fff; background: var(--ico, #64748B);
       box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
     }
-    .act-icon.codicon,
-    .act-icon.codicon[class*='codicon-'] {
-      font: normal normal normal 14px/1 codicon !important;
-      font-family: codicon !important;
-      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
-      color: #fff;
+    /* Glyphs must NOT inherit codicon — that font has no ☰/⏱/💬 → empty tofu squares */
+    .act-icon .act-fb {
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif !important;
+      font-size: 12px; font-weight: 700; line-height: 1; color: #fff;
+      display: inline-block;
     }
-    .act-icon.codicon:before { color: #fff; }
-    /* Visible glyph fallback when codicon ::before font fails to paint */
-    .act-icon .act-fb { font-family: inherit; font-size: 11px; font-weight: 700; line-height: 1; color: #fff; }
-    .act-icon.codicon.codicon-ready .act-fb { display: none; }
     .card-head .act-icon { width: 20px; height: 20px; font-size: 11px; }
-    .card-head .act-icon.codicon { font-size: 13px; }
+    .card-head .act-icon .act-fb { font-size: 11px; }
     .flow-node .act-icon {
       width: 18px; height: 18px; font-size: 10px; margin-right: 4px; vertical-align: -3px;
     }
-    .flow-node .act-icon.codicon { font-size: 12px; }
+    .flow-node .act-icon .act-fb { font-size: 10px; }
     .activity-item .act-icon { width: 20px; height: 20px; font-size: 11px; }
-    .activity-item .act-icon.codicon { font-size: 13px; }
+    .activity-item .act-icon .act-fb { font-size: 11px; }
     .palette-item .act-icon { width: 18px; height: 18px; font-size: 10px; margin-right: 6px; }
-    .palette-item .act-icon.codicon { font-size: 12px; }
-    .mm-ico.codicon {
-      font-family: codicon !important; font-weight: normal; font-size: 11px;
+    .palette-item .act-icon .act-fb { font-size: 10px; }
+    .mm-ico {
       display: inline-flex; align-items: center; justify-content: center;
+      width: 16px; height: 16px; border-radius: 4px; flex: 0 0 auto;
+      color: #fff; font-size: 10px; font-weight: 700;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
     }
+    .mm-ico .act-fb { font-size: 10px; color: #fff; }
     .minimap-dock {
       flex: 0 0 auto; border-top: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
       background: color-mix(in srgb, var(--panel) 92%, transparent);
@@ -1381,6 +1380,7 @@ export function getDesignerHtml(
       <button class="btn" id="btnLink" title="Connect two flowchart nodes" style="display:none">Link</button>
       <button class="btn" id="btnAutoLayout" style="display:none" title="Tidy flowchart layout">Tidy</button>
       <button class="btn" id="btnSync" type="button" title="Pull changes from Studio Web Local (no reopen)" style="display:none">↻ Sync</button>
+      <button class="btn symbol" id="btnHome" type="button" title="Home">⌂</button>
       <button class="btn symbol" id="btnAssistHelp" type="button" title="Assist — Live proposals / Scaffold" aria-expanded="false">✦</button>
       <button class="btn symbol" id="btnSettings" type="button" title="Settings">⚙</button>
       <button class="btn primary" id="btnSave">Save</button>
@@ -2517,16 +2517,12 @@ export function getDesignerHtml(
     function activityIconHtml(defOrType, color) {
       const def = typeof defOrType === 'string' ? findDef(defOrType) : defOrType;
       const c = color || def?.color || '#64748B';
-      const name = iconCodiconName(def?.icon);
       const glyph = iconGlyph(def?.icon);
       const title = escapeAttr((def?.displayName || '') + (def?.icon ? ' ' + def.icon : ''));
-      const fb = '<span class="act-fb" aria-hidden="true">' + escapeHtml(glyph) + '</span>';
-      if (name) {
-        return '<span class="act-icon codicon codicon-' + escapeAttr(name) + '" style="--ico:' +
-          escapeAttr(c) + ';background:' + escapeAttr(c) + '" title="' + title + '">' + fb + '</span>';
-      }
+      // Plain system-font glyph — do not put codicon class on the wrapper (hides ☰/⏱ as tofu)
       return '<span class="act-icon" style="--ico:' + escapeAttr(c) + ';background:' + escapeAttr(c) +
-        '" title="' + title + '">' + fb + '</span>';
+        '" title="' + title + '"><span class="act-fb" aria-hidden="true">' + escapeHtml(glyph) +
+        '</span></span>';
     }
     function coercePaintValue(val) {
       if (val == null || typeof val !== 'object' || Array.isArray(val)) return val;
@@ -5210,7 +5206,6 @@ export function getDesignerHtml(
       renderConnectionsPanel();
       syncDockActive();
       if (state.assistHelpOpen && state.assistTab === 'live') renderAssistLivePanel();
-      markCodiconsReady();
     }
 
     function persist(rerender) {
@@ -5635,6 +5630,9 @@ export function getDesignerHtml(
       }
     });
     document.getElementById('exprDialogApply')?.addEventListener('click', () => applyExprEditor());
+    document.getElementById('btnHome')?.addEventListener('click', () => {
+      vscode.postMessage({ type: 'openHome' });
+    });
     document.getElementById('btnSettings')?.addEventListener('click', () => openSettings());
     document.getElementById('settingsDialogCancel')?.addEventListener('click', () => closeSettings());
     document.getElementById('settingsDialogDismiss')?.addEventListener('click', () => closeSettings());
@@ -5779,17 +5777,30 @@ export function getDesignerHtml(
           vscode.postMessage({ type: 'edit', workflow: state.workflow });
         }
         let keepNode = keepId ? walkFind(state.workflow.activities, keepId)?.node : null;
-        // Sync/import may rewrite ids — rematch by type + name + summary fingerprint
+        // Sync/import may rewrite ids — rematch soft → hard
         if (!keepNode && keepSnap) {
-          keepNode = walkCollect(state.workflow.activities).find((n) =>
-            n.type === keepSnap.type &&
-            n.displayName === keepSnap.displayName &&
-            summary(n) === keepSnap.summary
-          ) || null;
+          const all = walkCollect(state.workflow.activities);
+          keepNode =
+            all.find((n) =>
+              n.type === keepSnap.type &&
+              n.displayName === keepSnap.displayName &&
+              summary(n) === keepSnap.summary
+            ) ||
+            all.find((n) =>
+              n.type === keepSnap.type && n.displayName === keepSnap.displayName
+            ) ||
+            all.find((n) => n.type === keepSnap.type && summary(n) === keepSnap.summary) ||
+            all.find((n) => n.type === keepSnap.type) ||
+            null;
         }
-        setSelectedNode(keepNode || null);
         closeExprEditor();
-        renderAll();
+        if (keepNode) {
+          // Full select path paints Properties (setSelectedNode alone left empty panel after Save)
+          selectActivity(keepNode.id, { rerender: true, node: keepNode });
+        } else {
+          setSelectedNode(null);
+          renderAll();
+        }
       }
       if (msg.type === 'insertActivity' && msg.activityType) {
         insertActivityType(msg.activityType, false);
@@ -6126,21 +6137,10 @@ export function getDesignerHtml(
       }
     });
 
-    function markCodiconsReady() {
-      const apply = () => {
-        document.querySelectorAll('.act-icon.codicon').forEach((el) => el.classList.add('codicon-ready'));
-      };
-      if (document.fonts && document.fonts.load) {
-        document.fonts.load('14px codicon').then(apply).catch(() => {});
-        // If font never loads, keep .act-fb glyphs visible
-      }
-    }
-
     restorePropsPanelState();
     applyPropsPanelLayout();
     syncSuggestionVariables();
     renderAll();
-    markCodiconsReady();
     vscode.postMessage({ type: 'ready' });
   </script>
 </body>

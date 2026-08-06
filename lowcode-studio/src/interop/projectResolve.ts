@@ -63,10 +63,7 @@ export function findAllLcsProjects(roots: string[]): string[] {
         for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
           if (
             !entry.isDirectory() ||
-            entry.name === 'node_modules' ||
-            entry.name === '.git' ||
-            entry.name === 'out' ||
-            entry.name.endsWith('.StudioWeb')
+            shouldSkipDir(entry.name)
           ) {
             continue;
           }
@@ -131,11 +128,18 @@ const SKIP_DIRS = new Set([
   'bin',
   'obj',
   '.vs',
-  '.local'
+  '.local',
+  // Sync conflict backups — must not appear in designer Workspace Explorer
+  '.lcs-sync-trash'
 ]);
 
 function shouldSkipDir(name: string): boolean {
-  return SKIP_DIRS.has(name) || name.endsWith('.StudioWeb') || name.endsWith('.StudioWebLocal');
+  return (
+    SKIP_DIRS.has(name) ||
+    name.startsWith('.') ||
+    name.endsWith('.StudioWeb') ||
+    name.endsWith('.StudioWebLocal')
+  );
 }
 
 /**

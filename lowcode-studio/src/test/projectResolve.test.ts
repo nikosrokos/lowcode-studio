@@ -80,6 +80,18 @@ function run(): void {
   assert.ok(children.some((e) => e.kind === 'workflow' && e.name === 'Main'));
   assert.ok(children.some((e) => e.kind === 'file' && e.name === 'project.json'));
 
+  // Sync trash must not appear in designer Workspace Explorer
+  const trash = path.join(project1, '.lcs-sync-trash', 'stamp1');
+  fs.mkdirSync(trash, { recursive: true });
+  fs.writeFileSync(path.join(trash, 'Main.lcs.json'), '{}\n', 'utf8');
+  fs.mkdirSync(path.join(project1, '.hidden'), { recursive: true });
+  const afterTrash = buildCurrentProjectTree(project1);
+  const afterChildren = afterTrash.find((e) => e.kind === 'project' && e.path === project1)?.children || [];
+  assert.ok(
+    !afterChildren.some((e) => e.name === '.lcs-sync-trash' || e.name === '.hidden'),
+    'Workspace Explorer must hide .lcs-sync-trash and dotfolders'
+  );
+
   const framework = children.find((e) => e.name === 'Framework');
   assert.ok(framework?.children?.some((c) => c.kind === 'workflow' && c.name === 'Init'));
 

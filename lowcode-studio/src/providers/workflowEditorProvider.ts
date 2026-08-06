@@ -134,26 +134,11 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
         }
         void vscode.window.setStatusBarMessage(status, 4500);
 
-        // If Save preferred Studio Web for this file, reload designer from disk
+        // If Save preferred Studio Web for this file, reload designer (migrate + setWorkflow)
         if (pulled && rel.endsWith('.lcs.json') && synced.pulled!.includes(rel)) {
-          const disk = await vscode.workspace.fs.readFile(document.uri);
-          const text = Buffer.from(disk).toString('utf8');
-          if (text !== document.getText()) {
-            const edit = new vscode.WorkspaceEdit();
-            edit.replace(
-              document.uri,
-              new vscode.Range(0, 0, document.lineCount, 0),
-              text
-            );
-            await vscode.workspace.applyEdit(edit);
-            try {
-              const workflow = parseWorkflow(text);
-              this.onWorkflowChanged(workflow);
-              this.activePanel?.webview.postMessage({ type: 'setWorkflow', workflow });
-            } catch {
-              // document change handler may refresh later
-            }
-            this.activePanel?.webview.postMessage({
+          if (this.activePanel) {
+            await this.reloadDesignerFromDisk(document, this.activePanel);
+            this.activePanel.webview.postMessage({
               type: 'toast',
               message: 'Reloaded from Studio Web Local edits',
               logged: true
@@ -682,6 +667,10 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
             logged: true
           });
           this.pushSyncStatus(document, webviewPanel);
+          break;
+        }
+        case 'openHome': {
+          await vscode.commands.executeCommand('lowcodeStudio.openHome');
           break;
         }
         case 'flushState': {

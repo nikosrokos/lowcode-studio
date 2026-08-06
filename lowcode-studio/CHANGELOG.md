@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.52] — 2026-08-06
+
+### Fixed
+- **Workspace Explorer** — hide `.lcs-sync-trash` (and other dotfolders) from the designer Explorer panel
+- **Activity / canvas icons** — paint system-font glyph badges only (codicon class on the wrapper made ☰/⏱ render as empty tofu squares)
+- **Properties after Studio Save** — Save→pull reload uses full migrate path; setWorkflow rematches softly and calls `selectActivity` so Message/Level paint again
+
+### Added
+- **Home** button (⌂) on the designer top-right toolbar
+
 ## [0.6.51] — 2026-08-06
 
 ### Fixed
