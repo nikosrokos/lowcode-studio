@@ -64,6 +64,25 @@ const ALIASES: Record<string, Record<string, string>> = {
     WorkflowPath: 'workflowPath',
     FilePath: 'workflowPath'
   },
+  'Data.BuildDataTable': {
+    Columns: 'columns',
+    ColumnNames: 'columns',
+    Result: 'result',
+    DataTable: 'result'
+  },
+  'Data.AddDataRow': {
+    DataTable: 'dataTable',
+    ArrayRow: 'arrayRow'
+  },
+  'Data.ReadCsv': {
+    FilePath: 'filePath',
+    DataTable: 'dataTable',
+    Result: 'dataTable'
+  },
+  'Data.WriteCsv': {
+    FilePath: 'filePath',
+    DataTable: 'dataTable'
+  },
   'ControlFlow.If': {
     Condition: 'condition'
   },
@@ -215,6 +234,27 @@ export function normalizeActivityNode(node: ActivityNode): ActivityNode {
 
 /** Normalize all activities in a workflow (mutates and returns doc). */
 export function normalizeWorkflowDocument(doc: WorkflowDocument): WorkflowDocument {
+  // Coerce children bags to arrays (bad SW JSON sometimes stores a single object)
+  const coerceLists = (list: ActivityNode[] | undefined): void => {
+    for (const n of list || []) {
+      if (!n) continue;
+      if (n.children != null && !Array.isArray(n.children)) {
+        n.children = [n.children as unknown as ActivityNode];
+      }
+      if (n.elseChildren != null && !Array.isArray(n.elseChildren)) {
+        n.elseChildren = [n.elseChildren as unknown as ActivityNode];
+      }
+      coerceLists(n.children);
+      coerceLists(n.elseChildren);
+    }
+  };
+  if (!Array.isArray(doc.activities)) {
+    doc.activities = [];
+  }
+  coerceLists(doc.activities);
+  walk(doc.activities, normalizeActivityNode);
+  // Promote lone root Sequence so Sync/pull activities are top-level click targets
+  unwrapSingletonSequence(doc);
   walk(doc.activities, normalizeActivityNode);
   doc.variables = Array.isArray(doc.variables) ? doc.variables : [];
   doc.arguments = Array.isArray(doc.arguments) ? doc.arguments : [];

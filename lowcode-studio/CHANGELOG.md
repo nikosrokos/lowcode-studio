@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.47] — 2026-08-06
+
+### Fixed
+- **Studio Web activities** (added/changed in SW) — Properties, edits, and right-click work after Sync without reopen
+  - Migrate/heal on Sync reload + pull write (ids, PascalCase, singleton Sequence unwrap)
+  - Context menu / ⋯ pass live node; Properties paint from `selectedNode` when walkFind races
+  - XAML import no longer drops Log Message / Build Data Table when a nested Sequence is present
+  - Build Data Table maps `Columns` / `Result` / `DataTable` onto catalog props
+
 ## [0.6.46] — 2026-08-06
 
 ### Added

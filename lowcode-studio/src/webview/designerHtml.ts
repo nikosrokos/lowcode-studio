@@ -1821,6 +1821,7 @@ export function getDesignerHtml(
       targetArgsStatus: {},
       collapsedLeftSections: { project: true, activities: false, variables: true, arguments: true, watch: true, fixtures: true },
       selectedId: null,
+      selectedNode: null,
       dragType: null,
       dragActivityId: null,
       linkFrom: null,
@@ -2226,7 +2227,10 @@ export function getDesignerHtml(
         if (state.workflow.startActivityId === id) state.workflow.startActivityId = undefined;
       }
       if (state.breakpoints[id]) delete state.breakpoints[id];
-      if (state.selectedId === id) state.selectedId = null;
+      if (state.selectedId === id) {
+        state.selectedId = null;
+        state.selectedNode = null;
+      }
       hideCtxMenu();
       persist(true);
       toast('Deleted activity');
@@ -2245,10 +2249,19 @@ export function getDesignerHtml(
     function ensureActivityIds(list) {
       let changed = false;
       const visit = (nodes) => {
-        for (const n of nodes || []) {
-          if (!n) continue;
+        const arr = Array.isArray(nodes) ? nodes : nodes ? [nodes] : [];
+        for (const n of arr) {
+          if (!n || typeof n !== 'object') continue;
           if (!String(n.id || '').trim()) {
             n.id = newId();
+            changed = true;
+          }
+          if (n.children != null && !Array.isArray(n.children)) {
+            n.children = [n.children];
+            changed = true;
+          }
+          if (n.elseChildren != null && !Array.isArray(n.elseChildren)) {
+            n.elseChildren = [n.elseChildren];
             changed = true;
           }
           if (n.children) visit(n.children);
@@ -2258,35 +2271,62 @@ export function getDesignerHtml(
       visit(list);
       return changed;
     }
+    /** Keep a live node ref so Properties can paint even if walkFind races after SW sync. */
+    function setSelectedNode(node) {
+      state.selectedNode = node || null;
+      state.selectedId = node && String(node.id || '').trim() ? String(node.id) : null;
+    }
+    function resolveSelectedNode() {
+      const sel = state.selectedId != null && String(state.selectedId) !== '' ? String(state.selectedId) : null;
+      if (sel) {
+        const hit = walkFind(state.workflow.activities, sel);
+        if (hit) {
+          state.selectedNode = hit.node;
+          return hit;
+        }
+      }
+      if (state.selectedNode && String(state.selectedNode.id || '').trim()) {
+        const hit = walkFind(state.workflow.activities, String(state.selectedNode.id));
+        if (hit) {
+          state.selectedId = hit.node.id;
+          state.selectedNode = hit.node;
+          return hit;
+        }
+        // Live node still usable for paint (tree walk missed — e.g. mid-heal)
+        return { node: state.selectedNode, list: null, index: -1 };
+      }
+      return null;
+    }
     function selectActivity(id, opts) {
       const heal = ensureActivityIds(state.workflow.activities);
       let hit = String(id || '').trim() ? walkFind(state.workflow.activities, String(id)) : null;
-      // Prefer live node reference (click handlers) — survives heal assigning a new id
+      // Prefer live node reference (click / contextmenu) — survives heal assigning a new id
       if (!hit && opts && opts.node) {
         if (!String(opts.node.id || '').trim()) opts.node.id = newId();
         hit = walkFind(state.workflow.activities, opts.node.id);
         if (!hit) {
-          // Node is in-memory but not found (shouldn't happen) — still paint props from it
-          state.selectedId = opts.node.id;
+          setSelectedNode(opts.node);
           ensurePropsPanelVisible();
           state.collapsedPropSections.activity = false;
           state.collapsedPropSections.general = false;
-          // Keep Studio Web checklist collapsed so Activity props stay visible
           if (state.collapsedPropSections.studioWeb === undefined) {
             state.collapsedPropSections.studioWeb = true;
           }
           if (opts.rerender) renderAll();
           else { renderProps(); renderBreadcrumbs(); renderMinimap(); }
+          requestAnimationFrame(() => {
+            if (state.selectedNode === opts.node || state.selectedId === opts.node.id) renderProps();
+          });
           if (heal) vscode.postMessage({ type: 'edit', workflow: state.workflow });
           return true;
         }
       }
       if (!hit) {
-        state.selectedId = null;
+        setSelectedNode(null);
         if (heal) persist(false);
         return false;
       }
-      state.selectedId = hit.node.id;
+      setSelectedNode(hit.node);
       ensurePropsPanelVisible();
       state.collapsedPropSections.activity = false;
       state.collapsedPropSections.general = false;
@@ -2301,37 +2341,40 @@ export function getDesignerHtml(
       }
       // Double-paint next frame — avoids empty props if a concurrent re-render raced
       requestAnimationFrame(() => {
-        if (state.selectedId === hit.node.id) renderProps();
+        if (state.selectedId === hit.node.id || state.selectedNode === hit.node) renderProps();
       });
       if (heal) {
         vscode.postMessage({ type: 'edit', workflow: state.workflow });
       }
       return true;
     }
-    function showCtxMenu(x, y, activityId) {
+    function showCtxMenu(x, y, activityId, nodeRef) {
       const menu = document.getElementById('ctxMenu');
       if (!menu) return;
-      if (!String(activityId || '').trim()) {
-        ensureActivityIds(state.workflow.activities);
+      let node = nodeRef || null;
+      if (!node && String(activityId || '').trim()) {
+        node = walkFind(state.workflow.activities, String(activityId))?.node || null;
       }
-      selectActivity(activityId, { rerender: false });
-      state.ctxTargetId = state.selectedId || activityId;
-      const hit = state.selectedId ? walkFind(state.workflow.activities, state.selectedId) : null;
-      const node = hit?.node;
+      if (node && !String(node.id || '').trim()) node.id = newId();
+      const id = node ? node.id : activityId;
+      selectActivity(id, { rerender: false, node: node || undefined });
+      state.ctxTargetId = state.selectedId || (node && node.id) || activityId;
+      const hit = resolveSelectedNode();
+      const resolved = hit?.node || node;
       const openBtn = menu.querySelector('[data-ctx="open"]');
       const vbBtn = menu.querySelector('[data-ctx="vb-repair"]');
       if (openBtn) {
-        openBtn.hidden = !(node && node.type === 'REFramework.InvokeWorkflow' && node.properties?.workflowPath);
+        openBtn.hidden = !(resolved && resolved.type === 'REFramework.InvokeWorkflow' && resolved.properties?.workflowPath);
       }
       if (vbBtn) {
-        const repairs = node ? vbRepairsForActivity(node) : [];
+        const repairs = resolved ? vbRepairsForActivity(resolved) : [];
         vbBtn.hidden = !repairs.length;
         vbBtn.textContent = repairs.length
           ? ('Apply VB repairs (' + repairs.length + ')')
           : 'Apply VB expression repairs';
       }
       // Ignore the click that often follows contextmenu / ⋯ button (was hiding the menu instantly)
-      state.ctxIgnoreClickUntil = Date.now() + 320;
+      state.ctxIgnoreClickUntil = Date.now() + 450;
       menu.classList.add('show');
       // Position after paint so offsetWidth/Height are accurate — flip up near bottom
       requestAnimationFrame(() => {
@@ -2517,9 +2560,11 @@ export function getDesignerHtml(
     function walkFind(list, id) {
       const want = String(id ?? '');
       if (!want) return null;
-      for (let i = 0; i < list.length; i++) {
-        const node = list[i];
-        if (String(node.id ?? '') === want) return { node, list, index: i };
+      const arr = Array.isArray(list) ? list : list ? [list] : [];
+      for (let i = 0; i < arr.length; i++) {
+        const node = arr[i];
+        if (!node || typeof node !== 'object') continue;
+        if (String(node.id ?? '') === want) return { node, list: arr, index: i };
         if (node.children) {
           const hit = walkFind(node.children, want);
           if (hit) return hit;
@@ -3328,7 +3373,7 @@ export function getDesignerHtml(
         e.stopPropagation();
         if (!String(node.id || '').trim()) node.id = newId();
         hideTip();
-        showCtxMenu(e.clientX, e.clientY, node.id);
+        showCtxMenu(e.clientX, e.clientY, node.id, node);
       });
       card.querySelector('[data-card-menu]')?.addEventListener('mousedown', (e) => {
         e.preventDefault();
@@ -3339,7 +3384,7 @@ export function getDesignerHtml(
         e.stopPropagation();
         hideTip();
         const rect = e.currentTarget.getBoundingClientRect();
-        showCtxMenu(rect.left, rect.bottom + 4, node.id);
+        showCtxMenu(rect.left, rect.bottom + 4, node.id, node);
         renderProps();
       });
       card.addEventListener('dragstart', (e) => {
@@ -3492,9 +3537,9 @@ export function getDesignerHtml(
         el.addEventListener('contextmenu', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          state.selectedId = node.id;
+          if (!String(node.id || '').trim()) node.id = newId();
           hideTip();
-          showCtxMenu(e.clientX, e.clientY, node.id);
+          showCtxMenu(e.clientX, e.clientY, node.id, node);
           renderProps();
         });
         el.querySelector('[data-card-menu]')?.addEventListener('mousedown', (e) => {
@@ -3506,7 +3551,7 @@ export function getDesignerHtml(
           e.stopPropagation();
           hideTip();
           const rect = e.currentTarget.getBoundingClientRect();
-          showCtxMenu(rect.left, rect.bottom + 4, node.id);
+          showCtxMenu(rect.left, rect.bottom + 4, node.id, node);
           renderProps();
         });
 
@@ -4408,8 +4453,7 @@ export function getDesignerHtml(
     function renderProps() {
       syncSuggestionVariables();
       ensureActivityIds(state.workflow.activities);
-      const sel = state.selectedId != null && String(state.selectedId) !== '' ? String(state.selectedId) : null;
-      const hit = sel ? walkFind(state.workflow.activities, sel) : null;
+      const hit = resolveSelectedNode();
       els.btnDelete.disabled = !hit;
       if (!hit) {
         els.props.innerHTML = '<div class="empty">Select a step to edit properties. In Flowchart mode, drag the blue port to connect nodes.</div>';
@@ -4448,7 +4492,11 @@ export function getDesignerHtml(
       const pascalHints = {
         Message: 'message', Text: 'message', Level: 'level',
         Condition: 'condition', To: 'to', Value: 'value',
-        Selector: 'selector', Duration: 'durationMs', Url: 'url', URL: 'url'
+        Selector: 'selector', Duration: 'durationMs', Url: 'url', URL: 'url',
+        Columns: 'columns', ColumnNames: 'columns', Result: 'result',
+        DataTable: node.type === 'Data.BuildDataTable' ? 'result' : 'dataTable',
+        ArrayRow: 'arrayRow', FilePath: 'filePath', WorkflowPath: 'workflowPath',
+        WorkflowFileName: 'workflowPath'
       };
       for (const [from, to] of Object.entries(pascalHints)) {
         if (
@@ -5605,9 +5653,24 @@ export function getDesignerHtml(
         state.workflow = msg.workflow || {};
         state.workflow.variables ||= [];
         state.workflow.arguments ||= [];
+        // Coerce / heal after Sync pull so SW activities are clickable immediately
+        if (!Array.isArray(state.workflow.activities)) state.workflow.activities = [];
         ensureActivityIds(state.workflow.activities);
-        state.selectedId =
-          keepId && walkFind(state.workflow.activities, keepId) ? keepId : null;
+        // Unwrap lone root Sequence client-side (host migrate may still be racing)
+        if (
+          state.workflow.type !== 'Flowchart' &&
+          state.workflow.activities.length === 1 &&
+          state.workflow.activities[0]?.type === 'ControlFlow.Sequence' &&
+          Array.isArray(state.workflow.activities[0].children) &&
+          state.workflow.activities[0].children.length
+        ) {
+          state.workflow.activities = state.workflow.activities[0].children;
+          ensureActivityIds(state.workflow.activities);
+          vscode.postMessage({ type: 'edit', workflow: state.workflow });
+        }
+        const keepHit = keepId ? walkFind(state.workflow.activities, keepId) : null;
+        state.selectedId = keepHit ? keepHit.node.id : null;
+        state.selectedNode = keepHit ? keepHit.node : null;
         closeExprEditor();
         renderAll();
       }

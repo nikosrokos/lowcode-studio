@@ -269,6 +269,12 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
         );
         await vscode.workspace.applyEdit(edit);
       }
+      // Heal SW pull shapes (ids / PascalCase / singleton Sequence) onto disk + designer
+      try {
+        await this.migrateDocumentIfNeeded(document);
+      } catch {
+        // paint whatever is on disk
+      }
       const workflow = parseWorkflow(document.getText());
       this.onWorkflowChanged(workflow);
       panel.webview.postMessage({ type: 'setWorkflow', workflow });

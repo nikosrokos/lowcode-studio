@@ -17,6 +17,7 @@ import {
   stringifyWorkflow,
   WorkflowDocument
 } from '../models/workflow';
+import { migrateWorkflowDocument } from './activityNormalize';
 
 export const STUDIO_WEB_LOCAL_URL = 'https://studio.uipath.com';
 /** Kept under the LCS project — overwritten .lcs.json / .xaml copies before sync. */
@@ -461,6 +462,7 @@ export function adoptStudioWebSolutionAsLcsProject(
     const xamlText = fs.readFileSync(xamlAbs, 'utf8');
     const name = path.basename(lcsRel, '.lcs.json');
     const result = importXaml(xamlText, name);
+    migrateWorkflowDocument(result.workflow);
     docs.push(result.workflow);
     warnings.push(
       ...result.warnings.map((w) => ({ message: `${xamlRel}: ${w.message}` }))
@@ -876,6 +878,8 @@ export function syncFromStudioWebLocal(
     result.warnings.push(
       ...imported.warnings.map((w) => ({ message: `${xamlRel}: ${w.message}` }))
     );
+    // Heal ids / PascalCase / singleton Sequence so designer Properties work after Sync
+    migrateWorkflowDocument(imported.workflow);
     const nextJson = stringifyWorkflow(imported.workflow);
 
     if (fs.existsSync(lcsAbs)) {

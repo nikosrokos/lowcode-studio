@@ -150,6 +150,35 @@ function run(): void {
   const again = importXaml(exported, 'RoundTrip');
   assert.ok(again.workflow.activities.length > 0);
 
+  // Nested Sequence among siblings must NOT drop LogMessage / BuildDataTable
+  const mixed = importXaml(
+    `<?xml version="1.0" encoding="utf-8"?>
+<Activity>
+  <Sequence DisplayName="Main">
+    <ui:LogMessage DisplayName="Log Message" Level="Info" Message="[&quot;hi&quot;]" />
+    <ui:BuildDataTable DisplayName="Build Data Table">
+      <ui:BuildDataTable.DataTable>
+        <OutArgument x:TypeArguments="sd:DataTable">[dt]</OutArgument>
+      </ui:BuildDataTable.DataTable>
+    </ui:BuildDataTable>
+    <Sequence DisplayName="Do">
+      <ui:LogMessage DisplayName="Inner Log" Level="Info" Message="[&quot;inner&quot;]" />
+    </Sequence>
+  </Sequence>
+</Activity>`,
+    'Mixed'
+  );
+  const types = mixed.workflow.activities.map((a) => a.type);
+  assert.ok(types.includes('System.LogMessage'), 'LogMessage kept beside nested Sequence: ' + types.join(','));
+  assert.ok(types.includes('Data.BuildDataTable'), 'BuildDataTable kept: ' + types.join(','));
+  assert.ok(types.includes('ControlFlow.Sequence'), 'nested Sequence kept as container: ' + types.join(','));
+  const bdt = mixed.workflow.activities.find((a) => a.type === 'Data.BuildDataTable');
+  assert.ok(bdt);
+  assert.ok(
+    bdt!.properties.result === 'dt' || bdt!.properties.columns,
+    'BuildDataTable has catalog props, not only note: ' + JSON.stringify(bdt!.properties)
+  );
+
   console.log(
     `xamlImport.test.ts: ok (${workflow.activities.length} activities, ${warnings.length} warnings)`
   );
