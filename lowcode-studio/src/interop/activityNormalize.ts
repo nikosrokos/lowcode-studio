@@ -260,7 +260,7 @@ function coalesceCaseInsensitive(
 }
 
 export function normalizeActivityNode(node: ActivityNode): ActivityNode {
-  if (!String(node.id || '').trim()) {
+  if (typeof node.id !== 'string' || !String(node.id).trim()) {
     node.id = newId();
   }
   remapImportedType(node);
@@ -376,13 +376,13 @@ export function unwrapSingletonSequence(doc: WorkflowDocument): boolean {
   return true;
 }
 
-/** True when raw JSON still has blank ids (common on older Studio Web pulls). */
+/** True when raw JSON still has blank / non-string ids (common on older Studio Web pulls). */
 export function rawWorkflowHasMissingIds(text: string): boolean {
   try {
     const raw = JSON.parse(text) as { activities?: ActivityNode[] };
     const visit = (list: ActivityNode[] | undefined): boolean => {
       for (const n of list || []) {
-        if (!String(n?.id || '').trim()) {
+        if (typeof n?.id !== 'string' || !String(n.id).trim()) {
           return true;
         }
         if (visit(n.children) || visit(n.elseChildren)) {
@@ -395,6 +395,11 @@ export function rawWorkflowHasMissingIds(text: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** @deprecated alias — same as rawWorkflowHasMissingIds (also catches non-string ids). */
+export function rawWorkflowHasBadIds(text: string): boolean {
+  return rawWorkflowHasMissingIds(text);
 }
 
 /**

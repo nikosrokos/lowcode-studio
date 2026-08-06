@@ -2278,7 +2278,8 @@ export function getDesignerHtml(
         const arr = Array.isArray(nodes) ? nodes : nodes ? [nodes] : [];
         for (const n of arr) {
           if (!n || typeof n !== 'object') continue;
-          if (!String(n.id || '').trim()) {
+          // Non-string ids (objects / numbers from bad SW JSON) break walkFind + selection
+          if (typeof n.id !== 'string' || !String(n.id).trim()) {
             n.id = newId();
             changed = true;
           }
@@ -2303,7 +2304,7 @@ export function getDesignerHtml(
     }
     function setSelectedNode(node) {
       state.selectedNode = node || null;
-      state.selectedId = node && String(node.id || '').trim() ? String(node.id) : null;
+      state.selectedId = node && typeof node.id === 'string' && node.id.trim() ? String(node.id) : null;
     }
     /** Rematch after Sync/SW reopen when ids rewrite — never keep a detached orphan. */
     function softRematchNode(snap) {
@@ -2322,6 +2323,50 @@ export function getDesignerHtml(
         null
       );
     }
+    /** Find by object identity — card clicks pass the live tree node. */
+    function walkFindRef(list, target) {
+      if (!target || typeof target !== 'object') return null;
+      const arr = Array.isArray(list) ? list : list ? [list] : [];
+      for (let i = 0; i < arr.length; i++) {
+        const node = arr[i];
+        if (!node || typeof node !== 'object') continue;
+        if (node === target) return { node, list: arr, index: i };
+        if (node.children) {
+          const hit = walkFindRef(node.children, target);
+          if (hit) return hit;
+        }
+        if (node.elseChildren) {
+          const hit = walkFindRef(node.elseChildren, target);
+          if (hit) return hit;
+        }
+      }
+      return null;
+    }
+    function updateSelectedChrome() {
+      const sel = state.selectedId;
+      document.querySelectorAll('.card[data-id], .flow-node[data-id]').forEach((el) => {
+        el.classList.toggle('selected', idsEqual(el.getAttribute('data-id'), sel));
+      });
+    }
+    /** Tree-backed node for the current selection (SW reopen safe). */
+    function resolveEditTarget() {
+      ensureActivityIds(state.workflow.activities);
+      const hit = resolveSelectedNode();
+      if (hit && hit.list != null && hit.node) return hit.node;
+      if (state.selectedNode) {
+        const byRef = walkFindRef(state.workflow.activities, state.selectedNode);
+        if (byRef) {
+          setSelectedNode(byRef.node);
+          return byRef.node;
+        }
+        const rematch = softRematchNode(state.selectedNode);
+        if (rematch) {
+          setSelectedNode(rematch);
+          return rematch;
+        }
+      }
+      return null;
+    }
     function resolveSelectedNode() {
       const sel = state.selectedId != null && String(state.selectedId).trim() !== '' ? String(state.selectedId) : null;
       if (sel) {
@@ -2332,17 +2377,24 @@ export function getDesignerHtml(
           return hit;
         }
       }
-      if (state.selectedNode && String(state.selectedNode.id || '').trim()) {
-        const hit = walkFind(state.workflow.activities, String(state.selectedNode.id));
-        if (hit) {
-          state.selectedId = String(hit.node.id);
-          state.selectedNode = hit.node;
-          return hit;
+      if (state.selectedNode) {
+        const byRef = walkFindRef(state.workflow.activities, state.selectedNode);
+        if (byRef) {
+          setSelectedNode(byRef.node);
+          return byRef;
         }
-        // Soft rematch — SW reopen / Sync id rewrite (never return orphan; edits would not persist)
+        if (String(state.selectedNode.id || '').trim()) {
+          const hit = walkFind(state.workflow.activities, String(state.selectedNode.id));
+          if (hit) {
+            setSelectedNode(hit.node);
+            return hit;
+          }
+        }
+        // Soft rematch — SW reopen / Sync id rewrite
         const rematch = softRematchNode(state.selectedNode);
         if (rematch) {
-          const found = walkFind(state.workflow.activities, rematch.id);
+          const found = walkFindRef(state.workflow.activities, rematch) ||
+            walkFind(state.workflow.activities, rematch.id);
           if (found) {
             setSelectedNode(found.node);
             return found;
@@ -2362,27 +2414,30 @@ export function getDesignerHtml(
       return null;
     }
     function selectActivity(id, opts) {
-      // Prefer tree-backed selection — SW reopen orphans broke Properties edits
-      if (opts && opts.node) {
-        if (!String(opts.node.id || '').trim()) opts.node.id = newId();
+      // Prefer tree-backed selection — card clicks pass the live node by reference
+      if (opts && opts.node && (typeof opts.node.id !== 'string' || !String(opts.node.id).trim())) {
+        opts.node.id = newId();
       }
       const heal = ensureActivityIds(state.workflow.activities);
-      let hit = String(id || '').trim() ? walkFind(state.workflow.activities, String(id)) : null;
-      // Prefer live node reference (click / contextmenu) — survives heal assigning a new id
+      let hit = null;
+      // 1) Object identity (most reliable for canvas card / flow node clicks)
+      if (opts && opts.node) {
+        hit = walkFindRef(state.workflow.activities, opts.node);
+      }
+      // 2) By id
+      if (!hit && String(id || '').trim()) {
+        hit = walkFind(state.workflow.activities, String(id));
+      }
+      // 3) Soft rematch when click ref is detached (SW reopen / Sync rewrite)
       if (!hit && opts && opts.node) {
-        hit = walkFind(state.workflow.activities, opts.node.id);
-        if (!hit) {
-          // Soft rematch when click ref is detached from state.workflow (SW reopen)
-          const rematch = softRematchNode(opts.node);
-          if (rematch) {
-            hit = walkFind(state.workflow.activities, rematch.id);
-          }
+        const rematch = softRematchNode(opts.node);
+        if (rematch) {
+          hit = walkFindRef(state.workflow.activities, rematch) ||
+            walkFind(state.workflow.activities, rematch.id);
         }
       }
-      // When walkFind hits, ALWAYS keep the tree node so property edits persist into state.workflow.
-      // Never paint / select a detached orphan — edits would not land in state.workflow.
       if (!hit) {
-        setSelectedNode(null);
+        // Keep prior selection if any; do not blank the panel on a missed click
         if (heal) persist(false);
         return false;
       }
@@ -2393,16 +2448,19 @@ export function getDesignerHtml(
       if (state.collapsedPropSections.studioWeb === undefined) {
         state.collapsedPropSections.studioWeb = true;
       }
-      // Always paint props first so Selection never looks empty during full re-render
+      // Paint props first; avoid full renderAll on every click (destroyed the card mid-pointerdown)
       renderProps();
+      updateSelectedChrome();
       if (opts?.rerender) renderAll();
       else {
         renderBreadcrumbs();
         renderMinimap();
       }
-      // Double-paint next frame — avoids empty props if a concurrent re-render raced
       requestAnimationFrame(() => {
-        if (idsEqual(state.selectedId, hit.node.id) || state.selectedNode === hit.node) renderProps();
+        if (idsEqual(state.selectedId, hit.node.id) || state.selectedNode === hit.node) {
+          renderProps();
+          updateSelectedChrome();
+        }
       });
       if (heal) {
         vscode.postMessage({ type: 'edit', workflow: state.workflow });
@@ -3452,8 +3510,9 @@ export function getDesignerHtml(
       // pointerdown: draggable cards often swallow click after a tiny move
       const selectThis = (e) => {
         if (e.target.closest('[data-card-menu]')) return;
-        if (!String(node.id || '').trim()) node.id = newId();
-        selectActivity(node.id, { rerender: true, node: node });
+        if (typeof node.id !== 'string' || !String(node.id).trim()) node.id = newId();
+        // rerender:false — full renderAll mid-pointerdown destroyed the card and raced props wiring
+        selectActivity(node.id, { rerender: false, node: node });
         hideTip();
         hideCtxMenu();
       };
@@ -4273,22 +4332,26 @@ export function getDesignerHtml(
 
     function assistLiveStripHtml(node) {
       if (!node) return '';
-      const props = collectLiveAssistProposals({ selectedOnly: true }).filter((p) => p.activityId === node.id);
-      if (!props.length) return '';
-      return '<div class="assist-live" id="assistLiveStrip">' +
-        '<div class="al-title"><span>Assist live · ' + props.length + ' proposal(s)</span>' +
-        '<button type="button" class="al-apply" id="btnAssistLiveOpen">Open Assist</button></div>' +
-        props.slice(0, 4).map((p) =>
-          '<div class="al-item">' +
-            '<div><div class="al-label">' + escapeHtml(p.label) + '</div>' +
-            '<div class="al-detail">' + escapeHtml(p.detail) + '</div></div>' +
-            (p.actionable
-              ? '<button type="button" class="al-apply" data-al-apply="' + escapeAttr(p.id) + '">Apply</button>'
-              : '<span></span>') +
-          '</div>'
-        ).join('') +
-        (props.length > 4 ? '<div class="al-detail" style="margin-top:6px">+' + (props.length - 4) + ' more in Assist ✦ → Live</div>' : '') +
-        '</div>';
+      try {
+        const props = collectLiveAssistProposals({ selectedOnly: true }).filter((p) => p.activityId === node.id);
+        if (!props.length) return '';
+        return '<div class="assist-live" id="assistLiveStrip">' +
+          '<div class="al-title"><span>Assist live · ' + props.length + ' proposal(s)</span>' +
+          '<button type="button" class="al-apply" id="btnAssistLiveOpen">Open Assist</button></div>' +
+          props.slice(0, 4).map((p) =>
+            '<div class="al-item">' +
+              '<div><div class="al-label">' + escapeHtml(p.label) + '</div>' +
+              '<div class="al-detail">' + escapeHtml(p.detail) + '</div></div>' +
+              (p.actionable
+                ? '<button type="button" class="al-apply" data-al-apply="' + escapeAttr(p.id) + '">Apply</button>'
+                : '<span></span>') +
+            '</div>'
+          ).join('') +
+          (props.length > 4 ? '<div class="al-detail" style="margin-top:6px">+' + (props.length - 4) + ' more in Assist ✦ → Live</div>' : '') +
+          '</div>';
+      } catch (_) {
+        return '';
+      }
     }
 
     function wireAssistLiveStrip(node) {
@@ -4549,65 +4612,71 @@ export function getDesignerHtml(
       });
     }
 
+    function persistPropEdit(target) {
+      vscode.postMessage({ type: 'edit', workflow: state.workflow });
+      const id = target && target.id;
+      document.querySelectorAll('.card[data-id], .flow-node[data-id]').forEach((el) => {
+        if (!idsEqual(el.getAttribute('data-id'), id)) return;
+        const sum = el.querySelector('.card-summary');
+        if (sum) sum.textContent = summary(target);
+        const title = el.querySelector('.card-title');
+        if (title && target.displayName) title.textContent = target.displayName;
+      });
+      renderBreadcrumbs();
+      renderMinimap();
+    }
+
+    /** Coerce SW ExpressionText / PascalCase onto catalog keys before paint + edit. */
+    function normalizeNodePropsForEdit(node) {
+      node.properties = node.properties || {};
+      for (const [k, v] of Object.entries(node.properties)) {
+        const coerced = coercePaintValue(v);
+        if (coerced !== v) node.properties[k] = coerced;
+      }
+      const pascalHints = {
+        Message: 'message', Text: 'message', Level: 'level',
+        Condition: 'condition', To: 'to', Value: 'value',
+        Selector: 'selector', Duration: 'durationMs', Url: 'url', URL: 'url',
+        Columns: 'columns', ColumnNames: 'columns', Result: 'result',
+        DataTable: node.type === 'Data.BuildDataTable' ? 'result' : 'dataTable',
+        ArrayRow: 'arrayRow', FilePath: 'filePath', WorkflowPath: 'workflowPath',
+        WorkflowFileName: 'workflowPath', WorkbookPath: 'workbookPath',
+        SheetName: 'sheetName', QueueName: 'queueName', AssetName: 'assetName',
+        ItemInformation: 'itemInformation', TimeoutMS: 'timeoutMs'
+      };
+      for (const [from, to] of Object.entries(pascalHints)) {
+        const fromVal = coercePaintValue(node.properties[from]);
+        const toVal = node.properties[to];
+        const toEmpty = toVal === undefined || toVal === null || String(toVal).trim() === '';
+        if (toEmpty && fromVal != null && String(fromVal).trim() !== '' && typeof fromVal !== 'object') {
+          node.properties[to] = fromVal;
+        }
+        if (node.properties[to] !== undefined && from !== to) delete node.properties[from];
+      }
+    }
+
     function renderProps() {
-      syncSuggestionVariables();
+      try {
+        syncSuggestionVariables();
+      } catch (_) {}
       ensureActivityIds(state.workflow.activities);
-      const hit = resolveSelectedNode();
-      els.btnDelete.disabled = !hit;
-      if (!hit) {
+      const node = resolveEditTarget();
+      els.btnDelete.disabled = !node;
+      if (!node) {
         els.props.innerHTML = '<div class="empty">Select a step to edit properties. In Flowchart mode, drag the blue port to connect nodes.</div>';
         renderBreadcrumbs();
         return;
       }
       ensurePropsPanelVisible();
       // Do NOT force-expand sections here — that broke expand/collapse. selectActivity opens them once.
-      /** Tree-backed node for edits (never a detached SW reopen orphan). */
-      function liveTreeNode() {
-        const sel = state.selectedId != null ? String(state.selectedId) : '';
-        if (sel) {
-          const t = walkFind(state.workflow.activities, sel);
-          if (t) return t.node;
-        }
-        if (hit.list != null && hit.node) return hit.node;
-        // Soft rematch when selection id drifted after Sync / SW reopen
-        if (hit.node) {
-          const rematch = softRematchNode(hit.node);
-          if (rematch) {
-            setSelectedNode(rematch);
-            return rematch;
-          }
-        }
-        return null;
-      }
-      /** Persist prop edits without full renderAll (keeps focus; updates card chrome). */
-      function persistPropEdit(target) {
-        vscode.postMessage({ type: 'edit', workflow: state.workflow });
-        const id = target && target.id;
-        document.querySelectorAll('.card[data-id], .flow-node[data-id]').forEach((el) => {
-          if (!idsEqual(el.getAttribute('data-id'), id)) return;
-          const sum = el.querySelector('.card-summary');
-          if (sum) sum.textContent = summary(target);
-          const title = el.querySelector('.card-title');
-          if (title && target.displayName) title.textContent = target.displayName;
-        });
-        renderBreadcrumbs();
-        renderMinimap();
-      }
-      // Never fall back to orphan hit.node — SW reopen orphans broke edits
-      const node = liveTreeNode();
-      if (!node) {
-        els.props.innerHTML = '<div class="empty">Select a step to edit properties. In Flowchart mode, drag the blue port to connect nodes.</div>';
-        renderBreadcrumbs();
-        return;
-      }
       setSelectedNode(node);
-      node.properties = node.properties || {};
+      normalizeNodePropsForEdit(node);
       const def = findDef(node.type);
       const currentColor = node.color || def?.color || '#64748B';
       const presets = ['#3B82F6','#8B5CF6','#F59E0B','#10B981','#EF4444','#64748B'];
 
-      let general = fieldHtml('Display Name', '<input id="prop_displayName" value="' + escapeAttr(node.displayName) + '" />');
-      general += fieldHtml('Type', '<input value="' + escapeAttr(node.type) + '" disabled />');
+      let general = fieldHtml('Display Name', '<input id="prop_displayName" value="' + escapeAttr(node.displayName || '') + '" />');
+      general += fieldHtml('Type', '<input value="' + escapeAttr(node.type || '') + '" disabled />');
       if (!def) {
         general += '<div class="empty" style="margin:0 0 8px">Unknown / imported type — properties below are editable raw fields. Replace with a catalog activity when possible.</div>';
       }
@@ -4625,31 +4694,8 @@ export function getDesignerHtml(
       const selectorProps = [];
       const mode = String(node.properties?.mode || 'Browser');
       const catalogPropNames = new Set((def?.properties || []).map((p) => p.name));
-      // Studio Web leftovers → catalog keys (coerce ExpressionText objects first)
-      node.properties = node.properties || {};
-      for (const [k, v] of Object.entries(node.properties)) {
-        const coerced = coercePaintValue(v);
-        if (coerced !== v) node.properties[k] = coerced;
-      }
-      const pascalHints = {
-        Message: 'message', Text: 'message', Level: 'level',
-        Condition: 'condition', To: 'to', Value: 'value',
-        Selector: 'selector', Duration: 'durationMs', Url: 'url', URL: 'url',
-        Columns: 'columns', ColumnNames: 'columns', Result: 'result',
-        DataTable: node.type === 'Data.BuildDataTable' ? 'result' : 'dataTable',
-        ArrayRow: 'arrayRow', FilePath: 'filePath', WorkflowPath: 'workflowPath',
-        WorkflowFileName: 'workflowPath'
-      };
-      for (const [from, to] of Object.entries(pascalHints)) {
-        const fromVal = coercePaintValue(node.properties[from]);
-        const toVal = node.properties[to];
-        const toEmpty = toVal === undefined || toVal === null || String(toVal).trim() === '';
-        if (toEmpty && fromVal != null && String(fromVal).trim() !== '' && typeof fromVal !== 'object') {
-          node.properties[to] = fromVal;
-        }
-        if (node.properties[to] !== undefined && from !== to) delete node.properties[from];
-      }
-      const pendingRepairs = vbRepairsForActivity(node);
+      let pendingRepairs = [];
+      try { pendingRepairs = vbRepairsForActivity(node); } catch (_) { pendingRepairs = []; }
       if (pendingRepairs.length) {
         state.collapsedPropSections.activity = false;
         activity += '<div class="vb-repair-banner">' +
@@ -4686,10 +4732,10 @@ export function getDesignerHtml(
         activity += fieldHtml(label, renderPropInput(p, val, node), p.required);
         const isExprProp = p.type === 'expression' || p.type === 'multiline' || p.name === 'condition' || p.name === 'expression' || p.name === 'assignments' || p.name === 'argumentMappings';
         if (isExprProp && p.name !== 'selector') {
-          activity += vbRepairHintHtml(p.name, val);
+          try { activity += vbRepairHintHtml(p.name, val); } catch (_) {}
         }
         if (p.name === 'selector') {
-          activity += selectorBuilderHtml(p.name, val);
+          try { activity += selectorBuilderHtml(p.name, val); } catch (_) {}
           selectorProps.push(p.name);
         }
         if (node.type === 'REFramework.InvokeWorkflow' && p.name === 'workflowPath') {
@@ -4710,10 +4756,10 @@ export function getDesignerHtml(
         };
         activity += fieldHtml(key, renderPropInput(synthetic, typeof val === 'object' && val !== null ? strVal : (val ?? ''), node));
         if (expressionish && key.toLowerCase() !== 'selector') {
-          activity += vbRepairHintHtml(key, typeof val === 'string' ? val : strVal);
+          try { activity += vbRepairHintHtml(key, typeof val === 'string' ? val : strVal); } catch (_) {}
         }
         if (key === 'selector') {
-          activity += selectorBuilderHtml(key, val ?? '');
+          try { activity += selectorBuilderHtml(key, val ?? ''); } catch (_) {}
           selectorProps.push(key);
         }
       }
@@ -4725,17 +4771,22 @@ export function getDesignerHtml(
         flow += '<div class="field"><button class="btn" id="btnSetStart" type="button">Use as flowchart start</button></div>';
       }
 
-      const studioWeb = studioWebChecklistHtml(node, def);
-      const assistStrip = assistLiveStripHtml(node);
+      let studioWeb = '';
+      let assistStrip = '';
+      try { studioWeb = studioWebChecklistHtml(node, def); } catch (_) { studioWeb = ''; }
+      try { assistStrip = assistLiveStripHtml(node); } catch (_) { assistStrip = ''; }
 
       let html = assistStrip;
       html += propSection('general', 'General', general);
       html += propSection('activity', 'Activity', activity);
       html += propSection('studioWeb', 'Required for Studio Web', studioWeb);
       if (flow) html += propSection('flow', 'Flowchart', flow);
+      // Paint HTML first so fields exist even if wiring helpers throw (SW reopen)
       els.props.innerHTML = html;
-      wireAssistLiveStrip(node);
-      if (node.type === 'REFramework.InvokeWorkflow') wireInvokeMapEditor(node);
+      try { wireAssistLiveStrip(node); } catch (_) {}
+      try {
+        if (node.type === 'REFramework.InvokeWorkflow') wireInvokeMapEditor(node);
+      } catch (_) {}
 
       els.props.querySelectorAll('.prop-section-head').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -4753,95 +4804,68 @@ export function getDesignerHtml(
         });
       });
 
-      document.getElementById('prop_displayName')?.addEventListener('change', (e) => {
-        const target = liveTreeNode();
-        if (!target) return;
-        target.displayName = e.target.value || target.displayName;
-        setSelectedNode(target);
-        persistPropEdit(target);
-      });
-      const applyColor = (value) => {
-        if (!value || !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value)) return;
-        const target = liveTreeNode();
-        if (!target) return;
-        target.color = value;
-        const hex = document.getElementById('prop_color_hex');
-        const picker = document.getElementById('prop_color');
-        if (hex) hex.value = value;
-        if (picker) picker.value = value.length === 4
-          ? '#' + value.slice(1).split('').map(ch => ch + ch).join('')
-          : value;
-        setSelectedNode(target);
-        persistPropEdit(target);
-      };
-      document.getElementById('prop_color')?.addEventListener('input', (e) => applyColor(e.target.value));
-      document.getElementById('prop_color_hex')?.addEventListener('change', (e) => applyColor(e.target.value.trim()));
+      // Color / VB / selector extras — prop field edits use delegated listeners (wirePropsDelegation)
       document.getElementById('btnResetColor')?.addEventListener('click', () => {
-        const target = liveTreeNode();
+        const target = resolveEditTarget();
         if (!target) return;
         delete target.color;
         setSelectedNode(target);
         persistPropEdit(target);
+        renderProps();
       });
       els.props.querySelectorAll('[data-color]').forEach(btn => {
-        btn.addEventListener('click', () => applyColor(btn.getAttribute('data-color')));
-      });
-      els.props.querySelectorAll('[data-prop]').forEach(input => {
-        const apply = () => {
-          const key = input.getAttribute('data-prop');
-          if (!key) return;
-          // Always mutate the node that lives in state.workflow (SW reopen orphans broke edits)
-          const target = liveTreeNode() || walkFind(state.workflow.activities, node.id)?.node;
+        btn.addEventListener('click', () => {
+          const value = btn.getAttribute('data-color');
+          if (!value || !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value)) return;
+          const target = resolveEditTarget();
           if (!target) return;
-          target.properties = target.properties || {};
-          let value = input.value;
-          const pdef = def?.properties?.find(p => p.name === key);
-          if (pdef?.type === 'number' || input.getAttribute('type') === 'number') value = Number(value);
-          if (pdef?.type === 'boolean' || (input.tagName === 'SELECT' && (value === 'true' || value === 'false') && typeof (target.properties[key]) === 'boolean')) {
-            value = value === 'true';
-          }
-          target.properties[key] = value;
+          target.color = value;
           setSelectedNode(target);
-          if (target.type === 'REFramework.InvokeWorkflow' && key === 'workflowPath') {
-            const path = String(value || '').trim();
-            delete state.targetArgsByPath[path];
-            delete state.targetArgsStatus[path];
-            if (path) requestTargetArguments(path);
-          }
           persistPropEdit(target);
-        };
-        input.addEventListener('change', apply);
-        input.addEventListener('blur', apply);
-        // Keep in-memory tree current while typing so Cmd+S / Save flush latest values
-        input.addEventListener('input', () => {
-          const key = input.getAttribute('data-prop');
-          if (!key) return;
-          const target = liveTreeNode() || walkFind(state.workflow.activities, node.id)?.node;
-          if (!target) return;
-          target.properties = target.properties || {};
-          let value = input.value;
-          const pdef = def?.properties?.find(p => p.name === key);
-          if (pdef?.type === 'number' || input.getAttribute('type') === 'number') value = Number(value);
-          if (pdef?.type === 'boolean') value = value === 'true';
-          target.properties[key] = value;
-          setSelectedNode(target);
+          const hex = document.getElementById('prop_color_hex');
+          const picker = document.getElementById('prop_color');
+          if (hex) hex.value = value;
+          if (picker) picker.value = value;
         });
       });
+      document.getElementById('prop_color')?.addEventListener('input', (e) => {
+        const value = e.target.value;
+        if (!value || !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value)) return;
+        const target = resolveEditTarget();
+        if (!target) return;
+        target.color = value;
+        setSelectedNode(target);
+        persistPropEdit(target);
+      });
+      document.getElementById('prop_color_hex')?.addEventListener('change', (e) => {
+        const value = String(e.target.value || '').trim();
+        if (!value || !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value)) return;
+        const target = resolveEditTarget();
+        if (!target) return;
+        target.color = value;
+        setSelectedNode(target);
+        persistPropEdit(target);
+      });
       document.getElementById('btnSetStart')?.addEventListener('click', () => {
-        state.workflow.startActivityId = node.id;
+        const target = resolveEditTarget();
+        if (!target) return;
+        state.workflow.startActivityId = target.id;
         toast('Start node set');
         persist(false);
       });
       document.getElementById('btnOpenWorkflow')?.addEventListener('click', () => {
+        const target = resolveEditTarget();
         vscode.postMessage({
           type: 'openWorkflow',
-          workflowPath: String(node.properties?.workflowPath || '')
+          workflowPath: String(target?.properties?.workflowPath || '')
         });
       });
       document.getElementById('btnVbApplyAll')?.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        const n = applyVbRepairsToActivity(node);
+        const target = resolveEditTarget();
+        if (!target) return;
+        const n = applyVbRepairsToActivity(target);
         if (!n) { toast('No VB repairs for this activity'); return; }
         persist(true);
         toast('Applied ' + n + ' VB expression repair(s)');
@@ -4853,25 +4877,37 @@ export function getDesignerHtml(
           const key = btn.getAttribute('data-vb-apply');
           const value = btn.getAttribute('data-vb-value');
           if (!key || value == null) return;
-          node.properties = node.properties || {};
-          node.properties[key] = value;
+          const target = resolveEditTarget();
+          if (!target) return;
+          target.properties = target.properties || {};
+          target.properties[key] = value;
           const input = els.props.querySelector('[data-prop="' + key + '"]');
           if (input) input.value = value;
+          setSelectedNode(target);
           persist(true);
           toast('Applied VB repair → ' + key);
         });
       });
-      selectorProps.forEach(propName => wireSelectorBuilder(els.props, node, propName));
+      try {
+        selectorProps.forEach(propName => wireSelectorBuilder(els.props, node, propName));
+      } catch (_) {}
       els.props.querySelectorAll('[data-suggest-value]').forEach(btn => {
         btn.addEventListener('click', () => {
           const prop = btn.closest('[data-suggest-for]')?.getAttribute('data-suggest-for');
           const value = btn.getAttribute('data-suggest-value') || '';
           if (!prop) return;
           const input = els.props.querySelector('[data-prop="' + prop + '"]');
-          if (input) input.value = value;
-          node.properties[prop] = value;
+          if (input) {
+            input.value = value;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+          const target = resolveEditTarget();
+          if (target) {
+            target.properties = target.properties || {};
+            target.properties[prop] = value;
+            persistPropEdit(target);
+          }
           toast('Applied ' + value);
-          persist(true);
         });
       });
       els.props.querySelectorAll('[data-expand-prop]').forEach(btn => {
@@ -4882,6 +4918,64 @@ export function getDesignerHtml(
         });
       });
       renderBreadcrumbs();
+    }
+
+    /**
+     * Delegated Properties editors — survive renderProps wiring failures (SW reopen).
+     * Per-input listeners used to attach AFTER Assist/VB helpers; a throw left fields dead
+     * while Delete (wired at startup) still worked.
+     */
+    function wirePropsDelegation() {
+      if (state._propsDelegated) return;
+      state._propsDelegated = true;
+      const readPropValue = (input, key, target) => {
+        let value = input.value;
+        const def = findDef(target.type);
+        const pdef = def?.properties?.find((p) => p.name === key);
+        if (pdef?.type === 'number' || input.getAttribute('type') === 'number') value = Number(value);
+        if (pdef?.type === 'boolean' || (input.tagName === 'SELECT' && (value === 'true' || value === 'false') && typeof (target.properties?.[key]) === 'boolean')) {
+          value = value === 'true';
+        }
+        return value;
+      };
+      const applyPropInput = (input, persist) => {
+        if (!input || input.disabled) return;
+        const target = resolveEditTarget();
+        if (!target) return;
+        if (input.id === 'prop_displayName') {
+          target.displayName = input.value || target.displayName;
+          setSelectedNode(target);
+          if (persist) persistPropEdit(target);
+          return;
+        }
+        const key = input.getAttribute('data-prop');
+        if (!key) return;
+        target.properties = target.properties || {};
+        target.properties[key] = readPropValue(input, key, target);
+        setSelectedNode(target);
+        if (target.type === 'REFramework.InvokeWorkflow' && key === 'workflowPath') {
+          const path = String(target.properties[key] || '').trim();
+          delete state.targetArgsByPath[path];
+          delete state.targetArgsStatus[path];
+          if (path) requestTargetArguments(path);
+        }
+        if (persist) persistPropEdit(target);
+      };
+      els.props.addEventListener('change', (e) => {
+        const input = e.target && e.target.closest ? e.target.closest('#prop_displayName, [data-prop]') : null;
+        if (!input || !els.props.contains(input)) return;
+        applyPropInput(input, true);
+      });
+      els.props.addEventListener('input', (e) => {
+        const input = e.target && e.target.closest ? e.target.closest('#prop_displayName, [data-prop]') : null;
+        if (!input || !els.props.contains(input)) return;
+        applyPropInput(input, false);
+      });
+      els.props.addEventListener('blur', (e) => {
+        const input = e.target && e.target.closest ? e.target.closest('[data-prop]') : null;
+        if (!input || !els.props.contains(input)) return;
+        applyPropInput(input, true);
+      }, true);
     }
 
     function refreshExprVbAssist() {
@@ -6196,6 +6290,7 @@ export function getDesignerHtml(
 
     restorePropsPanelState();
     applyPropsPanelLayout();
+    wirePropsDelegation();
     syncSuggestionVariables();
     renderAll();
     vscode.postMessage({ type: 'ready' });
