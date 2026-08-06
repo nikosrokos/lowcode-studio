@@ -100,6 +100,43 @@ function run(): void {
   assert.ok(Array.isArray(dry.variables.matches));
   assert.strictEqual(dry.variables.isMatch, true);
 
+  // Excel / Orchestrator modern locals → catalog (fewer Imported.*)
+  const excelOrchExpected: Array<[string, string]> = [
+    ['WriteDataTableToExcel', 'Excel.WriteRange'],
+    ['ReadCellValueX', 'Excel.ReadCell'],
+    ['ReadCellFormulaX', 'Excel.ReadCell'],
+    ['AppendDataTableToExcel', 'Excel.AppendRange'],
+    ['SaveExcelFileX', 'Excel.ExcelApplicationScope'],
+    ['CloseExcel', 'Excel.ExcelApplicationScope'],
+    ['ForEachExcelRow', 'Data.ForEachRow'],
+    ['BulkAddQueueItems', 'Orchestrator.AddQueueItem'],
+    ['GetQueueItems', 'Orchestrator.GetTransactionItem'],
+    ['AddTransactionItem', 'Orchestrator.AddQueueItem'],
+    ['SetCredential', 'Orchestrator.SetAsset'],
+    ['DeleteAsset', 'Orchestrator.SetAsset']
+  ];
+  for (const [xaml, lcs] of excelOrchExpected) {
+    assert.strictEqual(lcsTypeFromXamlName(xaml), lcs, xaml);
+    assert.ok(
+      ACTIVITY_CATALOG.some((a) => a.type === lcs),
+      `missing catalog ${lcs}`
+    );
+  }
+  const excelOrch = importXaml(fixture('excel-orch-import.xaml'), 'ExcelOrch');
+  const eoTypes = excelOrch.workflow.activities.map((a) => a.type);
+  assert.ok(
+    !eoTypes.some((t) => t.startsWith('Imported.')),
+    `Imported: ${eoTypes.join(',')}`
+  );
+  assert.ok(eoTypes.includes('Excel.WriteRange'));
+  assert.ok(eoTypes.includes('Excel.ReadCell'));
+  assert.ok(eoTypes.includes('Excel.AppendRange'));
+  assert.ok(eoTypes.includes('Excel.ExcelApplicationScope'));
+  assert.ok(eoTypes.includes('Data.ForEachRow'));
+  assert.ok(eoTypes.includes('Orchestrator.AddQueueItem'));
+  assert.ok(eoTypes.includes('Orchestrator.GetTransactionItem'));
+  assert.ok(eoTypes.includes('Orchestrator.SetAsset'));
+
   // Trash backups must never be pushed into Studio Web as workflows
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lcs-min-files-'));
   const lcsDir = path.join(root, 'Proj');

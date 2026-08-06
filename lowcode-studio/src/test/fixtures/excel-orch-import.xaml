@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Activity mc:Ignorable="sap sap2010"
+  xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities"
+  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation"
+  xmlns:sap2010="http://schemas.microsoft.com/netfx/2010/xaml/activities/presentation"
+  xmlns:ui="http://schemas.uipath.com/workflow/activities"
+  xmlns:excel="http://schemas.uipath.com/workflow/activities/excel"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  x:Class="ExcelOrchImport">
+  <Sequence DisplayName="ExcelOrchImport">
+    <excel:WriteDataTableToExcel DisplayName="Write DT" WorkbookPath="[&quot;out.xlsx&quot;]" SheetName="Sheet1" DataTable="[dt]" />
+    <excel:ReadCellValueX DisplayName="Read cell" WorkbookPath="[&quot;in.xlsx&quot;]" SheetName="Sheet1" Cell="A1" />
+    <excel:ReadCellFormulaX DisplayName="Read formula" WorkbookPath="[&quot;in.xlsx&quot;]" SheetName="Sheet1" Cell="B1" />
+    <excel:AppendDataTableToExcel DisplayName="Append DT" WorkbookPath="[&quot;out.xlsx&quot;]" SheetName="Sheet1" DataTable="[dt]" />
+    <excel:SaveExcelFileX DisplayName="Save" WorkbookPath="[&quot;out.xlsx&quot;]" />
+    <excel:CloseExcel DisplayName="Close" WorkbookPath="[&quot;out.xlsx&quot;]" />
+    <ui:ForEachExcelRow DisplayName="Each row" DataTable="[dt]" />
+    <ui:BulkAddQueueItems DisplayName="Bulk add" QueueName="MainQueue" />
+    <ui:GetQueueItems DisplayName="Get items" QueueName="MainQueue" />
+    <ui:AddTransactionItem DisplayName="Add tx" QueueName="MainQueue" />
+    <ui:SetCredential DisplayName="Set cred" AssetName="Credential" />
+    <ui:DeleteAsset DisplayName="Delete asset" AssetName="OldAsset" />
+  </Sequence>
+</Activity>

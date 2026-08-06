@@ -2305,6 +2305,23 @@ export function getDesignerHtml(
       state.selectedNode = node || null;
       state.selectedId = node && String(node.id || '').trim() ? String(node.id) : null;
     }
+    /** Rematch after Sync/SW reopen when ids rewrite — never keep a detached orphan. */
+    function softRematchNode(snap) {
+      if (!snap || !snap.type) return null;
+      const all = walkCollect(state.workflow.activities);
+      const snapSum = snap.summary != null ? snap.summary : summary(snap);
+      return (
+        all.find((n) =>
+          n.type === snap.type &&
+          n.displayName === snap.displayName &&
+          summary(n) === snapSum
+        ) ||
+        all.find((n) => n.type === snap.type && n.displayName === snap.displayName) ||
+        all.find((n) => n.type === snap.type && summary(n) === snapSum) ||
+        all.find((n) => n.type === snap.type) ||
+        null
+      );
+    }
     function resolveSelectedNode() {
       const sel = state.selectedId != null && String(state.selectedId).trim() !== '' ? String(state.selectedId) : null;
       if (sel) {
@@ -2322,8 +2339,15 @@ export function getDesignerHtml(
           state.selectedNode = hit.node;
           return hit;
         }
-        // Live node still usable for paint (tree walk missed — e.g. mid-heal / nested bag)
-        return { node: state.selectedNode, list: null, index: -1 };
+        // Soft rematch — SW reopen / Sync id rewrite (never return orphan; edits would not persist)
+        const rematch = softRematchNode(state.selectedNode);
+        if (rematch) {
+          const found = walkFind(state.workflow.activities, rematch.id);
+          if (found) {
+            setSelectedNode(found.node);
+            return found;
+          }
+        }
       }
       // DOM still shows selection chrome after a Sync id rewrite — recover from data-id
       const dom = document.querySelector('.card.selected[data-id], .flow-node.selected[data-id]');
@@ -2338,10 +2362,9 @@ export function getDesignerHtml(
       return null;
     }
     function selectActivity(id, opts) {
-      // Optimistic paint — Properties must not stay empty while heal/walk races
+      // Prefer tree-backed selection — SW reopen orphans broke Properties edits
       if (opts && opts.node) {
         if (!String(opts.node.id || '').trim()) opts.node.id = newId();
-        setSelectedNode(opts.node);
       }
       const heal = ensureActivityIds(state.workflow.activities);
       let hit = String(id || '').trim() ? walkFind(state.workflow.activities, String(id)) : null;
@@ -2349,30 +2372,17 @@ export function getDesignerHtml(
       if (!hit && opts && opts.node) {
         hit = walkFind(state.workflow.activities, opts.node.id);
         if (!hit) {
-          setSelectedNode(opts.node);
-          ensurePropsPanelVisible();
-          state.collapsedPropSections.activity = false;
-          state.collapsedPropSections.general = false;
-          if (state.collapsedPropSections.studioWeb === undefined) {
-            state.collapsedPropSections.studioWeb = true;
+          // Soft rematch when click ref is detached from state.workflow (SW reopen)
+          const rematch = softRematchNode(opts.node);
+          if (rematch) {
+            hit = walkFind(state.workflow.activities, rematch.id);
           }
-          renderProps();
-          renderBreadcrumbs();
-          renderMinimap();
-          if (opts.rerender) {
-            if (isFlow()) renderFlowchart(); else renderSequence();
-          }
-          requestAnimationFrame(() => {
-            if (state.selectedNode === opts.node || idsEqual(state.selectedId, opts.node.id)) renderProps();
-          });
-          if (heal) vscode.postMessage({ type: 'edit', workflow: state.workflow });
-          return true;
         }
       }
-      // Click passed a live node — only use it when the tree walk missed (orphan / mid-heal).
       // When walkFind hits, ALWAYS keep the tree node so property edits persist into state.workflow.
+      // Never paint / select a detached orphan — edits would not land in state.workflow.
       if (!hit) {
-        if (!(opts && opts.node)) setSelectedNode(null);
+        setSelectedNode(null);
         if (heal) persist(false);
         return false;
       }
@@ -2505,24 +2515,24 @@ export function getDesignerHtml(
       play: '>', 'symbol-method': 'f', 'debug-start': '>', 'run-all': '>>', key: 'K',
       lock: 'Lk', checklist: 'ok'
     };
+    /** Strip $(codicon) — do NOT use /\$/ inside this template literal (\\$ becomes $ and breaks the regex → "$(" badges). */
     function iconCodiconName(icon) {
-      return String(icon || '').replace(/^\$\(|\)$/g, '').trim();
+      let s = String(icon || '').trim();
+      if (s.indexOf('$(') === 0) s = s.slice(2);
+      if (s.endsWith(')')) s = s.slice(0, -1);
+      return s.trim();
     }
     function iconGlyph(icon) {
       const key = iconCodiconName(icon);
       if (key && ICON_GLYPHS[key]) return ICON_GLYPHS[key];
-      // Derive 1–2 letter badge from icon name or activity — never a circle tofu
-      if (key) {
-        const parts = key.split(/[-_]/).filter(Boolean);
-        if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-        return key.slice(0, 2).toUpperCase();
-      }
-      return '?';
+      // Prefer a plain circle over garbage like "$(" when the map misses
+      return '●';
     }
     function activityIconHtml(defOrType, color) {
       const def = typeof defOrType === 'string' ? findDef(defOrType) : defOrType;
       const c = color || def?.color || '#64748B';
-      const glyph = iconGlyph(def?.icon || (typeof defOrType === 'string' ? defOrType : def?.type));
+      // Only catalog icon strings — never fall back to type ("System.LogMessage" → "$(" after broken strip)
+      const glyph = iconGlyph(def?.icon || '');
       const title = escapeAttr((def?.displayName || '') + (def?.icon ? ' ' + def.icon : ''));
       return '<span class="act-icon" style="--ico:' + escapeAttr(c) + ';background:' + escapeAttr(c) +
         '" title="' + title + '"><span class="act-fb" aria-hidden="true">' + escapeHtml(glyph) +
@@ -4559,6 +4569,14 @@ export function getDesignerHtml(
           if (t) return t.node;
         }
         if (hit.list != null && hit.node) return hit.node;
+        // Soft rematch when selection id drifted after Sync / SW reopen
+        if (hit.node) {
+          const rematch = softRematchNode(hit.node);
+          if (rematch) {
+            setSelectedNode(rematch);
+            return rematch;
+          }
+        }
         return null;
       }
       /** Persist prop edits without full renderAll (keeps focus; updates card chrome). */
@@ -4575,7 +4593,13 @@ export function getDesignerHtml(
         renderBreadcrumbs();
         renderMinimap();
       }
-      const node = liveTreeNode() || hit.node;
+      // Never fall back to orphan hit.node — SW reopen orphans broke edits
+      const node = liveTreeNode();
+      if (!node) {
+        els.props.innerHTML = '<div class="empty">Select a step to edit properties. In Flowchart mode, drag the blue port to connect nodes.</div>';
+        renderBreadcrumbs();
+        return;
+      }
       setSelectedNode(node);
       node.properties = node.properties || {};
       const def = findDef(node.type);
@@ -4730,14 +4754,16 @@ export function getDesignerHtml(
       });
 
       document.getElementById('prop_displayName')?.addEventListener('change', (e) => {
-        const target = liveTreeNode() || node;
+        const target = liveTreeNode();
+        if (!target) return;
         target.displayName = e.target.value || target.displayName;
         setSelectedNode(target);
         persistPropEdit(target);
       });
       const applyColor = (value) => {
         if (!value || !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value)) return;
-        const target = liveTreeNode() || node;
+        const target = liveTreeNode();
+        if (!target) return;
         target.color = value;
         const hex = document.getElementById('prop_color_hex');
         const picker = document.getElementById('prop_color');
@@ -4751,7 +4777,8 @@ export function getDesignerHtml(
       document.getElementById('prop_color')?.addEventListener('input', (e) => applyColor(e.target.value));
       document.getElementById('prop_color_hex')?.addEventListener('change', (e) => applyColor(e.target.value.trim()));
       document.getElementById('btnResetColor')?.addEventListener('click', () => {
-        const target = liveTreeNode() || node;
+        const target = liveTreeNode();
+        if (!target) return;
         delete target.color;
         setSelectedNode(target);
         persistPropEdit(target);
@@ -4764,7 +4791,8 @@ export function getDesignerHtml(
           const key = input.getAttribute('data-prop');
           if (!key) return;
           // Always mutate the node that lives in state.workflow (SW reopen orphans broke edits)
-          const target = liveTreeNode() || walkFind(state.workflow.activities, node.id)?.node || node;
+          const target = liveTreeNode() || walkFind(state.workflow.activities, node.id)?.node;
+          if (!target) return;
           target.properties = target.properties || {};
           let value = input.value;
           const pdef = def?.properties?.find(p => p.name === key);
@@ -4788,7 +4816,8 @@ export function getDesignerHtml(
         input.addEventListener('input', () => {
           const key = input.getAttribute('data-prop');
           if (!key) return;
-          const target = liveTreeNode() || walkFind(state.workflow.activities, node.id)?.node || node;
+          const target = liveTreeNode() || walkFind(state.workflow.activities, node.id)?.node;
+          if (!target) return;
           target.properties = target.properties || {};
           let value = input.value;
           const pdef = def?.properties?.find(p => p.name === key);
@@ -5819,19 +5848,7 @@ export function getDesignerHtml(
         let keepNode = keepId ? walkFind(state.workflow.activities, keepId)?.node : null;
         // Sync/import may rewrite ids — rematch soft → hard
         if (!keepNode && keepSnap) {
-          const all = walkCollect(state.workflow.activities);
-          keepNode =
-            all.find((n) =>
-              n.type === keepSnap.type &&
-              n.displayName === keepSnap.displayName &&
-              summary(n) === keepSnap.summary
-            ) ||
-            all.find((n) =>
-              n.type === keepSnap.type && n.displayName === keepSnap.displayName
-            ) ||
-            all.find((n) => n.type === keepSnap.type && summary(n) === keepSnap.summary) ||
-            all.find((n) => n.type === keepSnap.type) ||
-            null;
+          keepNode = softRematchNode(keepSnap);
         }
         closeExprEditor();
         if (keepNode) {

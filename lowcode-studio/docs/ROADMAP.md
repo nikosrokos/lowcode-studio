@@ -195,10 +195,10 @@ Deterministic, propose→Apply. **F0–F4 + Live/Scaffold shipped through 0.6.41
 T3  Ready-for-Studio-Web gate           ← E2E confidence before publish
 T1  Multi-file / project-wide Assist    ← daily-path speed
 T4  Sync conflict clarity               ← trust Local Workspace as-is
-T8  Next import-map slice               ← fewer Imported.*
+T8  Next import-map slice               ← fewer Imported.* (**0.6.54**: Excel/Orch modern locals)
 T10 Dry-run breakpoints + watch         ← stay in Cursor to verify
 T12 Richer scaffolds / multi-file F2    ← Assist depth
-T9  Excel / Orchestrator parity         ← fewer Studio Web activity adds
+T9  Excel / Orchestrator parity         ← fewer Studio Web activity adds (**0.6.54**: import aliases + prop PascalCase)
 T13 Publish reveal / deep link          ← last mile
 T6  Typed property editors              ← remaining expression UX
 ```

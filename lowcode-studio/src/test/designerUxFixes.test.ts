@@ -66,14 +66,20 @@ function run(): void {
   assert.ok(html.includes('ICON_GLYPHS'), 'visible glyph fallbacks for activity icons');
   assert.ok(html.includes('act-fb'), 'glyph fallback span always painted');
   assert.ok(html.includes("output: 'LG'"), 'ASCII Log Message badge (not emoji tofu)');
-  assert.ok(!html.includes("'●'"), 'must not use white-circle ● fallback');
+  assert.ok(html.includes("'●'"), 'unknown icons fall back to a circle (not "$(")');
+  assert.ok(
+    html.includes("indexOf('$(')") || html.includes('indexOf("$(")'),
+    'codicon strip must not use template-broken /\\$/ regex'
+  );
+  assert.ok(!html.includes('slice(0, 2)'), 'must not derive badges via slice (produced "$(")');
   assert.ok(
     html.includes('font-family: ui-monospace') && html.includes('.act-icon .act-fb'),
     'glyph badges use monospace (readable ASCII)'
   );
   assert.ok(!html.includes('codicon-ready .act-fb'), 'must not hide glyph badges when font loads');
   assert.ok(html.includes('pointerdown'), 'select on pointerdown so draggable cards paint props');
-  assert.ok(html.includes('Optimistic paint'), 'selectActivity paints props before walk races');
+  assert.ok(html.includes('softRematchNode'), 'SW reopen soft-rematches instead of orphan paint');
+  assert.ok(html.includes('Never paint / select a detached orphan') || html.includes('never keep a detached orphan') || html.includes('Never fall back to orphan'), 'no orphan props path');
   assert.ok(html.includes('liveTreeNode'), 'prop edits target tree-backed node');
   assert.ok(html.includes('persistPropEdit'), 'prop edits persist without full re-render wipe');
   assert.ok(html.includes('SW reopen orphans broke edits') || html.includes('liveTreeNode()'), 'SW reopen edit path');
