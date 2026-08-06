@@ -2833,8 +2833,11 @@ export function getActivityDefinition(type: string): ActivityDefinition | undefi
 
 export function createActivityFromDefinition(def: ActivityDefinition) {
   const properties: Record<string, unknown> = {};
+  const varBinding = (name: string) =>
+    /^(to|result|item|row|values|argumentMappings)$/i.test(name) || /dataTable/i.test(name);
   for (const prop of def.properties) {
-    properties[prop.name] = prop.defaultValue ?? '';
+    // Leave variable bindings blank — do not auto-create / prefill dt, result, etc.
+    properties[prop.name] = varBinding(prop.name) ? '' : prop.defaultValue ?? '';
   }
 
   return {

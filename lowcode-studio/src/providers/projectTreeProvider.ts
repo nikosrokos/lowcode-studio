@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { getStudioWebLocalSyncStatus } from '../interop/studioWebLocal';
+import { getStudioWebLocalSyncStatus, SYNC_TRASH_DIR } from '../interop/studioWebLocal';
 
 type ItemKind = 'project' | 'folder' | 'workflow' | 'file' | 'info' | 'solution';
 
@@ -249,7 +249,7 @@ export class ProjectTreeProvider implements vscode.TreeDataProvider<ProjectTreeI
         continue;
       }
       for (const entry of entries) {
-        if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'out') {
+        if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'out' || entry.name === SYNC_TRASH_DIR) {
           continue;
         }
         const full = path.join(current, entry.name);
@@ -380,7 +380,12 @@ function collectProjectFolders(projectDir: string): Array<{ name: string; path: 
       if (preferred.includes(entry.name) || entry.name.startsWith('.')) {
         continue;
       }
-      if (entry.name === 'node_modules' || entry.name === 'out' || entry.name.endsWith('.StudioWeb')) {
+      if (
+        entry.name === 'node_modules' ||
+        entry.name === 'out' ||
+        entry.name === SYNC_TRASH_DIR ||
+        entry.name.endsWith('.StudioWeb')
+      ) {
         continue;
       }
       const full = path.join(projectDir, entry.name);
@@ -441,6 +446,14 @@ function listSolutionChildren(solutionDir: string): ProjectTreeItem[] {
     for (const entry of fs.readdirSync(solutionDir, { withFileTypes: true })) {
       const full = path.join(solutionDir, entry.name);
       if (entry.isDirectory()) {
+        if (
+          entry.name.startsWith('.') ||
+          entry.name === SYNC_TRASH_DIR ||
+          entry.name === 'node_modules' ||
+          entry.name === 'out'
+        ) {
+          continue;
+        }
         items.push(
           new ProjectTreeItem(
             entry.name,
@@ -475,7 +488,14 @@ function listFolderChildren(folderPath: string): ProjectTreeItem[] {
   }
 
   const dirs = entries
-    .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+    .filter(
+      (e) =>
+        e.isDirectory() &&
+        !e.name.startsWith('.') &&
+        e.name !== SYNC_TRASH_DIR &&
+        e.name !== 'node_modules' &&
+        e.name !== 'out'
+    )
     .sort((a, b) => a.name.localeCompare(b.name));
   const files = entries
     .filter((e) => e.isFile())
