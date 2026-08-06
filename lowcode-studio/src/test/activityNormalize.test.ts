@@ -96,6 +96,39 @@ function run(): void {
     });
   }
 
+  {
+    const node = normalizeActivityNode({
+      id: '',
+      type: 'System.LogMessage',
+      displayName: 'Log Message',
+      properties: { Message: '"hi"', Level: 'Info' }
+    } as any);
+    assert.ok(String(node.id || '').trim(), 'missing id is healed');
+    assert.strictEqual(node.properties.message, '"hi"');
+  }
+
+  {
+    const doc = parseWorkflow(
+      JSON.stringify({
+        schemaVersion: '1.0',
+        name: 'NoIds',
+        type: 'Sequence',
+        variables: [],
+        arguments: [],
+        activities: [
+          {
+            type: 'System.LogMessage',
+            displayName: 'Log Message',
+            properties: { Message: '"from studio web"', Level: 'Info' }
+          }
+        ],
+        metadata: {}
+      })
+    );
+    assert.ok(doc.activities[0].id, 'parseWorkflow assigns id when Studio Web omitted it');
+    assert.strictEqual(doc.activities[0].properties.message, '"from studio web"');
+  }
+
   console.log('activityNormalize.test.ts OK');
 }
 

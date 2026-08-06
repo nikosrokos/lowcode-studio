@@ -1,5 +1,6 @@
 import { getActivityDefinition } from '../models/activities';
 import type { ActivityNode, WorkflowDocument } from '../models/workflow';
+import { newId } from '../models/workflow';
 import { lcsTypeFromXamlName } from './activityMap';
 import { normalizeLogLevel } from './xamlExport';
 
@@ -148,6 +149,9 @@ function coalesceCaseInsensitive(
 }
 
 export function normalizeActivityNode(node: ActivityNode): ActivityNode {
+  if (!String(node.id || '').trim()) {
+    node.id = newId();
+  }
   remapImportedType(node);
 
   const props: Record<string, unknown> = {};

@@ -595,9 +595,15 @@ export function getDesignerHtml(
       padding: 6px 0; background: color-mix(in srgb, var(--bg) 88%, transparent);
       backdrop-filter: blur(8px);
     }
-    .canvas-help { color: var(--muted); font-size: 12px; flex: 1; min-width: 120px; }
+    .canvas-help { color: var(--muted); font-size: 12px; flex: 1 1 140px; min-width: 100px; }
+    .canvas-nav-tools {
+      display: flex; align-items: center; gap: 4px; flex: 0 0 auto;
+    }
+    .canvas-nav-tools .btn {
+      padding: 5px 9px; font-size: 11px; font-weight: 650;
+    }
     .workflow-search {
-      width: 180px; max-width: 40vw;
+      width: min(220px, 36vw); min-width: 120px;
       background: var(--input-bg); color: var(--text);
       border: 1px solid var(--input-border); border-radius: 8px;
       padding: 6px 10px; font-size: 12px;
@@ -1290,7 +1296,6 @@ export function getDesignerHtml(
       <div class="spacer"></div>
       <button class="btn" id="btnLink" title="Connect two flowchart nodes" style="display:none">Link</button>
       <button class="btn" id="btnAutoLayout" style="display:none" title="Tidy flowchart layout">Tidy</button>
-      <button class="btn" id="btnAlignSelection" style="display:none" title="Align selected flowchart nodes">Align</button>
       <button class="btn symbol" id="btnAssistHelp" type="button" title="Assist — Live proposals / Scaffold" aria-expanded="false">✦</button>
       <button class="btn symbol" id="btnSettings" type="button" title="Settings">⚙</button>
       <button class="btn primary" id="btnSave">Save</button>
@@ -1401,11 +1406,15 @@ export function getDesignerHtml(
       </div>
       <div class="canvas-bar">
         <div class="canvas-help" id="canvasHelp"></div>
+        <div class="canvas-nav-tools">
+          <button class="btn" id="btnFitCanvas" type="button" title="Fit content / selection (⤢)">Fit</button>
+          <button class="btn" id="btnAlignSelection" type="button" title="Align flowchart nodes to selection" style="display:none">Align</button>
+        </div>
         <div class="canvas-search-wrap">
-          <input class="workflow-search" id="workflowSearch" placeholder="Find in workflow…" title="Search activities (Enter = next)" />
-          <button type="button" class="sr-nav" id="btnSearchPrev" title="Previous match">↑</button>
+          <input class="workflow-search" id="workflowSearch" placeholder="Find activity…" title="Find in workflow — Enter / ↓ next · ↑ previous" />
+          <button type="button" class="sr-nav" id="btnSearchPrev" title="Previous match (↑)">↑</button>
           <span class="sr-count" id="searchHitCount"></span>
-          <button type="button" class="sr-nav" id="btnSearchNext" title="Next match">↓</button>
+          <button type="button" class="sr-nav" id="btnSearchNext" title="Next match (Enter / ↓)">↓</button>
         </div>
         <div class="zoom-tools">
           <button class="btn" id="btnZoomOutLegacy" type="button" title="Zoom out">−</button>
@@ -1442,7 +1451,7 @@ export function getDesignerHtml(
       <div class="expr-dialog" role="dialog" aria-label="Expression editor">
         <div class="expr-dialog-head">
           <div class="title" id="exprDialogTitle">Expression</div>
-          <button class="btn" type="button" id="exprDialogCancel">Close</button>
+          <button class="btn symbol" type="button" id="exprDialogAssist" title="Assist — Live proposals for this activity">✦</button>
         </div>
         <textarea id="exprDialogValue" spellcheck="false"></textarea>
         <div class="expr-vb-assist" id="exprVbAssist">
@@ -2095,6 +2104,52 @@ export function getDesignerHtml(
         state.propsMode = 'docked';
         applyFrameLayouts();
       }
+    }
+    function ensureActivityIds(list) {
+      let changed = false;
+      const visit = (nodes) => {
+        for (const n of nodes || []) {
+          if (!n) continue;
+          if (!String(n.id || '').trim()) {
+            n.id = newId();
+            changed = true;
+          }
+          if (n.children) visit(n.children);
+          if (n.elseChildren) visit(n.elseChildren);
+        }
+      };
+      visit(list);
+      return changed;
+    }
+    function selectActivity(id, opts) {
+      const heal = ensureActivityIds(state.workflow.activities);
+      const targetId = id;
+      if (!String(targetId || '').trim()) {
+        state.selectedId = null;
+        if (heal) persist(false);
+        return false;
+      }
+      const hit = walkFind(state.workflow.activities, targetId);
+      if (!hit) {
+        state.selectedId = null;
+        if (heal) persist(false);
+        return false;
+      }
+      state.selectedId = hit.node.id;
+      ensurePropsPanelVisible();
+      // Keep Activity section open so Studio Web / imported props are visible
+      state.collapsedPropSections.activity = false;
+      state.collapsedPropSections.general = false;
+      if (opts?.rerender) renderAll();
+      else {
+        renderProps();
+        renderBreadcrumbs();
+        renderMinimap();
+      }
+      if (heal) {
+        vscode.postMessage({ type: 'edit', workflow: state.workflow });
+      }
+      return true;
     }
     function showCtxMenu(x, y, activityId) {
       const menu = document.getElementById('ctxMenu');
@@ -2829,8 +2884,19 @@ export function getDesignerHtml(
         const spanY = Math.max(120, maxY - minY + 80);
         const next = Math.min(1.5, Math.max(0.5, Math.min(wrapW / spanX, wrapH / spanY)));
         setZoom(next);
-        if (state.selectedId) highlightSearchHit(state.selectedId);
-        else toast('Fit content · ' + Math.round(next * 100) + '%');
+        requestAnimationFrame(() => {
+          if (state.selectedId) highlightSearchHit(state.selectedId);
+          else toast('Fit · ' + Math.round(next * 100) + '%');
+        });
+        return;
+      }
+      const target = state.selectedId
+        ? document.querySelector('.card[data-id="' + state.selectedId + '"]')
+        : null;
+      if (target) {
+        setZoom(Math.max(state.zoom, 1));
+        requestAnimationFrame(() => highlightSearchHit(state.selectedId));
+        toast('Focused selection');
         return;
       }
       const cards = els.sequence?.querySelectorAll('.card');
@@ -2839,8 +2905,7 @@ export function getDesignerHtml(
       cards.forEach((c) => { maxBottom = Math.max(maxBottom, c.offsetTop + c.offsetHeight); });
       const next = Math.min(1.25, Math.max(0.55, wrapH / Math.max(maxBottom + 80, wrapH)));
       setZoom(next);
-      if (state.selectedId) highlightSearchHit(state.selectedId);
-      else toast('Fit content · ' + Math.round(next * 100) + '%');
+      toast('Fit · ' + Math.round(next * 100) + '%');
     }
     function alignSelectedFlowNodes() {
       if (!isFlow() || !state.selectedId) { toast('Select a flowchart node first'); return; }
@@ -3070,11 +3135,10 @@ export function getDesignerHtml(
       card.addEventListener('mouseleave', hideTip);
       card.addEventListener('click', (e) => {
         if (e.target.closest('[data-card-menu]')) return;
-        state.selectedId = node.id;
-        ensurePropsPanelVisible();
+        if (!String(node.id || '').trim()) node.id = newId();
+        selectActivity(node.id, { rerender: true });
         hideTip();
         hideCtxMenu();
-        renderAll();
       });
       card.addEventListener('contextmenu', (e) => {
         e.preventDefault();
@@ -3266,12 +3330,12 @@ export function getDesignerHtml(
 
         el.addEventListener('mousedown', (e) => {
           if (e.target.classList.contains('port') || e.target.closest('[data-card-menu]')) return;
-          state.selectedId = node.id;
+          if (!String(node.id || '').trim()) node.id = newId();
           state.draggingId = node.id;
           const pt = stagePoint(e);
           state.dragOffset = { x: pt.x - (node.x || 0), y: pt.y - (node.y || 0) };
           hideTip();
-          renderProps();
+          selectActivity(node.id, { rerender: false });
           renderConnectionsPanel();
           document.querySelectorAll('.flow-node').forEach(n => n.classList.remove('selected'));
           el.classList.add('selected');
@@ -4147,9 +4211,7 @@ export function getDesignerHtml(
         btn.addEventListener('click', () => {
           const id = btn.getAttribute('data-mm-id');
           if (!id) return;
-          state.selectedId = id;
-          ensurePropsPanelVisible();
-          persist(true);
+          selectActivity(id, { rerender: true });
           highlightSearchHit(id);
         });
       });
@@ -4157,7 +4219,9 @@ export function getDesignerHtml(
 
     function renderProps() {
       syncSuggestionVariables();
-      const hit = state.selectedId ? walkFind(state.workflow.activities, state.selectedId) : null;
+      ensureActivityIds(state.workflow.activities);
+      const sel = state.selectedId != null && String(state.selectedId) !== '' ? String(state.selectedId) : null;
+      const hit = sel ? walkFind(state.workflow.activities, sel) : null;
       els.btnDelete.disabled = !hit;
       if (!hit) {
         els.props.innerHTML = '<div class="empty">Select a step to edit properties. In Flowchart mode, drag the blue port to connect nodes.</div>';
@@ -4165,7 +4229,10 @@ export function getDesignerHtml(
         return;
       }
       ensurePropsPanelVisible();
+      // Always expand core sections when selecting (Studio Web imports often look "empty" when collapsed)
+      if (state.collapsedPropSections.activity === undefined) state.collapsedPropSections.activity = false;
       const node = hit.node;
+      node.properties = node.properties || {};
       const def = findDef(node.type);
       const currentColor = node.color || def?.color || '#64748B';
       const presets = ['#3B82F6','#8B5CF6','#F59E0B','#10B981','#EF4444','#64748B'];
@@ -4778,6 +4845,9 @@ export function getDesignerHtml(
     function renderAll() {
       state.workflow.variables ||= [];
       state.workflow.arguments ||= [];
+      if (ensureActivityIds(state.workflow.activities)) {
+        vscode.postMessage({ type: 'edit', workflow: state.workflow });
+      }
       els.workflowName.value = state.workflow.name || '';
       els.workflowType.textContent = state.workflow.type || 'Sequence';
       els.workflowType.classList.toggle('flow', isFlow());
@@ -4785,8 +4855,8 @@ export function getDesignerHtml(
       els.btnAutoLayout.style.display = isFlow() ? '' : 'none';
       if (els.btnAlignSelection) els.btnAlignSelection.style.display = isFlow() ? '' : 'none';
       els.canvasHelp.textContent = isFlow()
-        ? 'Flowchart · drag nodes · blue ports to link · Fit ⤢ · Align · dock for zoom & run'
-        : 'Sequence · drag activities onto the board · Find ↑↓ · Fit ⤢ · dock for zoom & run';
+        ? 'Flowchart · Fit / Align / Find in the bar · dock zoom & run'
+        : 'Sequence · Fit / Find in the bar · dock zoom, insert & run';
       applyZoom();
       renderCatalog();
       renderProjectTree();
@@ -4971,8 +5041,16 @@ export function getDesignerHtml(
     document.getElementById('btnZoomIn')?.addEventListener('click', () => setZoom(state.zoom + 0.1));
     document.getElementById('btnZoomOut')?.addEventListener('click', () => setZoom(state.zoom - 0.1));
     document.getElementById('btnZoomFit')?.addEventListener('click', () => fitCanvasView());
+    document.getElementById('btnFitCanvas')?.addEventListener('click', () => fitCanvasView());
     document.getElementById('btnZoomReset')?.addEventListener('click', () => setZoom(1));
     els.btnAlignSelection?.addEventListener('click', () => alignSelectedFlowNodes());
+    document.getElementById('exprDialogAssist')?.addEventListener('click', () => {
+      if (state.exprEdit?.nodeId) {
+        state.selectedId = state.exprEdit.nodeId;
+        state.assistLiveScope = 'selected';
+      }
+      openAssistHelp('live');
+    });
     document.getElementById('exprVbApply')?.addEventListener('click', () => {
       const next = els.exprVbAssist?.dataset?.vbNext;
       if (!next || !els.exprDialogValue) return;
@@ -5296,6 +5374,7 @@ export function getDesignerHtml(
         state.workflow = msg.workflow || {};
         state.workflow.variables ||= [];
         state.workflow.arguments ||= [];
+        ensureActivityIds(state.workflow.activities);
         state.selectedId =
           keepId && walkFind(state.workflow.activities, keepId) ? keepId : null;
         closeExprEditor();

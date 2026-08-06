@@ -71,29 +71,38 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     } catch {
       // ignore
     }
-    try {
-      await vscode.commands.executeCommand('lowcodeStudio.home.focus');
-    } catch {
-      // ignore
-    }
-    try {
-      this.view?.show?.(false);
-    } catch {
-      // ignore
+    // Retry focus — webview view may not be resolved on first tick after container show
+    for (let i = 0; i < 4; i++) {
+      try {
+        await vscode.commands.executeCommand('lowcodeStudio.home.focus');
+      } catch {
+        // ignore
+      }
+      try {
+        this.view?.show?.(false);
+      } catch {
+        // ignore
+      }
+      if (this.view) {
+        this.refresh();
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 80 + i * 60));
     }
     this.refresh();
   }
 
+  /** Open Home as a full editor tab (always visible even if sidebar webview is empty). */
   async showPanel(): Promise<void> {
     if (this.panel) {
-      this.panel.reveal(vscode.ViewColumn.One);
+      this.panel.reveal(vscode.ViewColumn.Active);
       this.refresh();
       return;
     }
     this.panel = vscode.window.createWebviewPanel(
       'lowcodeStudio.homePanel',
       'LowCode Studio Home',
-      vscode.ViewColumn.One,
+      vscode.ViewColumn.Active,
       {
         enableScripts: true,
         retainContextWhenHidden: true,
@@ -106,6 +115,14 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     this.panel.onDidDispose(() => {
       this.panel = undefined;
     });
+  }
+
+  /** Focus sidebar Home; fall back to editor-tab Home if the sidebar view never resolves. */
+  async openHome(): Promise<void> {
+    await this.focusSidebar();
+    if (!this.view) {
+      await this.showPanel();
+    }
   }
 
   rememberProject(projectDir: string, name?: string): void {
