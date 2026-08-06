@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.42] — 2026-08-06
+
+### Added
+- **T2 Invoke argument mapping** — row editor loads target workflow args; Add missing; Out/InOut XAML fidelity; Studio Web checklist for gaps
+- **T6 Expression editor VB Assist** — inline propose → Apply repair inside the expand dialog
+- **T5 Canvas navigation** — Fit ⤢ (content/selection), search ↑↓ next/prev, flowchart Align
+- **Cleaner Assist popup** — compact Live filters (Selected/All · VB/Required/Selector), Scaffold examples under details, Help demoted to **?**
+
+### Changed
+- Arguments panel trims names and warns on duplicates
+
 ## [0.6.41] — 2026-08-06
 
 ### Added

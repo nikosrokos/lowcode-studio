@@ -362,31 +362,118 @@ export function getDesignerHtml(
     .assist-live .al-apply:hover, .assist-panel .al-apply:hover {
       background: color-mix(in srgb, #0ea5e9 24%, transparent);
     }
-    .assist-panel-dialog { width: min(560px, 94vw); max-height: min(82vh, 720px); display: flex; flex-direction: column; }
-    .assist-tabs { display: flex; gap: 4px; padding: 0 14px 10px; border-bottom: 1px solid var(--border); }
+    .assist-panel-dialog {
+      width: min(440px, 94vw); max-height: min(72vh, 560px);
+      display: flex; flex-direction: column;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 14px; box-shadow: var(--shadow-frame); overflow: hidden;
+    }
+    .assist-tabs {
+      display: flex; gap: 2px; padding: 8px 12px 0; align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
     .assist-tabs button {
       appearance: none; border: 1px solid transparent; background: transparent; color: var(--muted);
-      border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer;
+      border-radius: 8px 8px 0 0; padding: 7px 12px; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer;
     }
     .assist-tabs button.active {
-      color: var(--text); background: var(--hover); border-color: color-mix(in srgb, var(--border) 80%, transparent);
+      color: var(--text); background: color-mix(in srgb, var(--input-bg) 80%, transparent);
+      border-color: var(--border); border-bottom-color: transparent; margin-bottom: -1px;
     }
-    .assist-tab-body { display: none; overflow: auto; padding: 12px 16px 16px; flex: 1; min-height: 0; }
-    .assist-tab-body.active { display: block; }
+    .assist-tabs .assist-help-link {
+      margin-left: auto; border: none; background: transparent; color: var(--muted);
+      font-size: 11px; font-weight: 650; cursor: pointer; padding: 6px 8px;
+    }
+    .assist-tabs .assist-help-link:hover { color: var(--text); }
+    .assist-tab-body { display: none; overflow: auto; padding: 10px 12px 12px; flex: 1; min-height: 0; }
+    .assist-tab-body.active { display: flex; flex-direction: column; gap: 8px; }
+    .assist-toolbar {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center; position: sticky; top: 0;
+      background: var(--panel); padding-bottom: 4px; z-index: 1;
+    }
+    .assist-toolbar .count {
+      margin-left: auto; font-size: 11px; font-weight: 700; color: var(--muted);
+    }
+    .assist-filter {
+      display: flex; flex-wrap: wrap; gap: 4px;
+    }
+    .assist-filter button {
+      appearance: none; border: 1px solid var(--border); background: transparent; color: var(--muted);
+      border-radius: 999px; padding: 2px 8px; font-size: 10px; font-weight: 700; cursor: pointer;
+    }
+    .assist-filter button.on {
+      color: #0284c7; border-color: color-mix(in srgb, #0ea5e9 50%, var(--border));
+      background: color-mix(in srgb, #0ea5e9 12%, transparent);
+    }
     .assist-scaffold-input {
-      width: 100%; min-height: 88px; resize: vertical; font: inherit; font-size: 12px;
+      width: 100%; min-height: 72px; resize: vertical; font: inherit; font-size: 12px;
       border-radius: 8px; border: 1px solid var(--input-border); background: var(--input-bg);
       color: var(--text); padding: 8px 10px; font-family: var(--mono);
     }
-    .assist-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-    .assist-proposal-list { margin-top: 12px; display: grid; gap: 6px; }
+    .assist-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    .assist-proposal-list { display: grid; gap: 4px; flex: 1; min-height: 0; }
     .assist-proposal {
-      border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
-      border-radius: 8px; padding: 8px 10px; background: color-mix(in srgb, var(--input-bg) 70%, transparent);
-      font-size: 12px;
+      display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; align-items: center;
+      border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+      border-radius: 8px; padding: 6px 8px; background: color-mix(in srgb, var(--input-bg) 55%, transparent);
+      font-size: 11px;
     }
-    .assist-proposal .ap-title { font-weight: 650; }
-    .assist-proposal .ap-meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .assist-proposal .ap-title { font-weight: 650; line-height: 1.3; }
+    .assist-proposal .ap-meta {
+      color: var(--muted); font-size: 10px; margin-top: 1px; word-break: break-word;
+      grid-column: 1 / 2;
+    }
+    .assist-proposal .al-apply { grid-row: 1 / span 2; align-self: center; }
+    .assist-group-label {
+      font-size: 10px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase;
+      color: var(--muted); margin: 6px 0 2px;
+    }
+    .assist-help-details { font-size: 12px; }
+    .assist-help-details > summary {
+      cursor: pointer; color: var(--muted); font-weight: 650; font-size: 11px; margin-bottom: 6px;
+    }
+    .invoke-map {
+      border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+      border-radius: 8px; padding: 8px; background: color-mix(in srgb, var(--input-bg) 40%, transparent);
+    }
+    .invoke-map-toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .invoke-map-row {
+      display: grid; grid-template-columns: 88px 1fr; gap: 6px; align-items: center;
+      margin-bottom: 6px;
+    }
+    .invoke-map-row .im-name {
+      font-size: 11px; font-weight: 650; font-family: var(--mono); overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
+    .invoke-map-row .im-dir {
+      display: inline-block; font-size: 9px; font-weight: 750; letter-spacing: .03em;
+      padding: 1px 5px; border-radius: 4px; margin-right: 4px;
+      border: 1px solid var(--border); color: var(--muted);
+    }
+    .invoke-map-row .im-dir.Out { color: #b45309; border-color: color-mix(in srgb, #f59e0b 50%, var(--border)); }
+    .invoke-map-row .im-dir.InOut { color: #7c3aed; border-color: color-mix(in srgb, #8b5cf6 50%, var(--border)); }
+    .invoke-map-missing {
+      font-size: 11px; color: #b45309; margin: 0 0 8px; line-height: 1.35;
+    }
+    .expr-vb-assist {
+      border-top: 1px solid var(--border); padding: 8px 12px; font-size: 11px;
+      background: color-mix(in srgb, #0ea5e9 8%, transparent);
+      display: none;
+    }
+    .expr-vb-assist.show { display: block; }
+    .expr-vb-assist .ev-label { font-weight: 700; color: #0284c7; margin-bottom: 4px; }
+    .expr-vb-assist .ev-proposed {
+      font-family: var(--mono); font-size: 11px; color: var(--text);
+      word-break: break-word; margin-bottom: 6px;
+    }
+    .canvas-search-wrap { display: flex; align-items: center; gap: 4px; min-width: 0; }
+    .canvas-search-wrap .workflow-search { flex: 1; min-width: 120px; }
+    .canvas-search-wrap .sr-nav {
+      appearance: none; border: 1px solid var(--border); background: var(--input-bg);
+      color: var(--muted); border-radius: 6px; width: 26px; height: 26px; cursor: pointer; font-size: 12px;
+    }
+    .canvas-search-wrap .sr-nav:hover { color: var(--text); border-color: var(--focus); }
+    .canvas-search-wrap .sr-count { font-size: 10px; color: var(--muted); min-width: 28px; text-align: center; }
     .panel .frame-resize-x {
       position: absolute; top: 0; bottom: 0; width: 5px; cursor: ew-resize;
       z-index: 6; background: transparent;
@@ -575,13 +662,7 @@ export function getDesignerHtml(
       display: flex; gap: 8px; justify-content: flex-end; padding: 10px 14px;
       border-top: 1px solid var(--border);
     }
-    .assist-help-dialog {
-      width: min(520px, 94vw); max-height: 86vh;
-      background: var(--panel); border: 1px solid var(--border);
-      border-radius: 14px; box-shadow: var(--shadow-frame);
-      display: flex; flex-direction: column; overflow: hidden;
-    }
-    .assist-help-body { overflow: auto; padding: 12px 16px 18px; font-size: 12px; line-height: 1.45; }
+    .assist-help-body { font-size: 12px; line-height: 1.45; }
     .assist-help-body p { margin: 0 0 10px; color: var(--text); }
     .assist-help-body .lead { color: var(--muted); margin-bottom: 14px; }
     .assist-help-body h3 {
@@ -624,14 +705,15 @@ export function getDesignerHtml(
     }
     .expr-dialog-head .title { flex: 1; font-weight: 700; font-size: 13px; }
     .expr-dialog textarea {
-      width: 100%; min-height: 220px; border: none; resize: vertical;
+      width: 100%; min-height: 200px; border: none; resize: vertical;
       background: var(--input-bg); color: var(--text); padding: 14px;
       font-family: var(--mono); font-size: 13px; line-height: 1.45;
     }
     .expr-dialog-foot {
-      display: flex; gap: 8px; justify-content: flex-end; padding: 10px 14px;
+      display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding: 10px 14px;
       border-top: 1px solid var(--border);
     }
+    .expr-dialog-foot .grow { flex: 1; }
     .field-with-expand { display: flex; gap: 6px; align-items: flex-start; }
     .field-with-expand > :first-child { flex: 1; min-width: 0; }
     .btn-expand-expr {
@@ -1208,7 +1290,8 @@ export function getDesignerHtml(
       <div class="spacer"></div>
       <button class="btn" id="btnLink" title="Connect two flowchart nodes" style="display:none">Link</button>
       <button class="btn" id="btnAutoLayout" style="display:none" title="Tidy flowchart layout">Tidy</button>
-      <button class="btn symbol" id="btnAssistHelp" type="button" title="Assist — Live propose / Scaffold (F2) / Help" aria-expanded="false">✦</button>
+      <button class="btn" id="btnAlignSelection" style="display:none" title="Align selected flowchart nodes">Align</button>
+      <button class="btn symbol" id="btnAssistHelp" type="button" title="Assist — Live proposals / Scaffold" aria-expanded="false">✦</button>
       <button class="btn symbol" id="btnSettings" type="button" title="Settings">⚙</button>
       <button class="btn primary" id="btnSave">Save</button>
     </div>
@@ -1318,7 +1401,12 @@ export function getDesignerHtml(
       </div>
       <div class="canvas-bar">
         <div class="canvas-help" id="canvasHelp"></div>
-        <input class="workflow-search" id="workflowSearch" placeholder="Find in workflow…" title="Search activities in this workflow" />
+        <div class="canvas-search-wrap">
+          <input class="workflow-search" id="workflowSearch" placeholder="Find in workflow…" title="Search activities (Enter = next)" />
+          <button type="button" class="sr-nav" id="btnSearchPrev" title="Previous match">↑</button>
+          <span class="sr-count" id="searchHitCount"></span>
+          <button type="button" class="sr-nav" id="btnSearchNext" title="Next match">↓</button>
+        </div>
         <div class="zoom-tools">
           <button class="btn" id="btnZoomOutLegacy" type="button" title="Zoom out">−</button>
           <span class="zoom-label" id="zoomLabelLegacy">100%</span>
@@ -1357,7 +1445,13 @@ export function getDesignerHtml(
           <button class="btn" type="button" id="exprDialogCancel">Close</button>
         </div>
         <textarea id="exprDialogValue" spellcheck="false"></textarea>
+        <div class="expr-vb-assist" id="exprVbAssist">
+          <div class="ev-label">VB Assist</div>
+          <div class="ev-proposed" id="exprVbProposed"></div>
+          <button type="button" class="al-apply" id="exprVbApply">Apply VB repair</button>
+        </div>
         <div class="expr-dialog-foot">
+          <span class="grow"></span>
           <button class="btn" type="button" id="exprDialogDismiss">Cancel</button>
           <button class="btn primary" type="button" id="exprDialogApply">Apply</button>
         </div>
@@ -1365,126 +1459,76 @@ export function getDesignerHtml(
     </div>
 
     <div class="settings-overlay" id="assistHelpOverlay">
-      <div class="assist-help-dialog assist-panel-dialog" role="dialog" aria-label="Assist" aria-modal="true">
+      <div class="assist-panel-dialog" role="dialog" aria-label="Assist" aria-modal="true">
         <div class="settings-dialog-head">
           <div class="title">Assist</div>
           <button class="btn" type="button" id="assistHelpClose">Close</button>
         </div>
         <div class="assist-tabs" role="tablist">
           <button type="button" class="active" data-assist-tab="live" role="tab" aria-selected="true">Live</button>
-          <button type="button" data-assist-tab="scaffold" role="tab" aria-selected="false">Scaffold (F2)</button>
-          <button type="button" data-assist-tab="help" role="tab" aria-selected="false">Help</button>
+          <button type="button" data-assist-tab="scaffold" role="tab" aria-selected="false">Scaffold</button>
+          <button type="button" class="assist-help-link" data-assist-tab="help" role="tab" aria-selected="false" title="How Assist works">?</button>
         </div>
         <div class="assist-tab-body active" data-assist-body="live" id="assistLiveBody">
-          <p class="lead" style="margin-top:0">
-            Real-time proposals for the open workflow. Nothing is written until you press <strong>Apply</strong>.
-          </p>
-          <div class="assist-actions" style="margin-top:0">
-            <button type="button" class="btn primary" id="assistLiveRefresh">Refresh proposals</button>
+          <div class="assist-toolbar">
+            <button type="button" class="btn primary" id="assistLiveRefresh">Refresh</button>
             <button type="button" class="btn" id="assistLiveApplyAll">Apply all</button>
+            <span class="count" id="assistLiveCount">0</span>
+          </div>
+          <div class="assist-filter" id="assistLiveFilter">
+            <button type="button" class="on" data-al-scope="selected">Selected</button>
+            <button type="button" data-al-scope="all">All</button>
+            <button type="button" class="on" data-al-kind="vb">VB</button>
+            <button type="button" class="on" data-al-kind="required">Required</button>
+            <button type="button" class="on" data-al-kind="selector">Selector</button>
           </div>
           <div class="assist-proposal-list" id="assistLiveList"></div>
         </div>
         <div class="assist-tab-body" data-assist-body="scaffold" id="assistScaffoldBody">
-          <p class="lead" style="margin-top:0">
-            Describe steps in plain language (newlines, <code>;</code>, or <em>then</em>). Keywords map to catalog activities — no LLM.
-          </p>
-          <textarea class="assist-scaffold-input" id="assistScaffoldInput" placeholder='use browser https://example.com then type into then click then log message "done"'></textarea>
+          <textarea class="assist-scaffold-input" id="assistScaffoldInput" placeholder='use browser https://example.com then type into then click then log "done"'></textarea>
           <div class="assist-actions">
             <button type="button" class="btn primary" id="assistScaffoldPropose">Propose</button>
-            <button type="button" class="btn" id="assistScaffoldAppend" disabled>Apply append</button>
-            <button type="button" class="btn" id="assistScaffoldReplace" disabled>Apply replace</button>
+            <button type="button" class="btn" id="assistScaffoldAppend" disabled>Append</button>
+            <button type="button" class="btn" id="assistScaffoldReplace" disabled>Replace</button>
           </div>
+          <details class="assist-help-details">
+            <summary>Examples</summary>
+            <div class="assist-help-body">
+              <span class="cmd">use browser https://example.com then type into then click then log message "done"</span>
+              <span class="cmd">read csv then for each row then http then write csv</span>
+            </div>
+          </details>
           <div class="assist-proposal-list" id="assistScaffoldList"></div>
         </div>
         <div class="assist-tab-body" data-assist-body="help">
           <div class="assist-help-body">
-            <p class="lead">
-              Assist helpers are <strong>deterministic</strong> (no chat LLM). Live / Scaffold run in the designer;
-              Command Palette helpers also write to the <strong>LowCode Studio</strong> Output channel.
+            <p class="lead" style="margin-top:0">
+              Deterministic helpers (no chat LLM). Nothing writes until you press <strong>Apply</strong>.
             </p>
-
-            <h3>Where to run commands</h3>
-            <ul>
-              <li>Designer toolbar <strong>✦</strong> → Live / Scaffold / Help</li>
-              <li>Command Palette → type <strong>LowCode Studio</strong> (or <kbd>⌘/Ctrl+Shift+P</kbd>)</li>
-              <li>Editor title bar on a <code>.lcs.json</code> file (Explain)</li>
-              <li>Project Explorer toolbar / title actions</li>
-              <li><strong>Manage Scenarios</strong> → <em>Generate from description…</em></li>
-            </ul>
-
-            <h3>Explain / critique workflow (F0)</h3>
-            <span class="cmd">LowCode Studio: Explain / critique workflow (Assist)</span>
-            <p>
-              Open the workflow in the designer (or select its <code>.lcs.json</code>), run the command.
-              Output shows structure, package/selector critique, and why Studio Web may reject a Save.
-              Read-only — it does not change the workflow.
-            </p>
-
-            <h3>Generate scenarios (F1)</h3>
-            <span class="cmd">LowCode Studio: Generate scenarios from description (Assist)</span>
-            <p>
-              Or: <strong>Manage Scenarios</strong> → <em>Generate from description…</em>.
-              Type a short process description in the input box, for example:
-            </p>
-            <span class="cmd">REFramework queue with HTTP API and login UI</span>
-            <p>
-              Keywords map to templates (<code>queue</code>, <code>http</code>, <code>login</code>,
-              <code>excel</code>, <code>fail</code>, …) and are saved to
-              <code>Data/Test/scenarios.json</code>. Then run with <kbd>Shift+F5</kbd> or Dry Run Scenarios.
-            </p>
-
-            <h3>Scaffold / dry-run-trace repair (F2)</h3>
-            <span class="cmd">LowCode Studio: Scaffold sequence from description (Assist)</span>
-            <p>
-              Prefer the <strong>Scaffold</strong> tab above for propose → Apply append/replace.
-              Keywords map to catalog activities only — no LLM. Example:
-            </p>
-            <span class="cmd">use browser https://example.com then type into then click then log message "done"</span>
-            <span class="cmd">LowCode Studio: Repair from dry-run trace (Assist)</span>
-            <p>
-              Runs a dry-run (or uses the last designer dry-run), then proposes fills for empty required
-              props, TODO selectors, and <code>Imported.*</code> → Comment replacements.
-            </p>
-
-            <h3>Suggest / repair selectors (F3)</h3>
-            <span class="cmd">LowCode Studio: Suggest / repair selectors (Assist)</span>
-            <p>Two modes (propose first — nothing is applied until you confirm):</p>
-            <ul>
-              <li><strong>From HTML / Explorer paste</strong> — paste a DOM snippet, <code>#id</code>, or UI Explorer dump; copy the best classic <code>&lt;html&gt;/&lt;webctrl&gt;</code> into Selector Builder</li>
-              <li><strong>Repair weak selectors</strong> — scans the open workflow for empty / placeholder / weak UI steps; apply all or pick which proposals to write</li>
-            </ul>
-            <span class="cmd">&lt;button id="loginBtn" aria-label="Sign in"&gt;Sign in&lt;/button&gt;</span>
-
-            <h3>Repair VB expressions (F4)</h3>
-            <span class="cmd">LowCode Studio: Repair VB expressions (Assist)</span>
-            <p>
-              Also shown automatically in the Properties panel under expression fields
-              (<span style="color:#ef4444;font-weight:600">red hint + Apply</span>) and in the
-              <strong>Live</strong> Assist strip. Right-click an activity → <em>Apply VB repairs</em>. Examples:
-            </p>
-            <ul>
-              <li><code>TRim(name)</code> → <code>name.Trim()</code></li>
-              <li><code>name.toUpperCase()</code> → <code>name.ToUpper()</code></li>
-              <li><code>x == null</code> → <code>x Is Nothing</code> · <code>&amp;&amp;</code> → <code>AndAlso</code></li>
-              <li><code>Len(s)</code> → <code>s.Length</code> · <code>Left(s, 3)</code> → <code>s.Substring(0, 3)</code></li>
-            </ul>
-            <p>Activity actions (move, duplicate, breakpoint, run-to-here) are on the <strong>right-click</strong> menu — card icon buttons were removed.</p>
-
-            <h3>Related dry-run settings (not Assist)</h3>
-            <p>
-              Optional real HTTP / Python live under Settings → VS Code
-              <code>lowcodeStudio.dryRun.*</code> (allow-listed hosts; fixtures always win).
-            </p>
-
-            <h3>Tips</h3>
-            <ul>
-              <li>Use <strong>Live</strong> for in-designer propose/apply; check Output for palette-only Assist</li>
-              <li>Explain works best with the active project open (package pins + Invoke paths)</li>
-              <li>Scenario names starting with <code>assist-</code> are safe to edit or delete in <code>scenarios.json</code></li>
-            </ul>
+            <details class="assist-help-details" open>
+              <summary>In this dialog</summary>
+              <ul>
+                <li><strong>Live</strong> — VB / required / selector proposals for the open workflow</li>
+                <li><strong>Scaffold</strong> — describe steps → Propose → Append or Replace</li>
+              </ul>
+            </details>
+            <details class="assist-help-details">
+              <summary>Command Palette (F0–F4)</summary>
+              <ul>
+                <li>Explain / critique · Generate scenarios · Scaffold · Repair from dry-run · Selectors · VB</li>
+                <li>Results also go to <strong>Output → LowCode Studio</strong></li>
+              </ul>
+            </details>
+            <details class="assist-help-details">
+              <summary>VB repair examples</summary>
+              <ul>
+                <li><code>TRim(name)</code> → <code>name.Trim()</code></li>
+                <li><code>name.toUpperCase()</code> → <code>name.ToUpper()</code></li>
+                <li><code>x == null</code> → <code>x Is Nothing</code></li>
+              </ul>
+            </details>
           </div>
-          <div class="settings-dialog-foot" style="border-top:none;padding:8px 0 0">
+          <div class="settings-dialog-foot" style="border-top:none;padding:4px 0 0">
             <button class="btn primary" type="button" id="assistHelpDone">Got it</button>
           </div>
         </div>
@@ -1665,6 +1709,7 @@ export function getDesignerHtml(
         <button class="dock-btn" id="btnZoomOut" type="button" title="Zoom out">−</button>
         <span class="zoom-label" id="zoomLabel" title="Current zoom">100%</span>
         <button class="dock-btn" id="btnZoomIn" type="button" title="Zoom in">+</button>
+        <button class="dock-btn" id="btnZoomFit" type="button" title="Fit content / selection">⤢</button>
         <button class="dock-btn" id="btnZoomReset" type="button" title="Reset zoom to 100%">⛶</button>
       </div>
       <span class="dock-sep" aria-hidden="true"></span>
@@ -1691,7 +1736,13 @@ export function getDesignerHtml(
       assistHelpOpen: false,
       assistTab: 'live',
       assistScaffoldProposal: null,
+      assistLiveScope: 'selected',
+      assistLiveKinds: { vb: true, required: true, selector: true },
       minimapCollapsed: false,
+      searchHits: [],
+      searchHitIndex: 0,
+      targetArgsByPath: {},
+      targetArgsStatus: {},
       collapsedLeftSections: { project: true, activities: false, variables: true, arguments: true, watch: true, fixtures: true },
       selectedId: null,
       dragType: null,
@@ -1761,11 +1812,16 @@ export function getDesignerHtml(
       assistHelpOverlay: document.getElementById('assistHelpOverlay'),
       btnAssistHelp: document.getElementById('btnAssistHelp'),
       assistLiveList: document.getElementById('assistLiveList'),
+      assistLiveCount: document.getElementById('assistLiveCount'),
       assistScaffoldList: document.getElementById('assistScaffoldList'),
       assistScaffoldInput: document.getElementById('assistScaffoldInput'),
       minimapDock: document.getElementById('minimapDock'),
       minimapStage: document.getElementById('minimapStage'),
       minimapCount: document.getElementById('minimapCount'),
+      searchHitCount: document.getElementById('searchHitCount'),
+      exprVbAssist: document.getElementById('exprVbAssist'),
+      exprVbProposed: document.getElementById('exprVbProposed'),
+      btnAlignSelection: document.getElementById('btnAlignSelection'),
       watchView: document.getElementById('watchView'),
       watchCount: document.getElementById('watchCount'),
       fixturesEditor: document.getElementById('fixturesEditor')
@@ -2156,6 +2212,70 @@ export function getDesignerHtml(
         node.y = typeof y === 'number' ? y : 80 + Math.floor(state.workflow.activities.length / 4) * 140;
       }
       return node;
+    }
+
+    function parseArgumentMappings(raw) {
+      const text = String(raw ?? '').trim();
+      if (!text) return [];
+      if (text.startsWith('{')) {
+        try {
+          const obj = JSON.parse(text);
+          return Object.entries(obj).map(([name, value]) => {
+            if (value && typeof value === 'object') {
+              return {
+                name: String(name).trim(),
+                expression: String(value.expression ?? '').trim(),
+                direction: value.direction === 'Out' || value.direction === 'InOut' ? value.direction : (value.direction === 'In' ? 'In' : undefined)
+              };
+            }
+            return { name: String(name).trim(), expression: String(value ?? '').trim() };
+          }).filter((m) => m.name);
+        } catch (_) {}
+      }
+      const out = [];
+      for (const line of text.split(/\\r?\\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const directed = trimmed.match(/^(In|Out|InOut)\\s*:\\s*([A-Za-z_][\\w]*)\\s*(?:=|:)\\s*(.+)$/i);
+        if (directed) {
+          const dirRaw = directed[1];
+          const direction = /^out$/i.test(dirRaw) ? 'Out' : /^inout$/i.test(dirRaw) ? 'InOut' : 'In';
+          out.push({ name: directed[2], expression: directed[3].trim(), direction });
+          continue;
+        }
+        const m = trimmed.match(/^([A-Za-z_][\\w]*)\\s*(?:=|:)\\s*(.+)$/);
+        if (m) out.push({ name: m[1], expression: m[2].trim() });
+      }
+      return out;
+    }
+    function formatArgumentMappings(mappings) {
+      return (mappings || []).filter((m) => m.name).map((m) => {
+        const expr = m.expression || '""';
+        if (m.direction === 'Out' || m.direction === 'InOut') return m.direction + ':' + m.name + ' = ' + expr;
+        return m.name + ' = ' + expr;
+      }).join('\\n');
+    }
+    function mergeInvokeMappings(targetArgs, existing) {
+      const byName = new Map((existing || []).map((m) => [m.name, m]));
+      const out = [];
+      for (const arg of targetArgs || []) {
+        const name = String(arg.name || '').trim();
+        if (!name) continue;
+        const prev = byName.get(name);
+        out.push({
+          name,
+          expression: prev?.expression ?? '',
+          direction: arg.direction || prev?.direction || 'In'
+        });
+        byName.delete(name);
+      }
+      for (const m of byName.values()) out.push(m);
+      return out;
+    }
+    function requestTargetArguments(workflowPath) {
+      const path = String(workflowPath || '').trim();
+      if (!path) return;
+      vscode.postMessage({ type: 'loadWorkflowArguments', workflowPath: path });
     }
 
     function walkFind(list, id) {
@@ -2680,6 +2800,72 @@ export function getDesignerHtml(
       state._zoomUserTouched = true;
       state.zoom = Math.min(1.75, Math.max(0.5, Math.round(next * 100) / 100));
       applyZoom();
+    }
+    function zoomToActivity(id) {
+      const el = document.querySelector('[data-id="' + id + '"]');
+      if (!el) return;
+      if (state.zoom < 0.9) setZoom(1);
+      highlightSearchHit(id);
+    }
+    function fitCanvasView() {
+      const wrap = document.getElementById('canvasWrap');
+      if (!wrap) { setZoom(1); return; }
+      const wrapW = Math.max(200, wrap.clientWidth - 48);
+      const wrapH = Math.max(160, wrap.clientHeight - 120);
+      if (isFlow()) {
+        const nodes = state.workflow.activities || [];
+        if (!nodes.length) { setZoom(1); return; }
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        const focus = state.selectedId
+          ? nodes.filter((n) => n.id === state.selectedId)
+          : nodes;
+        const list = focus.length ? focus : nodes;
+        for (const n of list) {
+          const x = n.x || 0, y = n.y || 0;
+          minX = Math.min(minX, x); minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x + 180); maxY = Math.max(maxY, y + 90);
+        }
+        const spanX = Math.max(160, maxX - minX + 80);
+        const spanY = Math.max(120, maxY - minY + 80);
+        const next = Math.min(1.5, Math.max(0.5, Math.min(wrapW / spanX, wrapH / spanY)));
+        setZoom(next);
+        if (state.selectedId) highlightSearchHit(state.selectedId);
+        else toast('Fit content · ' + Math.round(next * 100) + '%');
+        return;
+      }
+      const cards = els.sequence?.querySelectorAll('.card');
+      if (!cards || !cards.length) { setZoom(1); return; }
+      let maxBottom = 0;
+      cards.forEach((c) => { maxBottom = Math.max(maxBottom, c.offsetTop + c.offsetHeight); });
+      const next = Math.min(1.25, Math.max(0.55, wrapH / Math.max(maxBottom + 80, wrapH)));
+      setZoom(next);
+      if (state.selectedId) highlightSearchHit(state.selectedId);
+      else toast('Fit content · ' + Math.round(next * 100) + '%');
+    }
+    function alignSelectedFlowNodes() {
+      if (!isFlow() || !state.selectedId) { toast('Select a flowchart node first'); return; }
+      const selected = state.workflow.activities.find((a) => a.id === state.selectedId);
+      if (!selected) return;
+      const targetX = selected.x || 0;
+      let n = 0;
+      for (const a of state.workflow.activities) {
+        if (a.id === selected.id) continue;
+        // Align nodes roughly on the same row (±40px) to the selected X
+        if (Math.abs((a.y || 0) - (selected.y || 0)) <= 48) {
+          a.x = targetX;
+          n++;
+        }
+      }
+      if (!n) {
+        // Fallback: align all to selected X
+        for (const a of state.workflow.activities) {
+          if (a.id === selected.id) continue;
+          a.x = targetX;
+          n++;
+        }
+      }
+      persist(true);
+      toast('Aligned ' + n + ' node(s) to selection');
     }
     function stagePoint(e) {
       const rect = els.flowStage.getBoundingClientRect();
@@ -3317,6 +3503,17 @@ export function getDesignerHtml(
             ? (ok ? 'Invoke path set: ' + wp : 'Invoke path set — confirm file exists in project')
             : 'Invoke Workflow needs a workflow path'
         });
+        const target = state.targetArgsByPath[wp];
+        if (target && target.length) {
+          const mapped = parseArgumentMappings(node.properties?.argumentMappings);
+          const missing = target.filter((a) => !mapped.some((m) => m.name === a.name && String(m.expression || '').trim()));
+          items.push({
+            ok: missing.length === 0,
+            text: missing.length
+              ? 'Missing argument mappings: ' + missing.map((a) => a.name).join(', ')
+              : 'Argument mappings cover target contract (' + target.length + ')'
+          });
+        }
       }
       if (String(node.type || '').startsWith('Imported.')) {
         items.push({
@@ -3571,6 +3768,121 @@ export function getDesignerHtml(
       return true;
     }
 
+    function invokeMapEditorHtml(node) {
+      const path = String(node.properties?.workflowPath || '').trim();
+      const existing = parseArgumentMappings(node.properties?.argumentMappings);
+      const target = state.targetArgsByPath[path];
+      const status = state.targetArgsStatus[path];
+      const rows = target && target.length
+        ? mergeInvokeMappings(target, existing)
+        : (existing.length
+          ? existing
+          : [{ name: '', expression: '', direction: 'In' }]);
+      const missing = (target || []).filter((a) => {
+        const hit = existing.find((m) => m.name === a.name && String(m.expression || '').trim());
+        return !hit;
+      });
+      let html = '<div class="invoke-map" id="invokeMapEditor">';
+      html += '<div class="invoke-map-toolbar">' +
+        '<button type="button" class="btn" id="btnLoadTargetArgs"' + (path ? '' : ' disabled') + '>Load args from workflow</button>' +
+        '<button type="button" class="btn" id="btnFillMissingMaps"' + (target && target.length ? '' : ' disabled') + '>Add missing</button>' +
+        '</div>';
+      if (!path) {
+        html += '<div class="empty">Set Workflow Path first.</div>';
+      } else if (status && status !== 'ok') {
+        html += '<div class="invoke-map-missing">' + escapeHtml(status) + '</div>';
+      } else if (target && missing.length) {
+        html += '<div class="invoke-map-missing">Missing: ' +
+          escapeHtml(missing.map((a) => (a.direction === 'Out' || a.direction === 'InOut' ? a.direction + ':' : '') + a.name).join(', ')) +
+          '</div>';
+      } else if (target && !target.length) {
+        html += '<div class="empty">Target workflow has no arguments contract.</div>';
+      }
+      html += '<div id="invokeMapRows">' +
+        rows.map((m, i) => {
+          const dir = m.direction || 'In';
+          const name = m.name || '';
+          return '<div class="invoke-map-row" data-im-row="' + i + '">' +
+            '<div class="im-name" title="' + escapeAttr(name) + '"><span class="im-dir ' + escapeAttr(dir) + '">' +
+            escapeHtml(dir) + '</span>' + escapeHtml(name || '(name)') + '</div>' +
+            '<input data-im-expr="' + i + '" data-im-name="' + escapeAttr(name) + '" data-im-dir="' + escapeAttr(dir) +
+            '" value="' + escapeAttr(m.expression || '') + '" placeholder="Expression (caller var / arg)" list="dl_invoke_expr" />' +
+            '</div>';
+        }).join('') +
+        '</div>';
+      const suggest = [
+        ...(state.suggestions?.variables || []),
+        ...(state.workflow.arguments || []).map((a) => a.name)
+      ].slice(0, 40);
+      if (suggest.length) {
+        html += '<datalist id="dl_invoke_expr">' +
+          suggest.map((v) => '<option value="' + escapeAttr(v) + '"></option>').join('') +
+          '</datalist>';
+      }
+      html += '<details class="modern-sel" style="margin-top:8px"><summary>Raw mappings</summary>' +
+        '<textarea data-prop="argumentMappings" id="invokeMapRaw">' +
+        escapeHtml(String(node.properties?.argumentMappings || '')) +
+        '</textarea></details>';
+      html += '</div>';
+      return html;
+    }
+    function serializeInvokeMapFromDom() {
+      const rows = [];
+      els.props.querySelectorAll('[data-im-expr]').forEach((input) => {
+        const name = input.getAttribute('data-im-name') || '';
+        if (!name) return;
+        const direction = input.getAttribute('data-im-dir') || 'In';
+        rows.push({
+          name,
+          expression: input.value || '',
+          direction: direction === 'Out' || direction === 'InOut' ? direction : 'In'
+        });
+      });
+      return formatArgumentMappings(rows);
+    }
+    function wireInvokeMapEditor(node) {
+      const path = String(node.properties?.workflowPath || '').trim();
+      if (path && state.targetArgsByPath[path] === undefined) {
+        requestTargetArguments(path);
+      }
+      document.getElementById('btnLoadTargetArgs')?.addEventListener('click', () => {
+        if (!path) { toast('Set workflow path first'); return; }
+        requestTargetArguments(path);
+        toast('Loading target arguments…');
+      });
+      document.getElementById('btnFillMissingMaps')?.addEventListener('click', () => {
+        const target = state.targetArgsByPath[path] || [];
+        if (!target.length) { toast('Load target arguments first'); return; }
+        const merged = mergeInvokeMappings(target, parseArgumentMappings(node.properties?.argumentMappings));
+        for (const m of merged) {
+          if (!String(m.expression || '').trim()) {
+            // Prefer same-named caller arg/var
+            const locals = [
+              ...(state.workflow.arguments || []).map((a) => a.name),
+              ...(state.suggestions?.variables || [])
+            ];
+            if (locals.includes(m.name)) m.expression = m.name;
+            else if (m.direction === 'Out') m.expression = m.name.replace(/^out_?/i, '') || m.name;
+            else m.expression = m.name;
+          }
+        }
+        node.properties.argumentMappings = formatArgumentMappings(merged);
+        persist(true);
+        toast('Filled missing mappings');
+      });
+      const persistRows = () => {
+        node.properties = node.properties || {};
+        node.properties.argumentMappings = serializeInvokeMapFromDom();
+        const raw = document.getElementById('invokeMapRaw');
+        if (raw) raw.value = node.properties.argumentMappings;
+        vscode.postMessage({ type: 'edit', workflow: state.workflow });
+      };
+      els.props.querySelectorAll('[data-im-expr]').forEach((input) => {
+        input.addEventListener('change', persistRows);
+        input.addEventListener('blur', persistRows);
+      });
+    }
+
     function assistLiveStripHtml(node) {
       if (!node) return '';
       const props = collectLiveAssistProposals({ selectedOnly: true }).filter((p) => p.activityId === node.id);
@@ -3611,21 +3923,43 @@ export function getDesignerHtml(
     function renderAssistLivePanel() {
       const list = els.assistLiveList;
       if (!list) return;
-      const proposals = collectLiveAssistProposals({ selectedOnly: false });
+      const scopeSelected = state.assistLiveScope !== 'all';
+      const kinds = state.assistLiveKinds || { vb: true, required: true, selector: true };
+      let proposals = collectLiveAssistProposals({ selectedOnly: scopeSelected && !!state.selectedId });
+      if (scopeSelected && !state.selectedId) {
+        proposals = collectLiveAssistProposals({ selectedOnly: false }).slice(0, 12);
+      }
+      proposals = proposals.filter((p) => kinds[p.kind] !== false);
+      if (els.assistLiveCount) els.assistLiveCount.textContent = String(proposals.length);
+      document.querySelectorAll('[data-al-scope]').forEach((btn) => {
+        btn.classList.toggle('on', btn.getAttribute('data-al-scope') === (scopeSelected ? 'selected' : 'all'));
+      });
+      document.querySelectorAll('[data-al-kind]').forEach((btn) => {
+        const k = btn.getAttribute('data-al-kind');
+        btn.classList.toggle('on', !!kinds[k]);
+      });
       if (!proposals.length) {
-        list.innerHTML = '<div class="empty">No live proposals — expressions look VB-clean and required fields are set.</div>';
+        list.innerHTML = '<div class="empty">No proposals for this filter.</div>';
         return;
       }
-      list.innerHTML = proposals.map((p) =>
-        '<div class="assist-proposal">' +
-          '<div class="ap-title">' + escapeHtml(p.label) + '</div>' +
-          '<div class="ap-meta">' + escapeHtml(p.detail) + '</div>' +
-          (p.actionable
-            ? '<div class="assist-actions" style="margin-top:8px"><button type="button" class="al-apply" data-al-panel-apply="' +
-              escapeAttr(p.id) + '">Apply</button></div>'
-            : '') +
-        '</div>'
-      ).join('');
+      const groups = { vb: [], required: [], selector: [] };
+      for (const p of proposals) (groups[p.kind] || groups.vb).push(p);
+      const labels = { vb: 'VB', required: 'Required', selector: 'Selector' };
+      let html = '';
+      for (const key of ['vb', 'required', 'selector']) {
+        if (!groups[key].length) continue;
+        html += '<div class="assist-group-label">' + labels[key] + ' · ' + groups[key].length + '</div>';
+        html += groups[key].map((p) =>
+          '<div class="assist-proposal">' +
+            '<div class="ap-title">' + escapeHtml(p.label) + '</div>' +
+            (p.actionable
+              ? '<button type="button" class="al-apply" data-al-panel-apply="' + escapeAttr(p.id) + '">Apply</button>'
+              : '<span></span>') +
+            '<div class="ap-meta">' + escapeHtml(p.detail) + '</div>' +
+          '</div>'
+        ).join('');
+      }
+      list.innerHTML = html;
       list.querySelectorAll('[data-al-panel-apply]').forEach((btn) => {
         btn.addEventListener('click', () => {
           const id = btn.getAttribute('data-al-panel-apply');
@@ -3901,6 +4235,10 @@ export function getDesignerHtml(
           }
           continue;
         }
+        if (node.type === 'REFramework.InvokeWorkflow' && p.name === 'argumentMappings') {
+          activity += fieldHtml(label, invokeMapEditorHtml(node), p.required);
+          continue;
+        }
         activity += fieldHtml(label, renderPropInput(p, val, node), p.required);
         const isExprProp = p.type === 'expression' || p.type === 'multiline' || p.name === 'condition' || p.name === 'expression' || p.name === 'assignments' || p.name === 'argumentMappings';
         if (isExprProp && p.name !== 'selector') {
@@ -3953,6 +4291,7 @@ export function getDesignerHtml(
       if (flow) html += propSection('flow', 'Flowchart', flow);
       els.props.innerHTML = html;
       wireAssistLiveStrip(node);
+      if (node.type === 'REFramework.InvokeWorkflow') wireInvokeMapEditor(node);
 
       els.props.querySelectorAll('.prop-section-head').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -3998,6 +4337,12 @@ export function getDesignerHtml(
             value = value === 'true';
           }
           node.properties[key] = value;
+          if (node.type === 'REFramework.InvokeWorkflow' && key === 'workflowPath') {
+            const path = String(value || '').trim();
+            delete state.targetArgsByPath[path];
+            delete state.targetArgsStatus[path];
+            if (path) requestTargetArguments(path);
+          }
           persist(true);
         };
         input.addEventListener('change', apply);
@@ -4071,18 +4416,34 @@ export function getDesignerHtml(
       renderBreadcrumbs();
     }
 
+    function refreshExprVbAssist() {
+      const box = els.exprVbAssist;
+      const proposed = els.exprVbProposed;
+      if (!box || !proposed || !els.exprDialogValue) return;
+      const r = rewriteVbExpression(els.exprDialogValue.value || '');
+      if (!r.changed) {
+        box.classList.remove('show');
+        proposed.textContent = '';
+        return;
+      }
+      proposed.textContent = (r.labels.join('; ') || 'expression fix') + ' → ' + r.next;
+      box.dataset.vbNext = r.next;
+      box.classList.add('show');
+    }
     function openExprEditor(node, propName, def) {
       const pdef = (def?.properties || []).find(p => p.name === propName);
       const label = pdef?.label || propName;
       state.exprEdit = { nodeId: node.id, prop: propName };
       if (els.exprDialogTitle) els.exprDialogTitle.textContent = label + ' — ' + (node.displayName || node.type);
       if (els.exprDialogValue) els.exprDialogValue.value = String(node.properties?.[propName] ?? '');
+      refreshExprVbAssist();
       els.exprOverlay?.classList.add('show');
       els.exprDialogValue?.focus();
     }
     function closeExprEditor() {
       state.exprEdit = null;
       els.exprOverlay?.classList.remove('show');
+      els.exprVbAssist?.classList.remove('show');
     }
     function applyExprEditor() {
       if (!state.exprEdit) return;
@@ -4136,15 +4497,55 @@ export function getDesignerHtml(
       setTimeout(() => el.classList.remove('search-hit'), 900);
     }
 
-    function findInWorkflow(query) {
+    function findAllInWorkflow(query) {
       const q = String(query || '').trim().toLowerCase();
-      if (!q) return null;
-      const all = walkCollect(state.workflow.activities);
-      return all.find(n =>
+      if (!q) return [];
+      return walkCollect(state.workflow.activities).filter((n) =>
         String(n.displayName || '').toLowerCase().includes(q) ||
         String(n.type || '').toLowerCase().includes(q) ||
         String(summary(n) || '').toLowerCase().includes(q)
-      ) || null;
+      );
+    }
+    function findInWorkflow(query) {
+      return findAllInWorkflow(query)[0] || null;
+    }
+    function updateSearchHitCount() {
+      if (!els.searchHitCount) return;
+      const total = state.searchHits.length;
+      if (!total) { els.searchHitCount.textContent = ''; return; }
+      els.searchHitCount.textContent = (state.searchHitIndex + 1) + '/' + total;
+    }
+    function goToSearchHit(delta) {
+      const q = els.workflowSearch?.value || '';
+      state.searchHits = findAllInWorkflow(q);
+      if (!state.searchHits.length) {
+        updateSearchHitCount();
+        toast('No match');
+        return;
+      }
+      state.searchHitIndex = ((state.searchHitIndex + delta) % state.searchHits.length + state.searchHits.length) % state.searchHits.length;
+      const hit = state.searchHits[state.searchHitIndex];
+      state.selectedId = hit.id;
+      persist(true);
+      zoomToActivity(hit.id);
+      updateSearchHitCount();
+    }
+    function runWorkflowSearch(advance) {
+      const q = els.workflowSearch?.value || '';
+      state.searchHits = findAllInWorkflow(q);
+      if (!state.searchHits.length) {
+        state.searchHitIndex = 0;
+        updateSearchHitCount();
+        if (String(q || '').trim()) toast('No match for “' + q + '”');
+        return;
+      }
+      if (advance) state.searchHitIndex = (state.searchHitIndex + 1) % state.searchHits.length;
+      else state.searchHitIndex = Math.min(state.searchHitIndex, state.searchHits.length - 1);
+      const hit = state.searchHits[state.searchHitIndex];
+      state.selectedId = hit.id;
+      persist(true);
+      zoomToActivity(hit.id);
+      updateSearchHitCount();
     }
 
     function renderVariables() {
@@ -4226,7 +4627,16 @@ export function getDesignerHtml(
         const i = Number(input.getAttribute('data-arg'));
         const field = input.getAttribute('data-field');
         if (!state.workflow.arguments || !state.workflow.arguments[i] || !field) return;
-        state.workflow.arguments[i][field] = input.value;
+        let value = input.value;
+        if (field === 'name') {
+          value = String(value || '').trim().replace(/\\s+/g, '_');
+          const dup = state.workflow.arguments.some((a, idx) => idx !== i && a.name === value);
+          if (dup) {
+            toast('Duplicate argument name: ' + value);
+          }
+          input.value = value;
+        }
+        state.workflow.arguments[i][field] = value;
         vscode.postMessage({ type: 'edit', workflow: state.workflow });
         vscode.postMessage({
           type: 'argumentsChanged',
@@ -4373,9 +4783,10 @@ export function getDesignerHtml(
       els.workflowType.classList.toggle('flow', isFlow());
       els.btnLink.style.display = isFlow() ? '' : 'none';
       els.btnAutoLayout.style.display = isFlow() ? '' : 'none';
+      if (els.btnAlignSelection) els.btnAlignSelection.style.display = isFlow() ? '' : 'none';
       els.canvasHelp.textContent = isFlow()
-        ? 'Flowchart · drag nodes · blue ports to link · bottom dock for zoom & run'
-        : 'Sequence · drag activities onto the board · bottom dock for zoom, insert & run';
+        ? 'Flowchart · drag nodes · blue ports to link · Fit ⤢ · Align · dock for zoom & run'
+        : 'Sequence · drag activities onto the board · Find ↑↓ · Fit ⤢ · dock for zoom & run';
       applyZoom();
       renderCatalog();
       renderProjectTree();
@@ -4559,7 +4970,32 @@ export function getDesignerHtml(
 
     document.getElementById('btnZoomIn')?.addEventListener('click', () => setZoom(state.zoom + 0.1));
     document.getElementById('btnZoomOut')?.addEventListener('click', () => setZoom(state.zoom - 0.1));
+    document.getElementById('btnZoomFit')?.addEventListener('click', () => fitCanvasView());
     document.getElementById('btnZoomReset')?.addEventListener('click', () => setZoom(1));
+    els.btnAlignSelection?.addEventListener('click', () => alignSelectedFlowNodes());
+    document.getElementById('exprVbApply')?.addEventListener('click', () => {
+      const next = els.exprVbAssist?.dataset?.vbNext;
+      if (!next || !els.exprDialogValue) return;
+      els.exprDialogValue.value = next;
+      refreshExprVbAssist();
+      toast('VB repair applied in editor — press Apply to save');
+    });
+    els.exprDialogValue?.addEventListener('input', () => refreshExprVbAssist());
+    document.querySelectorAll('[data-al-scope]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.assistLiveScope = btn.getAttribute('data-al-scope') === 'all' ? 'all' : 'selected';
+        renderAssistLivePanel();
+      });
+    });
+    document.querySelectorAll('[data-al-kind]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const k = btn.getAttribute('data-al-kind');
+        if (!k) return;
+        state.assistLiveKinds = state.assistLiveKinds || { vb: true, required: true, selector: true };
+        state.assistLiveKinds[k] = !state.assistLiveKinds[k];
+        renderAssistLivePanel();
+      });
+    });
     document.getElementById('canvasWrap')?.addEventListener('wheel', (e) => {
       if (!(e.ctrlKey || e.metaKey)) return;
       e.preventDefault();
@@ -4780,7 +5216,10 @@ export function getDesignerHtml(
     });
     document.getElementById('assistLiveRefresh')?.addEventListener('click', () => renderAssistLivePanel());
     document.getElementById('assistLiveApplyAll')?.addEventListener('click', () => {
-      const proposals = collectLiveAssistProposals({ selectedOnly: false }).filter((p) => p.actionable);
+      const scopeSelected = state.assistLiveScope !== 'all';
+      const kinds = state.assistLiveKinds || { vb: true, required: true, selector: true };
+      const proposals = collectLiveAssistProposals({ selectedOnly: scopeSelected && !!state.selectedId })
+        .filter((p) => kinds[p.kind] !== false && p.actionable);
       let n = 0;
       for (const p of proposals) {
         if (applyLiveProposal(p)) n++;
@@ -4827,30 +5266,17 @@ export function getDesignerHtml(
     els.workflowSearch?.addEventListener('input', () => {
       clearTimeout(searchTimer);
       searchTimer = setTimeout(() => {
-        const q = els.workflowSearch.value;
-        if (!String(q || '').trim()) return;
-        const hit = findInWorkflow(q);
-        if (!hit) {
-          toast('No match for “' + q + '”');
-          return;
-        }
-        state.selectedId = hit.id;
-        persist(true);
-        highlightSearchHit(hit.id);
+        state.searchHitIndex = 0;
+        runWorkflowSearch(false);
       }, 220);
     });
     els.workflowSearch?.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter') return;
       e.preventDefault();
-      const hit = findInWorkflow(els.workflowSearch.value);
-      if (!hit) {
-        toast('No match');
-        return;
-      }
-      state.selectedId = hit.id;
-      persist(true);
-      highlightSearchHit(hit.id);
+      runWorkflowSearch(true);
     });
+    document.getElementById('btnSearchNext')?.addEventListener('click', () => goToSearchHit(1));
+    document.getElementById('btnSearchPrev')?.addEventListener('click', () => goToSearchHit(-1));
     els.btnDelete.addEventListener('click', () => {
       if (!state.selectedId) return;
       deleteActivityById(state.selectedId);
@@ -4893,6 +5319,22 @@ export function getDesignerHtml(
         if (state.settingsOpen) fillSettingsForm();
       }
       if (msg.type === 'toast' && msg.message) toast(msg.message, { skipLog: !!msg.logged });
+      if (msg.type === 'workflowArguments') {
+        const path = String(msg.workflowPath || '').trim();
+        if (path) {
+          state.targetArgsByPath[path] = Array.isArray(msg.arguments) ? msg.arguments : [];
+          state.targetArgsStatus[path] = msg.ok
+            ? (msg.message || 'ok')
+            : (msg.message || 'Failed to load arguments');
+          const hit = state.selectedId ? walkFind(state.workflow.activities, state.selectedId) : null;
+          if (hit?.node?.type === 'REFramework.InvokeWorkflow' &&
+              String(hit.node.properties?.workflowPath || '').trim() === path) {
+            renderProps();
+          }
+          if (msg.ok) toast('Loaded ' + (msg.arguments?.length || 0) + ' target argument(s)');
+          else toast(msg.message || 'Could not load target arguments');
+        }
+      }
       if (msg.type === 'requestFlush') {
         // Flush typed-but-not-blurred property values into state.workflow before Cmd+S
         vscode.postMessage({ type: 'flushState', workflow: state.workflow });

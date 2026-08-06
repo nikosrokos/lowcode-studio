@@ -584,6 +584,21 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           await this.openInvokedWorkflow(document, String(message.workflowPath || ''));
           break;
         }
+        case 'loadWorkflowArguments': {
+          const result = this.resolveWorkflowArguments(
+            document,
+            String(message.workflowPath || '')
+          );
+          webviewPanel.webview.postMessage({
+            type: 'workflowArguments',
+            workflowPath: String(message.workflowPath || ''),
+            requestId: message.requestId,
+            ok: result.ok,
+            arguments: result.arguments,
+            message: result.message
+          });
+          break;
+        }
         case 'openProjectFile': {
           const filePath = String(message.path || '');
           if (!filePath || !fs.existsSync(filePath)) {
@@ -721,6 +736,62 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
     }
   }
 
+  private resolveWorkflowPath(
+    document: vscode.TextDocument,
+    workflowPath: string
+  ): string | undefined {
+    const relative = workflowPath.trim().replace(/\\/g, '/');
+    if (!relative) {
+      return undefined;
+    }
+    const projectRoot = findProjectRoot(path.dirname(document.uri.fsPath));
+    const withLcs =
+      relative.endsWith('.xaml') && !relative.endsWith('.lcs.json')
+        ? relative.replace(/\.xaml$/i, '.lcs.json')
+        : relative;
+    const candidates = [
+      path.isAbsolute(relative) ? relative : undefined,
+      path.isAbsolute(withLcs) ? withLcs : undefined,
+      projectRoot ? path.join(projectRoot, withLcs) : undefined,
+      projectRoot ? path.join(projectRoot, relative) : undefined,
+      path.join(path.dirname(document.uri.fsPath), withLcs),
+      path.join(path.dirname(document.uri.fsPath), relative)
+    ].filter((p): p is string => Boolean(p));
+    return candidates.find((p) => fs.existsSync(p));
+  }
+
+  private resolveWorkflowArguments(
+    document: vscode.TextDocument,
+    workflowPath: string
+  ): { ok: boolean; arguments: WorkflowDocument['arguments']; message?: string } {
+    const resolved = this.resolveWorkflowPath(document, workflowPath);
+    if (!resolved) {
+      return {
+        ok: false,
+        arguments: [],
+        message: `Could not find workflow: ${workflowPath || '(empty path)'}`
+      };
+    }
+    try {
+      if (resolved.endsWith('.lcs.json')) {
+        const doc = parseWorkflow(fs.readFileSync(resolved, 'utf8'));
+        return { ok: true, arguments: Array.isArray(doc.arguments) ? doc.arguments : [] };
+      }
+      // XAML-only target: no LCS sibling — return empty contract (UI still works)
+      return {
+        ok: true,
+        arguments: [],
+        message: 'Target has no .lcs.json arguments contract yet'
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        arguments: [],
+        message: err instanceof Error ? err.message : String(err)
+      };
+    }
+  }
+
   private async openInvokedWorkflow(
     document: vscode.TextDocument,
     workflowPath: string
@@ -731,14 +802,7 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
       return;
     }
 
-    const projectRoot = findProjectRoot(path.dirname(document.uri.fsPath));
-    const candidates = [
-      path.isAbsolute(relative) ? relative : undefined,
-      projectRoot ? path.join(projectRoot, relative) : undefined,
-      path.join(path.dirname(document.uri.fsPath), relative)
-    ].filter((p): p is string => Boolean(p));
-
-    const resolved = candidates.find((p) => fs.existsSync(p));
+    const resolved = this.resolveWorkflowPath(document, workflowPath);
     if (!resolved) {
       vscode.window.showErrorMessage(
         `Could not find invoked workflow: ${relative}`
