@@ -40,6 +40,8 @@ import {
   findProjectRoot
 } from '../interop/projectResolve';
 import {
+  getStudioWebLocalLink,
+  getStudioWebLocalSyncStatus,
   trySyncFromStudioWebLocal,
   trySyncToStudioWebLocal
 } from '../interop/studioWebLocal';
@@ -52,6 +54,8 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
   private lastSyncLabel = '';
   /** Designer Save will sync after document.save(); skip the parallel onDidSave sync. */
   private readonly skipNextDidSaveSync = new Set<string>();
+  /** Avoid spamming the VS Code toast when Studio Web is newer. */
+  private syncAlertNotifiedFor = '';
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -60,6 +64,26 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
 
   getActiveDocumentPath(): string | undefined {
     return this.activeDocument?.uri.fsPath;
+  }
+
+  /** Reload the open designer from disk after an external pull/sync. */
+  async reloadActiveDesignerFromDisk(): Promise<boolean> {
+    const document = this.activeDocument;
+    const panel = this.activePanel;
+    if (!document || !panel) {
+      return false;
+    }
+    return this.reloadDesignerFromDisk(document, panel);
+  }
+
+  /** Push current Studio Web sync status into the open designer (banner + Sync btn). */
+  pushSyncStatusToActive(): void {
+    const document = this.activeDocument;
+    const panel = this.activePanel;
+    if (!document || !panel) {
+      return;
+    }
+    this.pushSyncStatus(document, panel);
   }
 
   /** True if designer Save will handle sync — extension onDidSave should skip. */
@@ -170,6 +194,191 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Pull Studio Web → LCS for the open workflow (or whole project), then reload designer.
+   * Used by the designer Sync button / alert — no close/reopen needed.
+   */
+  async pullStudioWebForActiveDesigner(opts?: {
+    force?: boolean;
+    wholeProject?: boolean;
+  }): Promise<{ ok: boolean; message: string }> {
+    const document = this.activeDocument;
+    const panel = this.activePanel;
+    if (!document || !panel) {
+      return { ok: false, message: 'Open a workflow in the designer first.' };
+    }
+    const projectRoot = findProjectRoot(path.dirname(document.uri.fsPath));
+    if (!projectRoot || !getStudioWebLocalLink(projectRoot)) {
+      return { ok: false, message: 'Not linked to a Studio Web Local Workspace.' };
+    }
+    const rel = path.relative(projectRoot, document.uri.fsPath).replace(/\\/g, '/');
+    try {
+      // Flush in-memory edits first so we don't silently lose them on pull
+      await this.flushWebviewBeforeSave(document);
+      const pulled = trySyncFromStudioWebLocal(projectRoot, {
+        force: Boolean(opts?.force),
+        workflowRels: opts?.wholeProject || !rel.endsWith('.lcs.json') ? undefined : [rel]
+      });
+      if (!pulled) {
+        return { ok: false, message: 'Pull failed.' };
+      }
+      let reloaded = false;
+      if (pulled.updated.length || pulled.created.length) {
+        reloaded = await this.reloadDesignerFromDisk(document, panel);
+      }
+      this.pushSyncStatus(document, panel);
+      this.refreshProjectTree();
+      if (pulled.updated.length === 0 && pulled.conflicts.length === 0) {
+        return { ok: true, message: 'Already in sync with Studio Web Local.' };
+      }
+      if (pulled.conflicts.length && !pulled.updated.length) {
+        return {
+          ok: false,
+          message: `${pulled.conflicts.length} conflict(s) — both sides changed. Save to keep LCS, or Sync with force.`
+        };
+      }
+      const msg =
+        `Pulled ${pulled.updated.length} workflow(s)` +
+        (pulled.created.length ? ` (${pulled.created.length} new)` : '') +
+        (reloaded ? ' · designer reloaded' : '') +
+        (pulled.conflicts.length ? ` · ${pulled.conflicts.length} conflict(s) skipped` : '');
+      return { ok: true, message: msg };
+    } catch (err) {
+      return {
+        ok: false,
+        message: err instanceof Error ? err.message : 'Pull from Studio Web Local failed'
+      };
+    }
+  }
+
+  private async reloadDesignerFromDisk(
+    document: vscode.TextDocument,
+    panel: vscode.WebviewPanel
+  ): Promise<boolean> {
+    try {
+      const disk = await vscode.workspace.fs.readFile(document.uri);
+      const text = Buffer.from(disk).toString('utf8');
+      if (text !== document.getText()) {
+        const edit = new vscode.WorkspaceEdit();
+        edit.replace(
+          document.uri,
+          new vscode.Range(0, 0, document.lineCount, 0),
+          text
+        );
+        await vscode.workspace.applyEdit(edit);
+      }
+      const workflow = parseWorkflow(document.getText());
+      this.onWorkflowChanged(workflow);
+      panel.webview.postMessage({ type: 'setWorkflow', workflow });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private pushSyncStatus(
+    document: vscode.TextDocument,
+    panel: vscode.WebviewPanel
+  ): void {
+    const projectRoot = findProjectRoot(path.dirname(document.uri.fsPath));
+    if (!projectRoot) {
+      panel.webview.postMessage({
+        type: 'syncStatus',
+        linked: false,
+        inSync: true,
+        summary: 'No LCS project',
+        thisWorkflow: null
+      });
+      return;
+    }
+    const status = getStudioWebLocalSyncStatus(projectRoot);
+    const rel = path.relative(projectRoot, document.uri.fsPath).replace(/\\/g, '/');
+    const thisStale = status.stale.find((s) => s.workflowRel === rel);
+    const xamlNewerHere = thisStale?.reason === 'xaml-newer';
+    const lcsNewerHere = thisStale?.reason === 'lcs-newer';
+    const anyXamlNewer = status.stale.some((s) => s.reason === 'xaml-newer');
+    panel.webview.postMessage({
+      type: 'syncStatus',
+      linked: status.linked,
+      inSync: status.inSync,
+      summary: status.summary,
+      solutionLabel: status.link ? path.basename(status.link.solutionDir) : '',
+      thisWorkflow: thisStale
+        ? { rel, reason: thisStale.reason }
+        : status.linked
+          ? { rel, reason: 'in-sync' }
+          : null,
+      needsPull: Boolean(xamlNewerHere || (anyXamlNewer && !lcsNewerHere)),
+      xamlNewerCount: status.stale.filter((s) => s.reason === 'xaml-newer').length,
+      lcsNewerCount: status.stale.filter((s) => s.reason === 'lcs-newer').length
+    });
+
+    // One VS Code toast per stale fingerprint (Sync action → pull + reload)
+    if (status.linked && anyXamlNewer) {
+      const key = status.stale
+        .filter((s) => s.reason === 'xaml-newer')
+        .map((s) => s.workflowRel)
+        .sort()
+        .join('|');
+      if (key && key !== this.syncAlertNotifiedFor) {
+        this.syncAlertNotifiedFor = key;
+        void vscode.window
+          .showWarningMessage(
+            `Studio Web has newer changes (${status.stale.filter((s) => s.reason === 'xaml-newer').length}). Sync without reopening?`,
+            'Sync now',
+            'Dismiss'
+          )
+          .then(async (choice) => {
+            if (choice === 'Sync now') {
+              const result = await this.pullStudioWebForActiveDesigner({
+                wholeProject: true
+              });
+              void vscode.window.showInformationMessage(result.message);
+              panel.webview.postMessage({
+                type: 'toast',
+                message: result.message,
+                logged: true
+              });
+            }
+          });
+      }
+    } else if (status.inSync) {
+      this.syncAlertNotifiedFor = '';
+    }
+  }
+
+  private attachSyncWatchers(
+    document: vscode.TextDocument,
+    panel: vscode.WebviewPanel
+  ): vscode.Disposable {
+    const disposables: vscode.Disposable[] = [];
+    const tick = () => {
+      if (this.activePanel === panel) {
+        this.pushSyncStatus(document, panel);
+      }
+    };
+    tick();
+    const interval = setInterval(tick, 4000);
+    disposables.push({ dispose: () => clearInterval(interval) });
+
+    const projectRoot = findProjectRoot(path.dirname(document.uri.fsPath));
+    const link = projectRoot ? getStudioWebLocalLink(projectRoot) : undefined;
+    if (link?.solutionDir && fs.existsSync(link.solutionDir)) {
+      const pattern = new vscode.RelativePattern(link.solutionDir, '**/*.{xaml,json}');
+      const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+      const onFs = () => {
+        // Debounce burst writes from Studio Web
+        setTimeout(tick, 600);
+      };
+      watcher.onDidChange(onFs);
+      watcher.onDidCreate(onFs);
+      watcher.onDidDelete(onFs);
+      disposables.push(watcher);
+    }
+
+    return vscode.Disposable.from(...disposables);
   }
 
   /**
@@ -372,6 +581,8 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
 
     updateWebview();
 
+    const syncWatch = this.attachSyncWatchers(document, webviewPanel);
+
     const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument((e) => {
       if (e.document.uri.toString() === document.uri.toString() && e.contentChanges.length) {
         // External disk reload while designer tab is not focused — avoid fighting in-memory edits
@@ -383,6 +594,10 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
           } catch {
             updateWebview();
           }
+        }
+        // Keep sync banner current after local edits / pulls
+        if (this.activePanel === webviewPanel) {
+          this.pushSyncStatus(document, webviewPanel);
         }
       }
     });
@@ -398,6 +613,7 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
     });
 
     webviewPanel.onDidDispose(() => {
+      syncWatch.dispose();
       changeDocumentSubscription.dispose();
       willSaveSubscription.dispose();
       if (this.activePanel === webviewPanel) {
@@ -420,6 +636,8 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
         if (projectRoot) {
           void vscode.commands.executeCommand('lowcodeStudio.setActiveProject', projectRoot);
         }
+        // Recheck Studio Web when returning to the designer tab
+        this.pushSyncStatus(document, webviewPanel);
       }
     });
 
@@ -457,6 +675,7 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
             message: saveMsg,
             logged: true
           });
+          this.pushSyncStatus(document, webviewPanel);
           break;
         }
         case 'flushState': {
@@ -694,7 +913,29 @@ export class WorkflowEditorProvider implements vscode.CustomTextEditorProvider {
             type: 'settings',
             settings: this.readDesignerSettings()
           });
+          this.pushSyncStatus(document, webviewPanel);
           break;
+        case 'pullStudioWeb': {
+          const result = await this.pullStudioWebForActiveDesigner({
+            wholeProject: Boolean(message.wholeProject),
+            force: Boolean(message.force)
+          });
+          webviewPanel.webview.postMessage({
+            type: 'toast',
+            message: result.message,
+            logged: true
+          });
+          webviewPanel.webview.postMessage({
+            type: 'syncPullResult',
+            ok: result.ok,
+            message: result.message
+          });
+          break;
+        }
+        case 'checkSyncStatus': {
+          this.pushSyncStatus(document, webviewPanel);
+          break;
+        }
       }
     });
   }

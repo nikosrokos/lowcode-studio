@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.6.46] — 2026-08-06
+
+### Added
+- **Studio Web sync alert** — when Studio Web has newer `.xaml` while the designer is open, a banner + VS Code toast offer **Sync now** (no close/reopen)
+- Toolbar **↻ Sync** button (linked projects) pulls Studio Web → reloads the open designer in place
+- Live watch of the linked solution folder + 4s status poll; sync pill shows In sync / Studio Web newer
+
+### Fixed
+- **Pull from Studio Web Local** command also reloads the open designer (was requiring close/reopen)
+
 ## [0.6.45] — 2026-08-06
 
 ### Fixed

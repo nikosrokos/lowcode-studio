@@ -51,6 +51,11 @@ function run(): void {
     !html.includes('Always expand core sections when selecting'),
     'must not force-expand prop sections on every renderProps'
   );
+  assert.ok(html.includes('id="syncAlert"'), 'Studio Web sync alert banner');
+  assert.ok(html.includes('id="btnSync"'), 'Sync button in toolbar');
+  assert.ok(html.includes('function applySyncStatus'), 'applies syncStatus from host');
+  assert.ok(html.includes("type: 'pullStudioWeb'"), 'Sync posts pullStudioWeb');
+  assert.ok(html.includes('id="syncPill"'), 'sync status pill');
 
   console.log('designerUxFixes.test.ts: ok');
 }

@@ -602,6 +602,8 @@ export function activate(context: vscode.ExtensionContext): void {
           const pulled = trySyncFromStudioWebLocal(dir, { force: false });
           projectProvider.refresh();
           editorProvider?.refreshProjectTree?.();
+          await editorProvider?.reloadActiveDesignerFromDisk?.();
+          editorProvider?.pushSyncStatusToActive?.();
           if (!pulled) {
             return;
           }
@@ -612,7 +614,8 @@ export function activate(context: vscode.ExtensionContext): void {
                 : 'Already in sync — nothing to pull from Studio Web Local.'
               : `Pulled ${pulled.updated.length} workflow(s) from Studio Web Local` +
                 (pulled.created.length ? ` (${pulled.created.length} new)` : '') +
-                (pulled.backups.length ? ` · backups in ${SYNC_TRASH_DIR}/` : '');
+                (pulled.backups.length ? ` · backups in ${SYNC_TRASH_DIR}/` : '') +
+                ' · designer reloaded';
           void vscode.window.showInformationMessage(msg);
           if (pulled.conflicts.length) {
             void vscode.window.showWarningMessage(
