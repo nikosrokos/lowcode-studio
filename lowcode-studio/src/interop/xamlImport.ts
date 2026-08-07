@@ -348,7 +348,11 @@ function collectActivities(
       // types). Recursing here instead of mapping it means we land back on the
       // Sequence-unwrap shortcut above and actually see the real children, rather
       // than dropping them and emitting an empty "ActivityAction (imported)" node.
-      if (key === 'ActivityAction') {
+      // Catch (TryCatch.Catches) has the identical problem one level up — its own
+      // real content is itself a bare <ActivityAction>, so it needs the same
+      // recurse-instead-of-map treatment; the two cases compose naturally since
+      // recursing here just lands on the ActivityAction case above on the next call.
+      if (key === 'ActivityAction' || key === 'Catch') {
         results.push(...collectActivities(raw as Record<string, unknown>, warnings, depth + 1));
         continue;
       }
@@ -1393,6 +1397,18 @@ function pickCommonProps(
     extractArgument(raw, 'Url') ||
     extractArgument(raw, 'FilePath') ||
     extractArgument(raw, 'WorkbookPath');
+  // Modern Excel activities (confirmed via real Studio Web export) use
+  // WorkbookPathResource="[CType(<var>, UiPath.Platform.ResourceHandling.IResource)]"
+  // instead of a plain WorkbookPath string — pull the variable name back out of the
+  // cast so it round-trips symmetrically with the export-side fix.
+  const workbookResourceRaw =
+    raw['@_WorkbookPathResource'] || extractArgument(raw, 'WorkbookPathResource');
+  const workbookResource = workbookResourceRaw
+    ? cleanExpr(workbookResourceRaw).replace(
+        /^\[?CType\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,\s*UiPath\.Platform\.ResourceHandling\.IResource\s*\)\]?$/,
+        '$1'
+      )
+    : undefined;
   const item = raw['@_Item'] || extractArgument(raw, 'Item');
   const result =
     raw['@_Result'] ||
@@ -1405,9 +1421,9 @@ function pickCommonProps(
   if (item) {
     props.item = cleanExpr(item);
   }
-  if (url) {
+  if (url || workbookResource) {
     if (mapped?.startsWith('Excel.')) {
-      props.workbookPath = cleanExpr(url);
+      props.workbookPath = cleanExpr(workbookResource || url);
     } else if (mapped === 'UI.OpenApplication') {
       props.pathOrUrl = cleanExpr(url);
     } else {

@@ -63,7 +63,7 @@ export function exportWorkflowToXaml(
         : renderSequence(doc.activities, doc.name, varsXml);
 
     return `<?xml version="1.0" encoding="utf-8"?>
-<Activity mc:Ignorable="sap sap2010" x:Class="${escapeAttr(sanitizeClass(doc.name))}" sap:VirtualizedContainerService.HintSize="1200,800" sap2010:WorkflowViewState.IdRef="Activity1" xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation" xmlns:sap2010="http://schemas.microsoft.com/netfx/2010/xaml/activities/presentation" xmlns:scg="clr-namespace:System.Collections.Generic;assembly=System.Collections" xmlns:sd="clr-namespace:System.Data;assembly=System.Data.Common" xmlns:ui="http://schemas.uipath.com/workflow/activities" xmlns:uix="http://schemas.uipath.com/workflow/activities/uix" xmlns:excel="http://schemas.uipath.com/workflow/activities/excel" xmlns:mail="http://schemas.uipath.com/workflow/activities/mail" xmlns:python="http://schemas.uipath.com/workflow/activities/python" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+<Activity mc:Ignorable="sap sap2010" x:Class="${escapeAttr(sanitizeClass(doc.name))}" sap:VirtualizedContainerService.HintSize="1200,800" sap2010:WorkflowViewState.IdRef="Activity1" xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation" xmlns:sap2010="http://schemas.microsoft.com/netfx/2010/xaml/activities/presentation" xmlns:scg="clr-namespace:System.Collections.Generic;assembly=System.Collections" xmlns:sd="clr-namespace:System.Data;assembly=System.Data.Common" xmlns:ui="http://schemas.uipath.com/workflow/activities" xmlns:uix="http://schemas.uipath.com/workflow/activities/uix" xmlns:mail="http://schemas.uipath.com/workflow/activities/mail" xmlns:python="http://schemas.uipath.com/workflow/activities/python" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 ${membersXml}${body}
 </Activity>
 `;
@@ -737,7 +737,7 @@ ${pad}</ui:AddQueueItem>`;
         : info.ns === 'uia'
           ? `uix:${info.localName}`
           : info.ns === 'excel'
-            ? `excel:${info.localName}`
+            ? `ui:${info.localName}`
             : info.ns === 'mail'
               ? `mail:${info.localName}`
               : info.ns === 'python'
@@ -1239,12 +1239,32 @@ function renderExcelActivity(activity: ActivityNode, pad: string, indent = 0): s
   const range = escapeAttr(String(activity.properties.range || ''));
   const cell = escapeAttr(String(activity.properties.cell || 'A1'));
   switch (activity.type) {
-    case 'Excel.ReadRange':
-      return `${pad}<excel:ReadRange DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" SheetName="${sheet}" Range="${range}" />`;
+    case 'Excel.ReadRange': {
+      const display = escapeAttr(exportDisplayName(activity.displayName));
+      const resultVar = String(activity.properties.result || 'dt').replace(/^\[|\]$/g, '').trim();
+      const rawPath = String(activity.properties.workbookPath || 'data.xlsx').trim();
+      const looksLikeVariable = /^[A-Za-z_][A-Za-z0-9_]*$/.test(rawPath);
+      const sheetAttr = ` SheetName="${sheet}"`;
+      const rangeAttr = range ? ` Range="${range}"` : '';
+      const dataTableAttr = resultVar ? ` DataTable="[${escapeAttr(resultVar)}]"` : '';
+      if (looksLikeVariable) {
+        // Confirmed against a real Studio Web export: modern ReadRange takes an
+        // IResource, not a plain path string — CType-cast a Resource-typed variable.
+        return `${pad}<ui:ReadRange DisplayName="${display}" AddHeaders="True" WorkbookPathResource="[CType(${escapeAttr(rawPath)}, UiPath.Platform.ResourceHandling.IResource)]"${sheetAttr}${rangeAttr}${dataTableAttr} />`;
+      }
+      // UNVERIFIED: rawPath looks like a literal file path string rather than a
+      // Resource-typed variable, and I don't have a confirmed way to construct an
+      // IResource from a literal path (guessing a ResourceInfo constructor here
+      // risks shipping XAML that fails to compile in Studio Web, worse than this
+      // fallback). Keeping classic WorkbookPath as best-effort. If Excel Read Range
+      // with a literal path still fails to load, capture a real sample configured
+      // that way and this branch can be corrected properly.
+      return `${pad}<ui:ReadRange DisplayName="${display}" AddHeaders="True" WorkbookPath="${path}"${sheetAttr}${rangeAttr}${dataTableAttr} />`;
+    }
     case 'Excel.WriteRange':
-      return `${pad}<excel:WriteRange DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" SheetName="${sheet}" DataTable="[${escapeAttr(String(activity.properties.data || 'dt'))}]" />`;
+      return `${pad}<ui:WriteRange DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" SheetName="${sheet}" DataTable="[${escapeAttr(String(activity.properties.data || 'dt'))}]" />`;
     case 'Excel.AppendRange':
-      return `${pad}<excel:AppendRange DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" SheetName="${sheet}" DataTable="[${escapeAttr(String(activity.properties.data || 'dt'))}]" />`;
+      return `${pad}<ui:AppendRange DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" SheetName="${sheet}" DataTable="[${escapeAttr(String(activity.properties.data || 'dt'))}]" />`;
     case 'Excel.ExcelApplicationScope': {
       if (isPortableExport()) {
         const kids = (activity.children || []).map((c) => renderActivity(c, indent + 1)).join('\n');
@@ -1255,20 +1275,20 @@ ${pad}</Sequence>`;
       }
       const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
       const create = activity.properties.createIfNotExists === false || activity.properties.createIfNotExists === 'false' ? 'False' : 'True';
-      return `${pad}<excel:ExcelApplicationScope DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" CreateNewFile="${create}">
-${pad}  <excel:ExcelApplicationScope.Body>
+      return `${pad}<ui:ExcelApplicationScope DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" CreateNewFile="${create}">
+${pad}  <ui:ExcelApplicationScope.Body>
 ${pad}    <ActivityAction>
 ${pad}      <Sequence>
 ${kids}
 ${pad}      </Sequence>
 ${pad}    </ActivityAction>
-${pad}  </excel:ExcelApplicationScope.Body>
-${pad}</excel:ExcelApplicationScope>`;
+${pad}  </ui:ExcelApplicationScope.Body>
+${pad}</ui:ExcelApplicationScope>`;
     }
     case 'Excel.ReadCell':
-      return `${pad}<excel:ReadCell DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" SheetName="${sheet}" Cell="${cell}" />`;
+      return `${pad}<ui:ReadCell DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" SheetName="${sheet}" Cell="${cell}" />`;
     case 'Excel.WriteCell':
-      return `${pad}<excel:WriteCell DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" SheetName="${sheet}" Cell="${cell}" Value="[${escapeAttr(String(activity.properties.value ?? '""'))}]" />`;
+      return `${pad}<ui:WriteCell DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" WorkbookPath="${path}" SheetName="${sheet}" Cell="${cell}" Value="[${escapeAttr(String(activity.properties.value ?? '""'))}]" />`;
     default:
       return `${pad}<ui:Comment DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Text="Excel placeholder" />`;
   }

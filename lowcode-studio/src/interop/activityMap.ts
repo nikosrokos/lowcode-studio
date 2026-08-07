@@ -252,7 +252,7 @@ const MAP: Array<{
       'ExcelReadRange',
       'ReadExcelRange'
     ],
-    xamlNamespace: 'excel'
+    xamlNamespace: 'ui'
   },
   {
     lcsType: 'Excel.WriteRange',
@@ -263,7 +263,7 @@ const MAP: Array<{
       'WriteDataTableToExcel',
       'WriteExcelRange'
     ],
-    xamlNamespace: 'excel'
+    xamlNamespace: 'ui'
   },
   {
     lcsType: 'Excel.ReadCell',
@@ -274,12 +274,12 @@ const MAP: Array<{
       'ReadCellFormulaX',
       'ExcelReadCell'
     ],
-    xamlNamespace: 'excel'
+    xamlNamespace: 'ui'
   },
   {
     lcsType: 'Excel.WriteCell',
     xamlLocalNames: ['WriteCell', 'WriteCellX', 'WriteCellValueX', 'ExcelWriteCell'],
-    xamlNamespace: 'excel'
+    xamlNamespace: 'ui'
   },
   {
     lcsType: 'Excel.AppendRange',
@@ -289,7 +289,7 @@ const MAP: Array<{
       'ExcelAppendRange',
       'AppendDataTableToExcel'
     ],
-    xamlNamespace: 'excel'
+    xamlNamespace: 'ui'
   },
   {
     lcsType: 'Excel.ExcelApplicationScope',
@@ -302,7 +302,7 @@ const MAP: Array<{
       'CloseExcel',
       'CloseWorkbook'
     ],
-    xamlNamespace: 'excel'
+    xamlNamespace: 'ui'
   },
   {
     lcsType: 'Messaging.SendEmail',
