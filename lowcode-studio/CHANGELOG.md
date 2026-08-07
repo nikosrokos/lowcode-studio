@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
-## [0.7.4] — 2026-08-07
+## [0.7.5] — 2026-08-07
 
 ## [0.7.2] — 2026-08-06
 

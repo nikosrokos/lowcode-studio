@@ -436,11 +436,17 @@ ${pad}</ui:ForEachRow>`;
   }
 
   if (activity.type === 'Messaging.DeserializeJson') {
-    return `${pad}<ui:DeserializeJson DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" JsonString="[${escapeAttr(String(activity.properties.jsonString ?? '\"{}\"'))}]" />`;
+    // JsonObject holds the result variable — xamlImport.ts reads it back via
+    // raw['@_JsonObject']. Previously omitted here, so the configured result
+    // variable was silently dropped on every export.
+    return `${pad}<ui:DeserializeJson DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" JsonString="[${escapeAttr(String(activity.properties.jsonString ?? '\"{}\"'))}]" JsonObject="[${escapeAttr(String(activity.properties.result || 'jsonObj'))}]" />`;
   }
 
   if (activity.type === 'Messaging.SerializeJson') {
-    return `${pad}<ui:SerializeJson DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" JsonObject="[${escapeAttr(String(activity.properties.value || 'jsonObj'))}]" />`;
+    // JsonString holds the result variable — xamlImport.ts reads it back via
+    // raw['@_JsonString']. Previously omitted here, so the configured result
+    // variable was silently dropped on every export.
+    return `${pad}<ui:SerializeJson DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" JsonObject="[${escapeAttr(String(activity.properties.value || 'jsonObj'))}]" JsonString="[${escapeAttr(String(activity.properties.result || 'jsonText'))}]" />`;
   }
 
   if (activity.type === 'System.LogMessage') {

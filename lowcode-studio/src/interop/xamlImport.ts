@@ -962,7 +962,13 @@ function mapActivity(
       type: 'Orchestrator.AddQueueItem',
       displayName,
       properties: {
-        queueName: cleanExpr(raw['@_QueueName'] || extractArgument(raw, 'QueueName') || 'MainQueue'),
+        // Real exported attribute is QueueType, not QueueName (see FIXING_ACTIVITIES.md
+        // "Surprises we found" and the matching fix in xamlExport.ts's AddQueueItem
+        // render). Kept the old QueueName as a fallback for any documents/XAML that
+        // predate this fix.
+        queueName: cleanExpr(
+          raw['@_QueueType'] || extractArgument(raw, 'QueueType') || raw['@_QueueName'] || extractArgument(raw, 'QueueName') || 'MainQueue'
+        ),
         folderPath: cleanExpr(raw['@_FolderPath'] || extractArgument(raw, 'FolderPath') || ''),
         reference: cleanExpr(raw['@_Reference'] || extractArgument(raw, 'Reference') || '""'),
         itemInformation: cleanExpr(raw['@_ItemInformation'] || extractArgument(raw, 'ItemInformation') || '{}'),
@@ -1192,6 +1198,41 @@ function mapActivity(
         ),
         result: stripBrackets(
           cleanExpr(raw['@_Text'] || extractArgument(raw, 'Text') || 'tableText')
+        )
+      }
+    };
+  }
+
+  // UNVERIFIED (see FIXING_ACTIVITIES.md "Known unverified areas" convention): these
+  // local names / attribute shapes match what xamlExport.ts's renderExcelActivity-
+  // adjacent Data.ReadCsv/Data.WriteCsv render functions emit, but haven't been
+  // diffed against a real Studio-exported sample the way ReadRange etc. were.
+  // Without this block these types had no dedicated import case at all and fell
+  // through to pickCommonProps(), which has no Data.ReadCsv/Data.WriteCsv branch —
+  // filePath/result/data were silently dropped on every import.
+  if (localName === 'ReadCsvFile') {
+    return {
+      id: newId(),
+      type: 'Data.ReadCsv',
+      displayName,
+      properties: {
+        filePath: cleanExpr(raw['@_FilePath'] || extractArgument(raw, 'FilePath') || '"input.csv"'),
+        result: stripBrackets(
+          cleanExpr(raw['@_DataTable'] || extractArgument(raw, 'DataTable') || 'dt')
+        )
+      }
+    };
+  }
+
+  if (localName === 'WriteCsvFile') {
+    return {
+      id: newId(),
+      type: 'Data.WriteCsv',
+      displayName,
+      properties: {
+        filePath: cleanExpr(raw['@_FilePath'] || extractArgument(raw, 'FilePath') || '"output.csv"'),
+        data: stripBrackets(
+          cleanExpr(raw['@_DataTable'] || extractArgument(raw, 'DataTable') || 'dt')
         )
       }
     };
