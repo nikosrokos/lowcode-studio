@@ -35,6 +35,7 @@ export interface ActivityNode {
   properties: Record<string, unknown>;
   children?: ActivityNode[];
   elseChildren?: ActivityNode[];
+  finallyChildren?: ActivityNode[];
   /** Flowchart canvas position */
   x?: number;
   y?: number;

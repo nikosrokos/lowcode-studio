@@ -401,7 +401,7 @@ function mapActivity(
       type: 'ControlFlow.If',
       displayName,
       properties: {
-        condition: cleanExpr(raw['@_Condition'] ?? extractArgument(raw, 'Condition') ?? 'true')
+        condition: fromVbStringArgument(cleanExpr(raw['@_Condition'] ?? extractArgument(raw, 'Condition') ?? 'true'))
       },
       children: collectActivities(thenNode, warnings),
       elseChildren: collectActivities(elseNode, warnings)
@@ -459,8 +459,8 @@ function mapActivity(
       type: 'System.MessageBox',
       displayName,
       properties: {
-        text: cleanExpr(raw['@_Text'] ?? extractArgument(raw, 'Text') ?? '"Hello"'),
-        title: cleanExpr(raw['@_Caption'] ?? raw['@_Title'] ?? 'LowCode Studio')
+        text: fromVbStringArgument(cleanExpr(raw['@_Text'] ?? extractArgument(raw, 'Text') ?? '"Hello"')),
+        title: fromVbStringArgument(cleanExpr(raw['@_Caption'] ?? raw['@_Title'] ?? 'LowCode Studio'))
       }
     };
   }
@@ -471,7 +471,7 @@ function mapActivity(
       type: 'System.WriteLine',
       displayName,
       properties: {
-        text: cleanExpr(raw['@_Text'] ?? extractArgument(raw, 'Text') ?? '""')
+        text: fromVbStringArgument(cleanExpr(raw['@_Text'] ?? extractArgument(raw, 'Text') ?? '""'))
       }
     };
   }
@@ -483,7 +483,7 @@ function mapActivity(
       displayName,
       properties: {
         item: String(raw['@_DisplayName'] ? 'item' : 'item'),
-        values: cleanExpr(raw['@_Values'] ?? extractArgument(raw, 'Values') ?? 'collection')
+        values: fromVbStringArgument(cleanExpr(raw['@_Values'] ?? extractArgument(raw, 'Values') ?? 'collection'))
       },
       children: collectActivities(raw['Body'] || raw['ForEach.Body'] || raw, warnings)
     };
@@ -498,13 +498,14 @@ function mapActivity(
         exceptionType: 'System.Exception'
       },
       children: collectActivities(raw['Try'] || raw['TryCatch.Try'], warnings),
-      elseChildren: collectActivities(raw['Catches'] || raw['TryCatch.Catches'], warnings)
+      elseChildren: collectActivities(raw['Catches'] || raw['TryCatch.Catches'], warnings),
+      finallyChildren: collectActivities(raw['Finally'] || raw['TryCatch.Finally'], warnings)
     };
   }
 
   if (localName === 'Assign') {
     const to = cleanExpr(extractArgument(raw, 'To') ?? raw['@_To'] ?? 'variable');
-    const value = cleanExpr(extractArgument(raw, 'Value') ?? raw['@_Value'] ?? '""');
+    const value = fromVbStringArgument(cleanExpr(extractArgument(raw, 'Value') ?? raw['@_Value'] ?? '""'));
     return {
       id: newId(),
       type: 'Programming.Assign',
@@ -557,12 +558,12 @@ function mapActivity(
       type: 'Python.PythonScope',
       displayName,
       properties: {
-        path: cleanExpr(raw['@_Path'] || extractArgument(raw, 'Path') || ''),
-        libraryPath: cleanExpr(raw['@_LibraryPath'] || extractArgument(raw, 'LibraryPath') || ''),
+        path: fromVbStringArgument(cleanExpr(raw['@_Path'] || extractArgument(raw, 'Path') || '')),
+        libraryPath: fromVbStringArgument(cleanExpr(raw['@_LibraryPath'] || extractArgument(raw, 'LibraryPath') || '')),
         target: String(raw['@_Target'] || 'x64'),
-        workingFolder: cleanExpr(
+        workingFolder: fromVbStringArgument(cleanExpr(
           raw['@_WorkingFolder'] || extractArgument(raw, 'WorkingFolder') || ''
-        ),
+        )),
         version: cleanExpr(raw['@_Version'] || '')
       },
       children: collectActivities(raw, warnings)
@@ -575,8 +576,8 @@ function mapActivity(
       type: 'Python.LoadScript',
       displayName,
       properties: {
-        file: cleanExpr(raw['@_File'] || extractArgument(raw, 'File') || ''),
-        code: cleanExpr(raw['@_Code'] || extractArgument(raw, 'Code') || ''),
+        file: fromVbStringArgument(cleanExpr(raw['@_File'] || extractArgument(raw, 'File') || '')),
+        code: fromVbStringArgument(cleanExpr(raw['@_Code'] || extractArgument(raw, 'Code') || '')),
         result: stripBrackets(
           cleanExpr(raw['@_Result'] || extractArgument(raw, 'Result') || 'pythonScript')
         )

@@ -285,6 +285,7 @@ ${pad}</ForEach>`;
 
   if (activity.type === 'ControlFlow.TryCatch') {
     const tryKids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
+    const finallyKids = (activity.finallyChildren || []).map((c) => renderActivity(c, indent + 4)).join('\n');
     const catchKids = (activity.elseChildren || [])
       .map((c) => renderActivity(c, indent + 3))
       .join('\n');
@@ -306,6 +307,11 @@ ${pad}        </Sequence>
 ${pad}      </ActivityAction>
 ${pad}    </Catch>
 ${pad}  </TryCatch.Catches>
+${pad}  <TryCatch.Finally>
+${pad}     <Sequence>    
+${finallyKids}      
+${pad}     </Sequence>
+${pad}  </TryCatch.Finally>
 ${pad}</TryCatch>`;
   }
 
@@ -315,7 +321,7 @@ ${pad}  <Assign.To>
 ${pad}    <OutArgument x:TypeArguments="x:Object">[${escapeAttr(String(activity.properties.to ?? 'variable'))}]</OutArgument>
 ${pad}  </Assign.To>
 ${pad}  <Assign.Value>
-${pad}    <InArgument x:TypeArguments="x:Object">[${escapeAttr(String(activity.properties.value ?? '""'))}]</InArgument>
+${pad}    <InArgument x:TypeArguments="x:Object">[${escapeAttr(toVbStringArgument(String(activity.properties.value ?? '""')))}]</InArgument>
 ${pad}  </Assign.Value>
 ${pad}</Assign>`;
   }
