@@ -33,6 +33,17 @@ function isPortableExport(): boolean {
 }
 
 /**
+ * ScopeGuid of the innermost Use Application/Browser (NApplicationCard) currently
+ * being rendered, or undefined at top level. Real Studio Web XAML requires child
+ * UI Automation activities inside a card to declare a matching ScopeIdentifier
+ * attribute (and HealingAgentBehavior="SameAsCard") — confirmed against a real
+ * exported sample. Without it those activities aren't properly scoped to the card
+ * and Studio Web flags them. Set/restored around rendering NApplicationCard.Body's
+ * children, mirroring the exportTarget pattern above.
+ */
+let activeScopeGuid: string | undefined;
+
+/**
  * Best-effort XAML export for UiPath Studio Desktop (Windows) / Studio Web import.
  * Default project compatibility is **Windows** so robots run on Windows machines
  * with classic UI Automation selectors. Studio Web Local sync should pass Portable.
@@ -52,7 +63,7 @@ export function exportWorkflowToXaml(
         : renderSequence(doc.activities, doc.name, varsXml);
 
     return `<?xml version="1.0" encoding="utf-8"?>
-<Activity mc:Ignorable="sap sap2010" x:Class="${escapeAttr(sanitizeClass(doc.name))}" sap:VirtualizedContainerService.HintSize="1200,800" sap2010:WorkflowViewState.IdRef="Activity1" xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation" xmlns:sap2010="http://schemas.microsoft.com/netfx/2010/xaml/activities/presentation" xmlns:scg="clr-namespace:System.Collections.Generic;assembly=System.Collections" xmlns:sd="clr-namespace:System.Data;assembly=System.Data.Common" xmlns:ui="http://schemas.uipath.com/workflow/activities" xmlns:uia="http://schemas.uipath.com/workflow/activities/uipath.uiautomation.next" xmlns:excel="http://schemas.uipath.com/workflow/activities/excel" xmlns:mail="http://schemas.uipath.com/workflow/activities/mail" xmlns:python="http://schemas.uipath.com/workflow/activities/python" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+<Activity mc:Ignorable="sap sap2010" x:Class="${escapeAttr(sanitizeClass(doc.name))}" sap:VirtualizedContainerService.HintSize="1200,800" sap2010:WorkflowViewState.IdRef="Activity1" xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation" xmlns:sap2010="http://schemas.microsoft.com/netfx/2010/xaml/activities/presentation" xmlns:scg="clr-namespace:System.Collections.Generic;assembly=System.Collections" xmlns:sd="clr-namespace:System.Data;assembly=System.Data.Common" xmlns:ui="http://schemas.uipath.com/workflow/activities" xmlns:uix="http://schemas.uipath.com/workflow/activities/uix" xmlns:excel="http://schemas.uipath.com/workflow/activities/excel" xmlns:mail="http://schemas.uipath.com/workflow/activities/mail" xmlns:python="http://schemas.uipath.com/workflow/activities/python" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 ${membersXml}${body}
 </Activity>
 `;
@@ -593,7 +604,7 @@ ${pad}</ui:TimeoutScope>`;
     if (isPortableExport() && /InteractionMode="(WindowMessages|HardwareEvents|Background)"/.test(inputAttr)) {
       inputAttr = ' InteractionMode="Simulate"';
     }
-    return `${pad}<uia:NKeyboardShortcuts DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Shortcuts="[${escapeAttr(toVbStringArgument(key))}]"${selAttr}${inputAttr} />`;
+    return `${pad}<uix:NKeyboardShortcuts DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" Shortcuts="[${escapeAttr(toVbStringArgument(key))}]"${selAttr}${inputAttr} />`;
   }
 
   if (activity.type === 'UI.UseApplicationBrowser') {
@@ -666,7 +677,22 @@ ${pad}</ui:TimeoutScope>`;
   if (activity.type === 'Orchestrator.AddQueueItem') {
     const folder = String(activity.properties.folderPath || '');
     const folderAttr = folder ? ` FolderPath="${escapeAttr(folder)}"` : '';
-    return `${pad}<ui:AddQueueItem DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" QueueName="${escapeAttr(String(activity.properties.queueName || 'MainQueue'))}"${folderAttr} Reference="[${escapeAttr(String(activity.properties.reference ?? '""'))}]" Priority="${escapeAttr(String(activity.properties.priority || 'Normal'))}" ItemInformation="[${escapeAttr(String(activity.properties.itemInformation || '{}'))}]" />`;
+    const display = escapeAttr(exportDisplayName(activity.displayName));
+    const queueType = escapeAttr(String(activity.properties.queueName || 'MainQueue'));
+    const priority = escapeAttr(String(activity.properties.priority || 'Normal'));
+    const referenceRaw = String(activity.properties.reference ?? '""');
+    const referenceAttr = referenceRaw && referenceRaw !== '""'
+      ? ` Reference="[${escapeAttr(referenceRaw)}]"`
+      : '';
+    const itemInfoXml = renderQueueItemInformation(
+      String(activity.properties.itemInformation || '{}'),
+      pad + '    '
+    );
+    return `${pad}<ui:AddQueueItem DisplayName="${display}" QueueType="${queueType}"${folderAttr}${referenceAttr} Priority="${priority}">
+${pad}  <ui:AddQueueItem.ItemInformation>
+${itemInfoXml}
+${pad}  </ui:AddQueueItem.ItemInformation>
+${pad}</ui:AddQueueItem>`;
   }
 
   if (activity.type === 'Orchestrator.GetAsset') {
@@ -709,7 +735,7 @@ ${pad}</ui:TimeoutScope>`;
       info.ns === 'ui'
         ? `ui:${info.localName}`
         : info.ns === 'uia'
-          ? `uia:${info.localName}`
+          ? `uix:${info.localName}`
           : info.ns === 'excel'
             ? `excel:${info.localName}`
             : info.ns === 'mail'
@@ -764,9 +790,13 @@ function renderUseApplicationBrowser(
   pad: string,
   indent: number
 ): string {
+  const scopeGuid = crypto.randomUUID();
+  const prevScope = activeScopeGuid;
+  activeScopeGuid = scopeGuid;
   const kids = (activity.children || [])
     .map((c) => renderActivity(c, indent + 3))
     .join('\n');
+  activeScopeGuid = prevScope;
   const props = applyWindowsSelectorsToActivityProps(activity.properties || {});
   const mode = String(props.mode || 'Browser');
   const isApp = /application/i.test(mode);
@@ -785,14 +815,13 @@ function renderUseApplicationBrowser(
   }
   const selector = String(props.selector || '').trim();
   const selAttr = selector ? ` Selector="${escapeAttr(selector)}"` : '';
-  const scopeGuid = crypto.randomUUID();
 
   const targetInner = isApp
     ? ` FilePath="${escapeAttr(pathOrUrl)}"`
     : ` BrowserType="${browser}" Url="${escapeAttr(pathOrUrl)}"${selAttr}`;
 
-  return `${pad}<uia:NApplicationCard DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" OpenMode="${open}" CloseMode="${close}" AttachMode="${attach}"${inputAttr} Version="V2" ScopeGuid="${scopeGuid}">
-${pad}  <uia:NApplicationCard.Body>
+  return `${pad}<uix:NApplicationCard DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}" OpenMode="${open}" CloseMode="${close}" AttachMode="${attach}"${inputAttr} Version="V2" ScopeGuid="${scopeGuid}">
+${pad}  <uix:NApplicationCard.Body>
 ${pad}    <ActivityAction x:TypeArguments="x:Object">
 ${pad}      <ActivityAction.Argument>
 ${pad}        <DelegateInArgument x:TypeArguments="x:Object" Name="WSSessionData" />
@@ -801,11 +830,11 @@ ${pad}      <Sequence DisplayName="Do">
 ${kids}
 ${pad}      </Sequence>
 ${pad}    </ActivityAction>
-${pad}  </uia:NApplicationCard.Body>
-${pad}  <uia:NApplicationCard.TargetApp>
-${pad}    <uia:TargetApp Area="0, 0, 0, 0"${targetInner} Version="V2" />
-${pad}  </uia:NApplicationCard.TargetApp>
-${pad}</uia:NApplicationCard>`;
+${pad}  </uix:NApplicationCard.Body>
+${pad}  <uix:NApplicationCard.TargetApp>
+${pad}    <uix:TargetApp Area="0, 0, 0, 0"${targetInner} Version="V2" />
+${pad}  </uix:NApplicationCard.TargetApp>
+${pad}</uix:NApplicationCard>`;
 }
 
 function normalizeOpenMode(raw: unknown): string {
@@ -879,6 +908,36 @@ ${cols}
     </xs:element>
   </xs:schema>
 </NewDataSet>`;
+}
+
+/**
+ * AddQueueItem.ItemInformation is a Dictionary<string, InArgument<string>>, serialized
+ * as one <InArgument x:TypeArguments="x:String" x:Key="...">value</InArgument> per key —
+ * confirmed against a real Studio Web export. The LCS catalog stores this as a JSON
+ * multiline string (e.g. {"Name": "Sample"}); this converts one to the other.
+ * Falls back to a single "Value" key with the raw text if it isn't valid JSON, rather
+ * than dropping the data or emitting an empty dictionary.
+ */
+function renderQueueItemInformation(itemInfoJson: string, pad: string): string {
+  let entries: Array<[string, unknown]>;
+  try {
+    const parsed = JSON.parse(itemInfoJson);
+    entries =
+      parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? Object.entries(parsed)
+        : [['Value', itemInfoJson]];
+  } catch {
+    entries = itemInfoJson.trim() ? [['Value', itemInfoJson]] : [];
+  }
+  if (!entries.length) {
+    return '';
+  }
+  return entries
+    .map(([key, value]) => {
+      const text = typeof value === 'string' ? value : JSON.stringify(value);
+      return `${pad}<InArgument x:TypeArguments="x:String" x:Key="${escapeAttr(key)}">${escapeAttr(text)}</InArgument>`;
+    })
+    .join('\n');
 }
 
 function renderBuildDataTable(
@@ -971,11 +1030,11 @@ function renderExtractTableData(activity: ActivityNode, pad: string): string {
   // "ExtractTableData" is not a real class name and was silently breaking Studio Web
   // load after sync.
   if (!target) {
-    return `${pad}<uia:NExtractData ${attrs} />`;
+    return `${pad}<uix:NExtractData ${attrs} />`;
   }
-  return `${pad}<uia:NExtractData ${attrs}>
+  return `${pad}<uix:NExtractData ${attrs}>
 ${target}
-${pad}</uia:NExtractData>`;
+${pad}</uix:NExtractData>`;
 }
 
 function renderUiActivity(activity: ActivityNode, pad: string, indent: number): string {
@@ -1012,31 +1071,27 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
   const target = emitTargetXaml(props, pad + '  ');
   const open =
     activity.type === 'UI.Click'
-      ? 'uia:NClick'
+      ? 'uix:NClick'
       : activity.type === 'UI.TypeInto'
-        ? 'uia:NTypeInto'
+        ? 'uix:NTypeInto'
         : activity.type === 'UI.GetText'
-          ? 'uia:NGetText'
+          ? 'uix:NGetText'
           : activity.type === 'UI.Check'
-            ? 'uia:NCheck'
+            ? 'uix:NCheck'
             : activity.type === 'UI.Hover'
-              ? 'uia:NHover'
+              ? 'uix:NHover'
               : activity.type === 'UI.SelectItem'
-                ? 'uia:NSelectItem'
+                ? 'uix:NSelectItem'
                 : activity.type === 'UI.TakeScreenshot'
-                  ? 'uia:NTakeScreenshot'
+                  ? 'uix:NTakeScreenshot'
                   : activity.type === 'UI.GetAttribute'
-                    ? 'uia:NGetAttributeGeneric'
-                    : activity.type === 'UI.SendHotkey'
-                      ? 'uia:NKeyboardShortcuts'
-                      : (() => {
-                          // Should never happen for a type isUiActivity() accepts —
-                          // previously this silently fell back to NClick (wrong tag,
-                          // dropped properties) instead of surfacing the gap.
-                          throw new Error(
-                            `xamlExport: no modern UI Automation tag mapped for lcsType "${activity.type}"`
-                          );
-                        })();
+                    ? 'uix:NGetAttributeGeneric'
+                    : (() => {
+                        // Should never happen for a type isUiActivity() accepts.
+                        throw new Error(
+                          `xamlExport: no modern UI Automation tag mapped for lcsType "${activity.type}"`
+                        );
+                      })();
 
   const extra: string[] = [];
   if (activity.type === 'UI.Click') {
@@ -1069,13 +1124,13 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
   if (activity.type === 'UI.GetAttribute') {
     extra.push(`Attribute="${escapeAttr(String(props.attribute || 'aaname'))}"`);
   }
-  if (activity.type === 'UI.SendHotkey') {
-    // BEST EFFORT — could not confirm the exact NKeyboardShortcuts XAML property
-    // name/shape (a real Studio Web export of this activity would confirm whether
-    // it's a flat "Shortcut" attribute or a nested Shortcuts collection element).
-    // If this activity still fails to load after this fix, capture a real XAML
-    // sample from Studio Web/Desktop and adjust this block accordingly.
-    extra.push(`Shortcut="[${escapeAttr(toVbStringArgument(props.key))}]"`);
+  if (activeScopeGuid) {
+    // Confirmed against a real Studio Web export: UI activities nested inside a
+    // Use Application/Browser card must declare ScopeIdentifier (matching the
+    // card's ScopeGuid) and HealingAgentBehavior="SameAsCard", or Studio Web
+    // doesn't treat them as properly scoped to that card.
+    extra.push(`ScopeIdentifier="${escapeAttr(activeScopeGuid)}"`);
+    extra.push(`HealingAgentBehavior="SameAsCard"`);
   }
   if (activity.type === 'UI.GetText' || activity.type === 'UI.GetAttribute') {
     const resultVar = String(
@@ -1107,12 +1162,18 @@ function renderUiActivity(activity: ActivityNode, pad: string, indent: number): 
     activity.type === 'UI.SelectItem' ||
     activity.type === 'UI.GetText';
   if (supportsInputMethod) {
+    // Real Studio Web sample: a Click left with no explicit interaction mode,
+    // nested inside a Use Application/Browser card, exports InteractionMode="SameAsCard"
+    // — not "Simulate". Only changes the *default* used when the user hasn't picked
+    // something explicit (props.inputMethod); an explicit choice is never overridden.
     const fallback =
-      activity.type === 'UI.Click' ||
-      activity.type === 'UI.TypeInto' ||
-      activity.type === 'UI.GetText'
-        ? 'Simulate'
-        : 'Same as App/Browser';
+      activeScopeGuid && !props.inputMethod
+        ? 'Same as App/Browser'
+        : activity.type === 'UI.Click' ||
+            activity.type === 'UI.TypeInto' ||
+            activity.type === 'UI.GetText'
+          ? 'Simulate'
+          : 'Same as App/Browser';
     let inputAttr = interactionModeAttribute(props, fallback).trim();
     // Portable only supports Simulate + Chromium API (DebuggerApi) + SameAsCard
     if (
@@ -1169,7 +1230,7 @@ function renderCheckAppState(activity: ActivityNode, pad: string): string {
   ]
     .filter(Boolean)
     .join(' ');
-  return `${pad}<uia:NCheckState ${attrs} />`;
+  return `${pad}<uix:NCheckState ${attrs} />`;
 }
 
 function renderExcelActivity(activity: ActivityNode, pad: string, indent = 0): string {
