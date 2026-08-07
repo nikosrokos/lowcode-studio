@@ -28,6 +28,14 @@ export interface WorkflowArgument {
   defaultValue?: unknown;
 }
 
+export interface TryCatchClause {
+  /** Full CLR type name, e.g. "System.Exception", "System.IO.IOException" */
+  exceptionType: string;
+  /** DelegateInArgument.Name in the real XAML — defaults to "exception" */
+  exceptionVariable?: string;
+  children: ActivityNode[];
+}
+
 export interface ActivityNode {
   id: string;
   type: string;
@@ -36,6 +44,8 @@ export interface ActivityNode {
   children?: ActivityNode[];
   elseChildren?: ActivityNode[];
   finallyChildren?: ActivityNode[];
+  /** ControlFlow.TryCatch only — one clause per Catch block, in document order. */
+  catches?: TryCatchClause[];
   /** Flowchart canvas position */
   x?: number;
   y?: number;

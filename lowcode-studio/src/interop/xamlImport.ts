@@ -2,6 +2,7 @@ import { XMLParser } from 'fast-xml-parser';
 import {
   ActivityNode,
   ArgumentDirection,
+  TryCatchClause,
   VariableType,
   WorkflowArgument,
   WorkflowDocument,
@@ -366,6 +367,104 @@ function collectActivities(
   return results;
 }
 
+/**
+ * Parses TryCatch.Catches into one clause per <Catch> element, preserving each
+ * clause's real exception type and its own children (previously every Catch got
+ * flattened together and re-tagged as System.Exception — see FIXING_ACTIVITIES.md).
+ */
+function extractCatchClauses(
+  raw: Record<string, unknown>,
+  warnings: ImportWarning[]
+): TryCatchClause[] {
+  const catchesNode = raw['Catches'] || raw['TryCatch.Catches'];
+  if (!catchesNode || typeof catchesNode !== 'object') {
+    return [];
+  }
+  const catchEntries = asArray(
+    (catchesNode as Record<string, unknown>)['Catch']
+  ) as Array<Record<string, unknown>>;
+
+  const clauses: TryCatchClause[] = [];
+  for (const catchEl of catchEntries) {
+    if (!catchEl || typeof catchEl !== 'object') {
+      continue;
+    }
+    const nsMap = buildXmlnsPrefixMap(catchEl);
+    const typeArgRaw = String(
+      catchEl['@_TypeArguments'] || catchEl['@_x:TypeArguments'] || 's:Exception'
+    );
+    const exceptionType = resolveClrType(typeArgRaw, nsMap);
+    const exceptionVariable = extractDelegateArgName(catchEl) || 'exception';
+    // catchEl itself contains a bare ActivityAction key — collectActivities already
+    // knows how to unwrap that (see the ActivityAction/Catch case in the main loop),
+    // so recursing straight into the Catch element lands on the real children.
+    const children = collectActivities(catchEl, warnings);
+    clauses.push({ exceptionType, exceptionVariable, children });
+  }
+  if (!clauses.length) {
+    warnings.push({
+      message: 'TryCatch had Catches but no recognizable Catch clause; treated as empty.'
+    });
+  }
+  return clauses;
+}
+
+function extractDelegateArgName(catchEl: Record<string, unknown>): string | undefined {
+  const action = catchEl['ActivityAction'];
+  const actionObj = (Array.isArray(action) ? action[0] : action) as
+    | Record<string, unknown>
+    | undefined;
+  if (!actionObj || typeof actionObj !== 'object') {
+    return undefined;
+  }
+  const argWrap = actionObj['ActivityAction.Argument'];
+  const delegateArg =
+    argWrap && typeof argWrap === 'object'
+      ? (argWrap as Record<string, unknown>)['DelegateInArgument']
+      : undefined;
+  const delegateObj = (Array.isArray(delegateArg) ? delegateArg[0] : delegateArg) as
+    | Record<string, unknown>
+    | undefined;
+  const name = delegateObj?.['@_Name'] ?? delegateObj?.['@_x:Name'];
+  return name != null ? String(name) : undefined;
+}
+
+/** Collects every local xmlns:prefix="..." declaration on a node into a lookup map. */
+function buildXmlnsPrefixMap(node: Record<string, unknown>): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const [key, value] of Object.entries(node)) {
+    const m = /^@_xmlns:(.+)$/.exec(key);
+    if (m && typeof value === 'string') {
+      map[m[1]] = value;
+    }
+  }
+  return map;
+}
+
+/**
+ * Resolves a WF4 x:TypeArguments value like "s:IOException" — where "s" is bound
+ * via a local xmlns:s="clr-namespace:System.IO;assembly=..." attribute on the same
+ * <Catch> element — into a full CLR type name "System.IO.IOException". Falls back
+ * to the bare local name if the prefix can't be resolved, rather than dropping the
+ * clause entirely.
+ */
+function resolveClrType(typeArgRaw: string, nsMap: Record<string, string>): string {
+  const raw = typeArgRaw.trim();
+  const colonIdx = raw.indexOf(':');
+  if (colonIdx === -1) {
+    return raw || 'System.Exception';
+  }
+  const prefix = raw.slice(0, colonIdx);
+  const localName = raw.slice(colonIdx + 1);
+  const nsDecl = nsMap[prefix];
+  if (!nsDecl) {
+    return localName || raw;
+  }
+  const match = /^clr-namespace:([^;]+)/.exec(nsDecl);
+  const clrNamespace = match ? match[1] : '';
+  return clrNamespace ? `${clrNamespace}.${localName}` : localName;
+}
+
 function mapActivity(
   localName: string,
   raw: Record<string, unknown>,
@@ -490,15 +589,18 @@ function mapActivity(
   }
 
   if (localName === 'TryCatch') {
+    const catches = extractCatchClauses(raw, warnings);
     return {
       id: newId(),
       type: 'ControlFlow.TryCatch',
       displayName,
       properties: {
-        exceptionType: 'System.Exception'
+        // Kept for any UI that still reads a single exceptionType for display —
+        // catches[] is the real source of truth now.
+        exceptionType: catches[0]?.exceptionType || 'System.Exception'
       },
       children: collectActivities(raw['Try'] || raw['TryCatch.Try'], warnings),
-      elseChildren: collectActivities(raw['Catches'] || raw['TryCatch.Catches'], warnings),
+      catches,
       finallyChildren: collectActivities(raw['Finally'] || raw['TryCatch.Finally'], warnings)
     };
   }

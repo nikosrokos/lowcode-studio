@@ -284,6 +284,10 @@ ${pad}</ForEach>`;
   }
 
   if (activity.type === 'ControlFlow.TryCatch') {
+    return renderTryCatch(activity, pad, indent);
+  }
+/** 
+  if (activity.type === 'ControlFlow.TryCatch') {
     const tryKids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
     const finallyKids = (activity.finallyChildren || []).map((c) => renderActivity(c, indent + 4)).join('\n');
     const catchKids = (activity.elseChildren || [])
@@ -314,7 +318,7 @@ ${pad}     </Sequence>
 ${pad}  </TryCatch.Finally>
 ${pad}</TryCatch>`;
   }
-
+*/
   if (activity.type === 'Programming.Assign') {
     return `${pad}<Assign DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
 ${pad}  <Assign.To>
@@ -784,6 +788,106 @@ ${pad}  <ui:MultipleAssign.Assignments>
 ${assignBlocks || `${pad}  <Assign />`}
 ${pad}  </ui:MultipleAssign.Assignments>
 ${pad}</ui:MultipleAssign>`;
+}
+
+/**
+ * Best-guess assembly per exception type, for the xmlns:clr-namespace declaration
+ * WF4 requires on <Catch x:TypeArguments="...">. UNVERIFIED beyond System.Exception
+ * (the only case confirmed against a real Studio Web sample so far, per
+ * FIXING_ACTIVITIES.md) — treat entries here as suspects, same as the doc's other
+ * flagged areas, until each is checked against a real multi-catch export.
+ */
+const KNOWN_EXCEPTION_ASSEMBLIES: Record<string, string> = {
+  'System.Exception': 'System.Private.CoreLib',
+  'System.ArgumentException': 'System.Private.CoreLib',
+  'System.ArgumentNullException': 'System.Private.CoreLib',
+  'System.ArgumentOutOfRangeException': 'System.Private.CoreLib',
+  'System.InvalidOperationException': 'System.Private.CoreLib',
+  'System.NullReferenceException': 'System.Private.CoreLib',
+  'System.NotSupportedException': 'System.Private.CoreLib',
+  'System.NotImplementedException': 'System.Private.CoreLib',
+  'System.FormatException': 'System.Private.CoreLib',
+  'System.TimeoutException': 'System.Private.CoreLib',
+  'System.OverflowException': 'System.Private.CoreLib',
+  'System.IO.IOException': 'System.IO.FileSystem.Primitives',
+  'System.IO.FileNotFoundException': 'System.IO.FileSystem.Primitives',
+  'System.IO.DirectoryNotFoundException': 'System.IO.FileSystem.Primitives',
+  'System.Net.Http.HttpRequestException': 'System.Net.Http',
+  'UiPath.Core.BusinessRuleException': 'UiPath.System.Activities'
+};
+
+function resolveExceptionTypeInfo(fullType: string): {
+  namespace: string;
+  localName: string;
+  assembly: string;
+} {
+  const trimmed = (fullType || 'System.Exception').trim().replace(/^\[|\]$/g, '');
+  const lastDot = trimmed.lastIndexOf('.');
+  const namespace = lastDot >= 0 ? trimmed.slice(0, lastDot) : 'System';
+  const localName = lastDot >= 0 ? trimmed.slice(lastDot + 1) : trimmed || 'Exception';
+  // Unknown System.* types default to System.Private.CoreLib (true for most BCL
+  // exceptions on modern .NET); unknown non-System types are left assembly-less —
+  // Studio Web treats a bare clr-namespace as "same assembly as the project", which
+  // is wrong for a genuinely external type but safer than a fabricated assembly.
+  const assembly = KNOWN_EXCEPTION_ASSEMBLIES[trimmed] || (namespace.startsWith('System') ? 'System.Private.CoreLib' : '');
+  return { namespace, localName, assembly };
+}
+
+function renderTryCatch(activity: ActivityNode, pad: string, indent: number): string {
+  const tryKids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
+  const finallyKids = (activity.finallyChildren || []).map((c) => renderActivity(c, indent + 4)).join('\n');
+
+  // Real multi-catch model, with a fallback to the legacy single-catch shape
+  // (elseChildren + properties.exceptionType) for documents saved before this change.
+  const clauses =
+    activity.catches && activity.catches.length
+      ? activity.catches
+      : [
+          {
+            exceptionType: String(activity.properties.exceptionType || 'System.Exception'),
+            exceptionVariable: 'exception',
+            children: activity.elseChildren || []
+          }
+        ];
+
+  const catchXml = clauses
+    .map((clause, i) => {
+      const { namespace, localName, assembly } = resolveExceptionTypeInfo(clause.exceptionType);
+      const nsPrefix = i === 0 ? 's' : `s${i}`;
+      const xmlnsDecl = assembly
+        ? `clr-namespace:${namespace};assembly=${assembly}`
+        : `clr-namespace:${namespace}`;
+      const typeArg = `${nsPrefix}:${escapeAttr(localName)}`;
+      const varName = escapeAttr(clause.exceptionVariable || 'exception');
+      const kids = (clause.children || []).map((c) => renderActivity(c, indent + 3)).join('\n');
+      return `${pad}    <Catch x:TypeArguments="${typeArg}" xmlns:${nsPrefix}="${escapeAttr(xmlnsDecl)}">
+${pad}      <ActivityAction x:TypeArguments="${typeArg}">
+${pad}        <ActivityAction.Argument>
+${pad}          <DelegateInArgument x:TypeArguments="${typeArg}" Name="${varName}" />
+${pad}        </ActivityAction.Argument>
+${pad}        <Sequence>
+${kids}
+${pad}        </Sequence>
+${pad}      </ActivityAction>
+${pad}    </Catch>`;
+    })
+    .join('\n');
+
+  return `${pad}<TryCatch DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
+${pad}  <TryCatch.Try>
+${pad}    <Sequence>
+${tryKids}
+${pad}    </Sequence>
+${pad}  </TryCatch.Try>
+${pad}  <TryCatch.Catches>
+${catchXml}
+${pad}  </TryCatch.Catches>
+${pad}  <TryCatch.Finally>
+${pad}     <Sequence>    
+${finallyKids}      
+${pad}     </Sequence>
+${pad}  </TryCatch.Finally>
+${pad}</TryCatch>`;
 }
 
 /**
