@@ -340,6 +340,18 @@ function collectActivities(
       if (!raw || typeof raw !== 'object') {
         continue;
       }
+      // ActivityAction is WF4 delegate plumbing (used by ForEach.Body,
+      // NApplicationCard.Body, RetryScope, TimeoutScope, ParallelForEach, etc.) —
+      // not a real activity. Its actual children sit under a bare <Sequence> sibling
+      // to <ActivityAction.Argument>, which mapActivity has no way to find (it only
+      // checks raw['Body']/raw['Activity']/raw['Then']/raw['<Type>.Body'] for unknown
+      // types). Recursing here instead of mapping it means we land back on the
+      // Sequence-unwrap shortcut above and actually see the real children, rather
+      // than dropping them and emitting an empty "ActivityAction (imported)" node.
+      if (key === 'ActivityAction') {
+        results.push(...collectActivities(raw as Record<string, unknown>, warnings, depth + 1));
+        continue;
+      }
       const activity = mapActivity(key, raw as Record<string, unknown>, warnings);
       if (activity) {
         results.push(activity);
