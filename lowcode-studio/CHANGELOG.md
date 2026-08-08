@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Use **LowCode Studio: What's New** in the command palette (or the Output channel after an upgrade) to see the latest sections.
 
+## [0.7.9] — 2026-08-08
+- Fix scrollbar ligth theme 
+- Improve minimap
+
 ## [0.7.8] — 2026-08-08
 
 ## [0.7.7] — 2026-08-08

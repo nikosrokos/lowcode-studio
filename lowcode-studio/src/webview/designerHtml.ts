@@ -500,6 +500,12 @@ export function getDesignerHtml(
       outline: 2px solid var(--focus); outline-offset: 1px; opacity: 1;
     }
     .mm-row:hover, .mm-bar:hover, .mm-node:hover { opacity: 1; filter: brightness(1.06); }
+    .mm-branch-label {
+      font-size: 8.5px; font-weight: 700; color: var(--muted);
+      letter-spacing: .05em; text-transform: uppercase;
+      padding: 3px 0 1px 8px; border-left: 2px solid color-mix(in srgb, var(--focus) 30%, var(--muted));
+      margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
     .minimap-flow { position: relative; margin: 8px auto; }
     .mm-node {
       position: absolute; min-width: 28px; max-width: 72px; height: 18px; border-radius: 4px;
@@ -3028,6 +3034,10 @@ export function getDesignerHtml(
         acc.push(node);
         if (node.children) walkCollect(node.children, acc);
         if (node.elseChildren) walkCollect(node.elseChildren, acc);
+        if (node.finallyChildren) walkCollect(node.finallyChildren, acc);
+        for (const clause of node.catches || []) {
+          if (clause && clause.children) walkCollect(clause.children, acc);
+        }
       }
       return acc;
     }
@@ -4956,6 +4966,59 @@ export function getDesignerHtml(
       closeAssistHelp();
     }
 
+    /** Render one minimap row for a node at a given nesting depth. */
+    function mmRowHtml(n, depth) {
+      const def = findDef(n.type);
+      const color = n.color || def?.color || '#64748B';
+      const sel = idsEqual(state.selectedId, n.id) ? ' selected' : '';
+      const icoHtml = activityIconHtml(def || n.type, color).replace('act-icon', 'act-icon mm-ico');
+      const name = n.displayName || n.type || 'Activity';
+      const indent = Math.min(depth, 8) * 10;
+      return '<button type="button" class="mm-row' + sel + '" data-mm-id="' + escapeAttr(n.id) +
+        '" style="margin-left:' + indent + 'px;width:calc(100% - ' + indent + 'px)">' +
+        '<span class="mm-accent" style="background:' + escapeAttr(color) + '"></span>' +
+        icoHtml +
+        '<span class="mm-label">' + escapeHtml(name) + '</span></button>';
+    }
+    /** Branch label chip (Then/Else/Try/Catch/Finally) shown above a nested group, mirroring the canvas. */
+    function mmBranchLabelHtml(text, depth) {
+      const indent = Math.min(depth, 8) * 10;
+      return '<div class="mm-branch-label" style="margin-left:' + indent + 'px">' + escapeHtml(text) + '</div>';
+    }
+    /** Recursively render the real nested structure (Then/Else/Try/Catch/Finally) instead of a flat list. */
+    function renderMinimapNodes(list, depth) {
+      let html = '';
+      for (const n of list || []) {
+        html += mmRowHtml(n, depth);
+        const def = findDef(n.type);
+        const isTryCatch = n.type === 'ControlFlow.TryCatch';
+        if (n.children && n.children.length) {
+          html += mmBranchLabelHtml(isTryCatch ? 'Try' : (def?.hasElse ? 'Then' : 'Body'), depth + 1);
+          html += renderMinimapNodes(n.children, depth + 1);
+        }
+        if (isTryCatch) {
+          const catches = Array.isArray(n.catches) && n.catches.length
+            ? n.catches
+            : (n.elseChildren && n.elseChildren.length
+              ? [{ exceptionType: n.properties?.exceptionType || 'System.Exception', children: n.elseChildren }]
+              : []);
+          for (const clause of catches) {
+            if (clause?.children?.length) {
+              html += mmBranchLabelHtml('Catch (' + (clause.exceptionType || 'System.Exception') + ')', depth + 1);
+              html += renderMinimapNodes(clause.children, depth + 1);
+            }
+          }
+          if (n.finallyChildren && n.finallyChildren.length) {
+            html += mmBranchLabelHtml('Finally', depth + 1);
+            html += renderMinimapNodes(n.finallyChildren, depth + 1);
+          }
+        } else if (n.elseChildren && n.elseChildren.length) {
+          html += mmBranchLabelHtml('Else', depth + 1);
+          html += renderMinimapNodes(n.elseChildren, depth + 1);
+        }
+      }
+      return html;
+    }
     function renderMinimap() {
       const stage = els.minimapStage;
       const countEl = els.minimapCount;
@@ -4994,28 +5057,23 @@ export function getDesignerHtml(
           }).join('') + '</div>';
       } else {
         stage.innerHTML = '<div class="minimap-seq">' +
-          nodes.map((n, i) => {
-            const def = findDef(n.type);
-            const color = n.color || def?.color || '#64748B';
-            const sel = idsEqual(state.selectedId, n.id) ? ' selected' : '';
-            const icoHtml = activityIconHtml(def || n.type, color).replace('act-icon', 'act-icon mm-ico');
-            const name = n.displayName || n.type || 'Activity';
-            return '<button type="button" class="mm-row' + sel + '" data-mm-id="' + escapeAttr(n.id) +
-              '" title="#' + (i + 1) + ' ' + escapeAttr(name) + '">' +
-              '<span class="mm-accent" style="background:' + escapeAttr(color) + '"></span>' +
-              icoHtml +
-              '<span class="mm-label"><span class="mm-step">#' + (i + 1) + '</span>' +
-              escapeHtml(name) + '</span></button>';
-          }).join('') + '</div>';
+          renderMinimapNodes(state.workflow.activities, 0) +
+          '</div>';
       }
       stage.querySelectorAll('[data-mm-id]').forEach((btn) => {
+        const id = btn.getAttribute('data-mm-id');
+        const hit = id ? walkFind(state.workflow.activities, id) : null;
+        const node = hit?.node;
         btn.addEventListener('click', () => {
-          const id = btn.getAttribute('data-mm-id');
           if (!id) return;
-          const hit = walkFind(state.workflow.activities, id);
-          selectActivity(id, { rerender: true, node: hit?.node });
+          selectActivity(id, { rerender: true, node });
           highlightSearchHit(id);
         });
+        if (node) {
+          btn.addEventListener('mouseenter', (e) => showTip(tipHtml(node), e.clientX, e.clientY));
+          btn.addEventListener('mousemove', (e) => showTip(tipHtml(node), e.clientX, e.clientY));
+          btn.addEventListener('mouseleave', hideTip);
+        }
       });
     }
 
