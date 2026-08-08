@@ -1,0 +1,73 @@
+$ cd /workspace/lowcode-studio && git format-patch -1 HEAD --stdout
+
+From 37c722765f55864323c5138af00f14e0345a37be Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 8 Aug 2026 15:05:28 +0000
+Subject: [PATCH] Fix properties panel not opening for any activity
+
+The TryCatch handling commit (4f808c1) replaced the reference-identity
+walkFindRef() with an id-based walkFind(), but left 5 call sites still
+calling walkFindRef(). Since it's inline webview JS with no build-time
+type checking, every card click threw a ReferenceError inside
+selectActivity() before renderProps()/ensurePropsPanelVisible() could
+run, so the properties panel never opened for any activity.
+
+Restore walkFindRef() as a reference-identity lookup (extended with
+finallyChildren/catches traversal to match the TryCatch support added
+to walkFind()), keeping both functions since callers pass either a
+live node object or an id string depending on context.
+---
+ lowcode-studio/src/webview/designerHtml.ts | 30 +++++++++++++++++++++-
+ 1 file changed, 29 insertions(+), 1 deletion(-)
+
+diff --git a/lowcode-studio/src/webview/designerHtml.ts b/lowcode-studio/src/webview/designerHtml.ts
+index 68c0991..5eace73 100644
+--- a/lowcode-studio/src/webview/designerHtml.ts
++++ b/lowcode-studio/src/webview/designerHtml.ts
+@@ -2558,7 +2558,7 @@ export function getDesignerHtml(
+         null
+       );
+     }
+-    /** Find by object identity — card clicks pass the live tree node. */
++    /** Find by id string. */
+     function walkFind(list, id) {
+   const want = String(id ?? '');
+   if (!want) return null;
+@@ -2587,6 +2587,34 @@ export function getDesignerHtml(
+     }
+   }
+   return null;
++}
++    /** Find by object identity — card clicks pass the live tree node. */
++    function walkFindRef(list, target) {
++  const arr = Array.isArray(list) ? list : list ? [list] : [];
++  for (let i = 0; i < arr.length; i++) {
++    const node = arr[i];
++    if (!node || typeof node !== 'object') continue;
++    if (node === target) return { node, list: arr, index: i };
++    if (node.children) {
++      const hit = walkFindRef(node.children, target);
++      if (hit) return hit;
++    }
++    if (node.elseChildren) {
++      const hit = walkFindRef(node.elseChildren, target);
++      if (hit) return hit;
++    }
++    if (node.finallyChildren) {
++      const hit = walkFindRef(node.finallyChildren, target);
++      if (hit) return hit;
++    }
++    for (const clause of node.catches || []) {
++      if (clause && clause.children) {
++        const hit = walkFindRef(clause.children, target);
++        if (hit) return hit;
++      }
++    }
++  }
++  return null;
+ }
+     function updateSelectedChrome() {
+       const sel = state.selectedId;
+-- 
+2.43.0
+Shell cwd was reset to /home/user/lowcode-studio
