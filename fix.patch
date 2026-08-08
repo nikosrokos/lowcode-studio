@@ -1,73 +1,95 @@
-$ cd /workspace/lowcode-studio && git format-patch -1 HEAD --stdout
-
-From 37c722765f55864323c5138af00f14e0345a37be Mon Sep 17 00:00:00 2001
+From 4a04f40ca1f9b87b41771fab1b7f743c8da117da Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
-Date: Sat, 8 Aug 2026 15:05:28 +0000
-Subject: [PATCH] Fix properties panel not opening for any activity
+Date: Sat, 8 Aug 2026 16:39:58 +0000
+Subject: [PATCH] Fix right-click menu and expand-value editor throwing for
+ expression code
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
 
-The TryCatch handling commit (4f808c1) replaced the reference-identity
-walkFindRef() with an id-based walkFind(), but left 5 call sites still
-calling walkFindRef(). Since it's inline webview JS with no build-time
-type checking, every card click threw a ReferenceError inside
-selectActivity() before renderProps()/ensurePropsPanelVisible() could
-run, so the properties panel never opened for any activity.
+rewriteVbExpression() builds its VB-rewrite regexes from string patterns
+inside designerHtml.ts's outer template literal. Each backslash needed to
+survive two escaping layers (the outer TS template literal, then the
+browser's own JS string-literal parsing) but was only doubled instead of
+quadrupled, so patterns like '\\.toUpperCase\\s*\\(' arrived in the
+browser as the string '.toUpperCases*(' — an invalid, unterminated regex
+group that threw a SyntaxError from `new RegExp()`.
 
-Restore walkFindRef() as a reference-identity lookup (extended with
-finallyChildren/catches traversal to match the TryCatch support added
-to walkFind()), keeping both functions since callers pass either a
-live node object or an id string depending on context.
+That throw was uncaught in two call sites: showCtxMenu() (via
+vbRepairsForActivity) and openExprEditor()'s refreshExprVbAssist(), so
+both aborted before showing their UI. It only surfaced for property
+values containing unquoted "code" segments — e.g. Add Queue Item's raw
+JSON itemInformation, or a Log Message/Message Box using string
+concatenation or variables (common inside TryCatch error handling) —
+explaining why right-click and the expand-value (⛶) editor silently did
+nothing only in those specific cases.
+
+Fixed by quadrupling the backslashes in each pattern literal so they
+resolve to valid regex source once both escaping layers unwind.
+Verified via a headless-Chromium repro harness that builds the actual
+webview HTML through getDesignerHtml() and drives it with Playwright.
 ---
- lowcode-studio/src/webview/designerHtml.ts | 30 +++++++++++++++++++++-
- 1 file changed, 29 insertions(+), 1 deletion(-)
+ lowcode-studio/src/webview/designerHtml.ts | 34 +++++++++++-----------
+ 1 file changed, 17 insertions(+), 17 deletions(-)
 
 diff --git a/lowcode-studio/src/webview/designerHtml.ts b/lowcode-studio/src/webview/designerHtml.ts
-index 68c0991..5eace73 100644
+index 5eace73..f57dcd9 100644
 --- a/lowcode-studio/src/webview/designerHtml.ts
 +++ b/lowcode-studio/src/webview/designerHtml.ts
-@@ -2558,7 +2558,7 @@ export function getDesignerHtml(
-         null
-       );
-     }
--    /** Find by object identity — card clicks pass the live tree node. */
-+    /** Find by id string. */
-     function walkFind(list, id) {
-   const want = String(id ?? '');
-   if (!want) return null;
-@@ -2587,6 +2587,34 @@ export function getDesignerHtml(
-     }
-   }
-   return null;
-+}
-+    /** Find by object identity — card clicks pass the live tree node. */
-+    function walkFindRef(list, target) {
-+  const arr = Array.isArray(list) ? list : list ? [list] : [];
-+  for (let i = 0; i < arr.length; i++) {
-+    const node = arr[i];
-+    if (!node || typeof node !== 'object') continue;
-+    if (node === target) return { node, list: arr, index: i };
-+    if (node.children) {
-+      const hit = walkFindRef(node.children, target);
-+      if (hit) return hit;
-+    }
-+    if (node.elseChildren) {
-+      const hit = walkFindRef(node.elseChildren, target);
-+      if (hit) return hit;
-+    }
-+    if (node.finallyChildren) {
-+      const hit = walkFindRef(node.finallyChildren, target);
-+      if (hit) return hit;
-+    }
-+    for (const clause of node.catches || []) {
-+      if (clause && clause.children) {
-+        const hit = walkFindRef(clause.children, target);
-+        if (hit) return hit;
-+      }
-+    }
-+  }
-+  return null;
- }
-     function updateSelectedChrome() {
-       const sel = state.selectedId;
+@@ -4400,36 +4400,36 @@ export function getDesignerHtml(
+         return next;
+       };
+       const unary = (chunk, name, wrap, label) =>
+-        sub(chunk, '(?<![\\w.])' + name + '\\s*\\(\\s*([^()]+?)\\s*\\)', 'gi', (_m, arg) => wrap(String(arg).trim()), label);
++        sub(chunk, '(?<![\\\\w.])' + name + '\\\\s*\\\\(\\\\s*([^()]+?)\\\\s*\\\\)', 'gi', (_m, arg) => wrap(String(arg).trim()), label);
+       for (let pi = 0; pi < parts.length; pi++) {
+         if (parts[pi].kind === 'string') continue;
+         let c = parts[pi].text;
+-        c = sub(c, '\\.toUpperCase\\s*\\(', 'gi', '.ToUpper(', '.toUpperCase() → .ToUpper()');
+-        c = sub(c, '\\.toLowerCase\\s*\\(', 'gi', '.ToLower(', '.toLowerCase() → .ToLower()');
+-        c = sub(c, '\\.trim\\s*\\(', 'gi', '.Trim(', '.trim() → .Trim()');
+-        c = sub(c, '\\.includes\\s*\\(', 'gi', '.Contains(', '.includes() → .Contains()');
+-        c = sub(c, '\\.startsWith\\s*\\(', 'gi', '.StartsWith(', '.startsWith() → .StartsWith()');
+-        c = sub(c, '\\.endsWith\\s*\\(', 'gi', '.EndsWith(', '.endsWith() → .EndsWith()');
+-        c = sub(c, '\\.length\\b', 'g', '.Length', '.length → .Length');
++        c = sub(c, '\\\\.toUpperCase\\\\s*\\\\(', 'gi', '.ToUpper(', '.toUpperCase() → .ToUpper()');
++        c = sub(c, '\\\\.toLowerCase\\\\s*\\\\(', 'gi', '.ToLower(', '.toLowerCase() → .ToLower()');
++        c = sub(c, '\\\\.trim\\\\s*\\\\(', 'gi', '.Trim(', '.trim() → .Trim()');
++        c = sub(c, '\\\\.includes\\\\s*\\\\(', 'gi', '.Contains(', '.includes() → .Contains()');
++        c = sub(c, '\\\\.startsWith\\\\s*\\\\(', 'gi', '.StartsWith(', '.startsWith() → .StartsWith()');
++        c = sub(c, '\\\\.endsWith\\\\s*\\\\(', 'gi', '.EndsWith(', '.endsWith() → .EndsWith()');
++        c = sub(c, '\\\\.length\\\\b', 'g', '.Length', '.length → .Length');
+         c = unary(c, 'Trim', (a) => a + '.Trim()', 'Trim(x) → x.Trim()');
+         c = unary(c, 'LTrim', (a) => a + '.TrimStart()', 'LTrim(x) → x.TrimStart()');
+         c = unary(c, 'RTrim', (a) => a + '.TrimEnd()', 'RTrim(x) → x.TrimEnd()');
+         c = unary(c, 'UCase', (a) => a + '.ToUpper()', 'UCase(x) → x.ToUpper()');
+         c = unary(c, 'LCase', (a) => a + '.ToLower()', 'LCase(x) → x.ToLower()');
+         c = unary(c, 'Len', (a) => a + '.Length', 'Len(x) → x.Length');
+-        const lhs = '([\\w.]+(?:\\([^)]*\\))?)';
+-        c = sub(c, lhs + '\\s*(?:===|==)\\s*(?:null|undefined)\\b', 'gi', (_m, a) => a + ' Is Nothing', '== null → Is Nothing');
+-        c = sub(c, lhs + '\\s*(?:!==|!=)\\s*(?:null|undefined)\\b', 'gi', (_m, a) => a + ' IsNot Nothing', '!= null → IsNot Nothing');
+-        c = sub(c, '\\bundefined\\b', 'g', 'Nothing', 'undefined → Nothing');
+-        c = sub(c, '\\bnull\\b', 'g', 'Nothing', 'null → Nothing');
+-        c = sub(c, lhs + '\\s*(?:==|=)\\s*Nothing\\b', 'gi', (_m, a) => a + ' Is Nothing', '= Nothing → Is Nothing');
++        const lhs = '([\\\\w.]+(?:\\\\([^)]*\\\\))?)';
++        c = sub(c, lhs + '\\\\s*(?:===|==)\\\\s*(?:null|undefined)\\\\b', 'gi', (_m, a) => a + ' Is Nothing', '== null → Is Nothing');
++        c = sub(c, lhs + '\\\\s*(?:!==|!=)\\\\s*(?:null|undefined)\\\\b', 'gi', (_m, a) => a + ' IsNot Nothing', '!= null → IsNot Nothing');
++        c = sub(c, '\\\\bundefined\\\\b', 'g', 'Nothing', 'undefined → Nothing');
++        c = sub(c, '\\\\bnull\\\\b', 'g', 'Nothing', 'null → Nothing');
++        c = sub(c, lhs + '\\\\s*(?:==|=)\\\\s*Nothing\\\\b', 'gi', (_m, a) => a + ' Is Nothing', '= Nothing → Is Nothing');
+         c = sub(c, '===', 'g', '=', '=== → =');
+         c = sub(c, '!==', 'g', '<>', '!== → <>');
+         c = sub(c, '!=', 'g', '<>', '!= → <>');
+         c = sub(c, '&&', 'g', ' AndAlso ', '&& → AndAlso');
+-        c = sub(c, '\\|\\|', 'g', ' OrElse ', '|| → OrElse');
+-        c = sub(c, '\\btrue\\b', 'g', 'True', 'true → True');
+-        c = sub(c, '\\bfalse\\b', 'g', 'False', 'false → False');
++        c = sub(c, '\\\\|\\\\|', 'g', ' OrElse ', '|| → OrElse');
++        c = sub(c, '\\\\btrue\\\\b', 'g', 'True', 'true → True');
++        c = sub(c, '\\\\bfalse\\\\b', 'g', 'False', 'false → False');
+         c = c.replace(/[ \t]{2,}/g, ' ');
+         parts[pi] = { kind: 'code', text: c };
+       }
 -- 
 2.43.0
-Shell cwd was reset to /home/user/lowcode-studio
+
