@@ -5185,6 +5185,9 @@ if (node.type === 'ControlFlow.TryCatch') {
       els.props.innerHTML = html;
       try { wireAssistLiveStrip(node); } catch (_) {}
       try {
+        if (node.type === 'REFramework.InvokeWorkflow') wireInvokeMapEditor(node);
+      } catch (_) {}
+      try {
         if (node.type === 'ControlFlow.TryCatch') wireCatchesEditor(node);
       } catch (_) {}
 
