@@ -2496,31 +2496,43 @@ export function getDesignerHtml(
       }
     }
     function ensureActivityIds(list) {
-      let changed = false;
-      const visit = (nodes) => {
-        const arr = Array.isArray(nodes) ? nodes : nodes ? [nodes] : [];
-        for (const n of arr) {
-          if (!n || typeof n !== 'object') continue;
-          // Non-string ids (objects / numbers from bad SW JSON) break walkFind + selection
-          if (typeof n.id !== 'string' || !String(n.id).trim()) {
-            n.id = newId();
-            changed = true;
-          }
-          if (n.children != null && !Array.isArray(n.children)) {
-            n.children = [n.children];
-            changed = true;
-          }
-          if (n.elseChildren != null && !Array.isArray(n.elseChildren)) {
-            n.elseChildren = [n.elseChildren];
-            changed = true;
-          }
-          if (n.children) visit(n.children);
-          if (n.elseChildren) visit(n.elseChildren);
-        }
-      };
-      visit(list);
-      return changed;
+  let changed = false;
+  const visit = (nodes) => {
+    const arr = Array.isArray(nodes) ? nodes : nodes ? [nodes] : [];
+    for (const n of arr) {
+      if (!n || typeof n !== 'object') continue;
+      if (typeof n.id !== 'string' || !String(n.id).trim()) {
+        n.id = newId();
+        changed = true;
+      }
+      if (n.children != null && !Array.isArray(n.children)) {
+        n.children = [n.children];
+        changed = true;
+      }
+      if (n.elseChildren != null && !Array.isArray(n.elseChildren)) {
+        n.elseChildren = [n.elseChildren];
+        changed = true;
+      }
+      if (n.finallyChildren != null && !Array.isArray(n.finallyChildren)) {
+        n.finallyChildren = [n.finallyChildren];
+        changed = true;
+      }
+      if (n.catches != null && !Array.isArray(n.catches)) {
+        n.catches = [n.catches];
+        changed = true;
+      }
+      if (n.children) visit(n.children);
+      if (n.elseChildren) visit(n.elseChildren);
+      if (n.finallyChildren) visit(n.finallyChildren);
+      for (const clause of n.catches || []) {
+        if (clause && (typeof clause !== 'object')) continue;
+        if (clause.children) visit(clause.children);
+      }
     }
+  };
+  visit(list);
+  return changed;
+}
     /** Keep a live node ref so Properties can paint even if walkFind races after SW sync. */
     function idsEqual(a, b) {
       return a != null && b != null && String(a) === String(b);
@@ -2547,24 +2559,35 @@ export function getDesignerHtml(
       );
     }
     /** Find by object identity — card clicks pass the live tree node. */
-    function walkFindRef(list, target) {
-      if (!target || typeof target !== 'object') return null;
-      const arr = Array.isArray(list) ? list : list ? [list] : [];
-      for (let i = 0; i < arr.length; i++) {
-        const node = arr[i];
-        if (!node || typeof node !== 'object') continue;
-        if (node === target) return { node, list: arr, index: i };
-        if (node.children) {
-          const hit = walkFindRef(node.children, target);
-          if (hit) return hit;
-        }
-        if (node.elseChildren) {
-          const hit = walkFindRef(node.elseChildren, target);
-          if (hit) return hit;
-        }
-      }
-      return null;
+    function walkFind(list, id) {
+  const want = String(id ?? '');
+  if (!want) return null;
+  const arr = Array.isArray(list) ? list : list ? [list] : [];
+  for (let i = 0; i < arr.length; i++) {
+    const node = arr[i];
+    if (!node || typeof node !== 'object') continue;
+    if (String(node.id ?? '') === want) return { node, list: arr, index: i };
+    if (node.children) {
+      const hit = walkFind(node.children, want);
+      if (hit) return hit;
     }
+    if (node.elseChildren) {
+      const hit = walkFind(node.elseChildren, want);
+      if (hit) return hit;
+    }
+    if (node.finallyChildren) {
+      const hit = walkFind(node.finallyChildren, want);
+      if (hit) return hit;
+    }
+    for (const clause of node.catches || []) {
+      if (clause && clause.children) {
+        const hit = walkFind(clause.children, want);
+        if (hit) return hit;
+      }
+    }
+  }
+  return null;
+}
     function updateSelectedChrome() {
       const sel = state.selectedId;
       document.querySelectorAll('.card[data-id], .flow-node[data-id]').forEach((el) => {
@@ -3631,9 +3654,19 @@ export function getDesignerHtml(
       const hit = walkFind(state.workflow.activities, id);
       if (!hit) return state.workflow.activities;
       if (branch === 'else') { hit.node.elseChildren ||= []; return hit.node.elseChildren; }
-      hit.node.children ||= [];
-      return hit.node.children;
+      if (branch === 'finally') { hit.node.finallyChildren ||= []; return hit.node.finallyChildren; }
+      if (branch && branch.indexOf('catch') === 0) {
+      const idx = Number(branch.slice(5));
+      hit.node.catches = Array.isArray(hit.node.catches) ? hit.node.catches : [];
+      if (!hit.node.catches[idx]) {
+        hit.node.catches[idx] = { exceptionType: 'System.Exception', exceptionVariable: 'exception', children: [] };
+      }
+      hit.node.catches[idx].children ||= [];
+      return hit.node.catches[idx].children;
     }
+    hit.node.children ||= [];
+    return hit.node.children;
+  }
     function insertAtPath(pathKey, node) {
       const { base, index } = parsePath(pathKey);
       const list = getListByPath(base);
@@ -3795,19 +3828,73 @@ export function getDesignerHtml(
       wrap.appendChild(card);
       const showBody = !!(def?.container || (node.children && node.children.length) || (node.elseChildren && node.elseChildren.length));
       if (showBody) {
-        const children = document.createElement('div');
-        children.className = 'children';
-        children.appendChild(Object.assign(document.createElement('div'), { className: 'branch-label', textContent: def?.hasElse ? 'Then' : 'Body' }));
-        renderList(node.children || [], children, node.id + ':then');
-        wrap.appendChild(children);
-        if (def?.hasElse || (node.elseChildren && node.elseChildren.length)) {
-          const elseChildren = document.createElement('div');
-          elseChildren.className = 'else-children';
-          elseChildren.appendChild(Object.assign(document.createElement('div'), { className: 'branch-label', textContent: node.type === 'ControlFlow.TryCatch' ? 'Catch' : 'Else' }));
-          renderList(node.elseChildren || [], elseChildren, node.id + ':else');
-          wrap.appendChild(elseChildren);
-        }
+  const children = document.createElement('div');
+  children.className = 'children';
+  children.appendChild(Object.assign(document.createElement('div'), { className: 'branch-label', textContent: node.type === 'ControlFlow.TryCatch' ? 'Try' : (def?.hasElse ? 'Then' : 'Body') }));
+  renderList(node.children || [], children, node.id + ':then');
+  wrap.appendChild(children);
+
+  if (node.type === 'ControlFlow.TryCatch') {
+    const catches = Array.isArray(node.catches) && node.catches.length
+      ? node.catches
+      : [{ exceptionType: node.properties?.exceptionType || 'System.Exception', exceptionVariable: 'exception', children: node.elseChildren || [] }];
+    catches.forEach((clause, ci) => {
+      const catchWrap = document.createElement('div');
+      catchWrap.className = 'else-children';
+      const label = document.createElement('div');
+      label.className = 'branch-label';
+      label.textContent = 'Catch (' + (clause.exceptionType || 'System.Exception') + ')';
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'icon-btn';
+      delBtn.title = 'Remove this catch clause';
+      delBtn.textContent = '✕';
+      delBtn.style.marginLeft = '8px';
+      delBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const target = walkFind(state.workflow.activities, node.id)?.node;
+        if (!target || !Array.isArray(target.catches)) return;
+        target.catches.splice(ci, 1);
+        persist(true);
+        toast('Removed catch clause');
+      });
+      label.appendChild(delBtn);
+      catchWrap.appendChild(label);
+      renderList(clause.children || [], catchWrap, node.id + ':catch' + ci);
+      wrap.appendChild(catchWrap);
+    });
+
+    const addCatchBtn = document.createElement('button');
+    addCatchBtn.type = 'button';
+    addCatchBtn.className = 'btn';
+    addCatchBtn.style.margin = '4px 0 8px 10px';
+    addCatchBtn.textContent = '+ Add Catch';
+    addCatchBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const target = walkFind(state.workflow.activities, node.id)?.node;
+      if (!target) return;
+      target.catches = Array.isArray(target.catches) ? target.catches : [];
+      target.catches.push({ exceptionType: 'System.Exception', exceptionVariable: 'exception', children: [] });
+      persist(true);
+      toast('Catch clause added');
+    });
+    wrap.appendChild(addCatchBtn);
+
+    const finallyWrap = document.createElement('div');
+    finallyWrap.className = 'else-children';
+    finallyWrap.appendChild(Object.assign(document.createElement('div'), { className: 'branch-label', textContent: 'Finally' }));
+    renderList(node.finallyChildren || [], finallyWrap, node.id + ':finally');
+    wrap.appendChild(finallyWrap);
+      } else if (def?.hasElse || (node.elseChildren && node.elseChildren.length)) {
+      const elseChildren = document.createElement('div');
+      elseChildren.className = 'else-children';
+      elseChildren.appendChild(Object.assign(document.createElement('div'), { className: 'branch-label', textContent: 'Else' }));
+      renderList(node.elseChildren || [], elseChildren, node.id + ':else');
+      wrap.appendChild(elseChildren);
       }
+    }
       return wrap;
     }
 
@@ -4564,6 +4651,58 @@ export function getDesignerHtml(
       });
     }
 
+    function wireCatchesEditor(node) {
+  const persistClause = (idx, field, value) => {
+    const target = resolveEditTarget();
+    if (!target) return;
+    target.catches = Array.isArray(target.catches) ? target.catches : [];
+    if (!target.catches[idx]) {
+      target.catches[idx] = { exceptionType: 'System.Exception', exceptionVariable: 'exception', children: [] };
+    }
+    if (field === 'type') target.catches[idx].exceptionType = value || 'System.Exception';
+    if (field === 'var') target.catches[idx].exceptionVariable = value || 'exception';
+    setSelectedNode(target);
+    persistPropEdit(target);
+  };
+  els.props.querySelectorAll('[data-catch-type]').forEach((input) => {
+    const idx = Number(input.getAttribute('data-catch-type'));
+    input.addEventListener('change', () => persistClause(idx, 'type', input.value.trim()));
+    input.addEventListener('blur', () => persistClause(idx, 'type', input.value.trim()));
+  });
+  els.props.querySelectorAll('[data-catch-var]').forEach((input) => {
+    const idx = Number(input.getAttribute('data-catch-var'));
+    input.addEventListener('change', () => persistClause(idx, 'var', input.value.trim()));
+    input.addEventListener('blur', () => persistClause(idx, 'var', input.value.trim()));
+  });
+  els.props.querySelectorAll('[data-catch-remove]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const idx = Number(btn.getAttribute('data-catch-remove'));
+      const target = resolveEditTarget();
+      if (!target || !Array.isArray(target.catches) || target.catches.length <= 1) {
+        toast('TryCatch needs at least one Catch clause');
+        return;
+      }
+      target.catches.splice(idx, 1);
+      setSelectedNode(target);
+      persist(true);
+      toast('Removed catch clause');
+    });
+  });
+  document.getElementById('btnAddCatchClause')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const target = resolveEditTarget();
+    if (!target) return;
+    target.catches = Array.isArray(target.catches) ? target.catches : [];
+    target.catches.push({ exceptionType: 'System.Exception', exceptionVariable: 'exception', children: [] });
+    setSelectedNode(target);
+    persist(true);
+    toast('Catch clause added');
+  });
+}
+
     function assistLiveStripHtml(node) {
       if (!node) return '';
       try {
@@ -5005,6 +5144,32 @@ export function getDesignerHtml(
         flow += '<div class="field"><button class="btn" id="btnSetStart" type="button">Use as flowchart start</button></div>';
       }
 
+      let catchesSection = '';
+if (node.type === 'ControlFlow.TryCatch') {
+  const clauses = Array.isArray(node.catches) && node.catches.length
+    ? node.catches
+    : [{ exceptionType: node.properties?.exceptionType || 'System.Exception', exceptionVariable: 'exception' }];
+  catchesSection += '<div class="invoke-map" id="catchesEditor">';
+  catchesSection += '<div class="invoke-map-toolbar"><button type="button" class="btn" id="btnAddCatchClause">+ Add Catch</button></div>';
+  clauses.forEach((clause, ci) => {
+    catchesSection +=
+      '<div class="invoke-map-row" data-catch-row="' + ci + '" style="grid-template-columns:1fr 1fr 28px;">' +
+        '<input data-catch-type="' + ci + '" value="' + escapeAttr(clause.exceptionType || 'System.Exception') + '" placeholder="System.Exception" list="dl_exception_types" />' +
+        '<input data-catch-var="' + ci + '" value="' + escapeAttr(clause.exceptionVariable || 'exception') + '" placeholder="exception" />' +
+        '<button type="button" class="icon-btn" data-catch-remove="' + ci + '" title="Remove clause">✕</button>' +
+      '</div>';
+  });
+  catchesSection +=
+    '<datalist id="dl_exception_types">' +
+    ['System.Exception', 'System.ArgumentException', 'System.ArgumentNullException', 'System.InvalidOperationException',
+     'System.NullReferenceException', 'System.NotSupportedException', 'System.FormatException', 'System.TimeoutException',
+     'System.IO.IOException', 'System.IO.FileNotFoundException', 'System.Net.Http.HttpRequestException',
+     'UiPath.Core.BusinessRuleException'
+    ].map(t => '<option value="' + escapeAttr(t) + '"></option>').join('') +
+    '</datalist>';
+  catchesSection += '</div>';
+}
+
       let studioWeb = '';
       let assistStrip = '';
       try { studioWeb = studioWebChecklistHtml(node, def); } catch (_) { studioWeb = ''; }
@@ -5013,13 +5178,14 @@ export function getDesignerHtml(
       let html = assistStrip;
       html += propSection('general', 'General', general);
       html += propSection('activity', 'Activity', activity);
+      if (catchesSection) html += propSection('catches', 'Catch Clauses', catchesSection);
       html += propSection('studioWeb', 'Required for Studio Web', studioWeb);
       if (flow) html += propSection('flow', 'Flowchart', flow);
       // Paint HTML first so fields exist even if wiring helpers throw (SW reopen)
       els.props.innerHTML = html;
       try { wireAssistLiveStrip(node); } catch (_) {}
       try {
-        if (node.type === 'REFramework.InvokeWorkflow') wireInvokeMapEditor(node);
+        if (node.type === 'ControlFlow.TryCatch') wireCatchesEditor(node);
       } catch (_) {}
 
       els.props.querySelectorAll('.prop-section-head').forEach(btn => {

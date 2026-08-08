@@ -1,8 +1,6 @@
 # LowCode Studio
 
-tudio-like low-code RPA for **VS Code / Cursor** on Mac, Windows, and Linux.
-
-Design REFramework & classic workflows locally → dry-run → sync with **Studio Web Local Workspace** → publish.
+Studio-like low-code RPA for **VS Code / Cursor** on Mac, Windows, and Linux.
 
 > Not an official UiPath product. · [Repo](https://github.com/nikosrokos/lowcode-studio)
 
@@ -21,21 +19,12 @@ Design on Mac  →  F5 / Shift+F5 dry-run  →  Connect Studio Web Local  →  S
 | **Ship** | Studio Web Local Workspace — bidirectional sync on Save |
 | **Design** | Insert ⌘K · Blueprints · REFramework · Assist (explain / selectors / VB) |
 
-## Highlights
-
-- **Bidirectional Studio Web sync** — edits in Studio Web Local pull into `.lcs.json`; Save pushes `.xaml` (backups in `.lcs-sync-trash/`)
-- **Portable-safe activities** — Use Browser, Build Data Table, and catalog fixes so Studio Web does not show “activity missing”
-- **Assist** — Explain, scenarios, selector repair, VB expression repair
-- **Mac-first designer** — sequences, flowcharts, REFramework, dry-run without Studio Desktop
-
 ## Install
 
 ```bash
 cd lowcode-studio
 npm install && npm run compile && npm test && npm run package
 ```
-
-**Extensions: Install from VSIX…** → `lowcode-studio-0.6.53.vsix` → reload window.
 
 > Open the **`lowcode-studio/`** folder (not the repo root) when using **Run Extension** / F5.
 
