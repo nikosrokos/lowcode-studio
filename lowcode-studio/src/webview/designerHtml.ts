@@ -2558,7 +2558,7 @@ export function getDesignerHtml(
         null
       );
     }
-    /** Find by object identity — card clicks pass the live tree node. */
+    /** Find by id string. */
     function walkFind(list, id) {
   const want = String(id ?? '');
   if (!want) return null;
@@ -2582,6 +2582,34 @@ export function getDesignerHtml(
     for (const clause of node.catches || []) {
       if (clause && clause.children) {
         const hit = walkFind(clause.children, want);
+        if (hit) return hit;
+      }
+    }
+  }
+  return null;
+}
+    /** Find by object identity — card clicks pass the live tree node. */
+    function walkFindRef(list, target) {
+  const arr = Array.isArray(list) ? list : list ? [list] : [];
+  for (let i = 0; i < arr.length; i++) {
+    const node = arr[i];
+    if (!node || typeof node !== 'object') continue;
+    if (node === target) return { node, list: arr, index: i };
+    if (node.children) {
+      const hit = walkFindRef(node.children, target);
+      if (hit) return hit;
+    }
+    if (node.elseChildren) {
+      const hit = walkFindRef(node.elseChildren, target);
+      if (hit) return hit;
+    }
+    if (node.finallyChildren) {
+      const hit = walkFindRef(node.finallyChildren, target);
+      if (hit) return hit;
+    }
+    for (const clause of node.catches || []) {
+      if (clause && clause.children) {
+        const hit = walkFindRef(clause.children, target);
         if (hit) return hit;
       }
     }
