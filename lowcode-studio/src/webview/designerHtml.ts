@@ -2947,26 +2947,6 @@ export function getDesignerHtml(
       vscode.postMessage({ type: 'loadWorkflowArguments', workflowPath: path });
     }
 
-    function walkFind(list, id) {
-      const want = String(id ?? '');
-      if (!want) return null;
-      const arr = Array.isArray(list) ? list : list ? [list] : [];
-      for (let i = 0; i < arr.length; i++) {
-        const node = arr[i];
-        if (!node || typeof node !== 'object') continue;
-        if (String(node.id ?? '') === want) return { node, list: arr, index: i };
-        if (node.children) {
-          const hit = walkFind(node.children, want);
-          if (hit) return hit;
-        }
-        if (node.elseChildren) {
-          const hit = walkFind(node.elseChildren, want);
-          if (hit) return hit;
-        }
-      }
-      return null;
-    }
-
     /** Ancestor chain from root to the node (inclusive), for nested breadcrumbs. */
     function walkAncestors(list, id, trail) {
       const path = trail || [];
@@ -2983,6 +2963,16 @@ export function getDesignerHtml(
         if (node.elseChildren) {
           const hit = walkAncestors(node.elseChildren, want, next);
           if (hit) return hit;
+        }
+        if (node.finallyChildren) {
+          const hit = walkAncestors(node.finallyChildren, want, next);
+          if (hit) return hit;
+        }
+        for (const clause of node.catches || []) {
+          if (clause && clause.children) {
+            const hit = walkAncestors(clause.children, want, next);
+            if (hit) return hit;
+          }
         }
       }
       return null;
