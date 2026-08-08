@@ -127,6 +127,22 @@ export function getDesignerHtml(
       --tip-bg: #ffffff;
       --tip-border: #aeb8c6;
     }
+      
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: color-mix(in srgb, var(--muted) 55%, transparent) transparent;
+    }
+    *::-webkit-scrollbar { width: 12px; height: 12px; }
+    *::-webkit-scrollbar-track { background: transparent; }
+    *::-webkit-scrollbar-thumb {
+      background-color: color-mix(in srgb, var(--muted) 45%, transparent);
+      border-radius: 999px;
+      border: 3px solid transparent;
+      background-clip: content-box;
+    }
+    *::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--muted) 70%, transparent); }
+    *::-webkit-scrollbar-corner { background: transparent; }
+
     /* Forced dark — stable tokens independent of host theme */
     html[data-theme="dark"] {
       --bg: #1a1d23;
