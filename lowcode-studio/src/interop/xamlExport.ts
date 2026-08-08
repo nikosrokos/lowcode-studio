@@ -229,6 +229,23 @@ ${lines.join('\n')}
 `;
 }
 
+/**
+ * If.Condition / While.Condition / DoWhile.Condition — WF4's x:Boolean converter
+ * accepts a plain literal directly on the attribute, and that's exactly what real
+ * Studio Web XAML uses for the default case (see Main.xaml: `Condition="True"`,
+ * no brackets). The old code always wrapped every condition in [...], turning a
+ * plain "True" default into "[True]" — an unnecessary expression cast that doesn't
+ * match a real sample and doesn't round-trip byte-for-byte. Only wrap in brackets
+ * when the condition is an actual VB expression.
+ */
+function conditionAttr(value: unknown): string {
+  const text = String(value ?? 'True').trim();
+  if (/^(true|false)$/i.test(text)) {
+    return escapeAttr(text.charAt(0).toUpperCase() + text.slice(1).toLowerCase());
+  }
+  return escapeAttr(`[${text}]`);
+}
+
 function renderActivity(activity: ActivityNode, indent: number): string {
   if (shouldSkipActivityOnExport(activity)) {
     return '';
@@ -246,7 +263,7 @@ function renderActivity(activity: ActivityNode, indent: number): string {
     const elseKids = (activity.elseChildren || [])
       .map((c) => renderActivity(c, indent + 2))
       .join('\n');
-    return `${pad}<If Condition="[${escapeAttr(String(activity.properties.condition ?? 'True'))}]" DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
+    return `${pad}<If Condition="${conditionAttr(activity.properties.condition)}" DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
 ${pad}  <If.Then>
 ${pad}    <Sequence DisplayName="Then">
 ${thenKids}
@@ -262,7 +279,7 @@ ${pad}</If>`;
 
   if (activity.type === 'ControlFlow.While') {
     const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
-    return `${pad}<While Condition="[${escapeAttr(String(activity.properties.condition ?? 'True'))}]" DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
+    return `${pad}<While Condition="${conditionAttr(activity.properties.condition)}" DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
 ${pad}  <Sequence>
 ${kids}
 ${pad}  </Sequence>
@@ -548,7 +565,7 @@ ${pad}</Switch>`;
 
   if (activity.type === 'ControlFlow.DoWhile') {
     const kids = (activity.children || []).map((c) => renderActivity(c, indent + 2)).join('\n');
-    return `${pad}<DoWhile Condition="[${escapeAttr(String(activity.properties.condition ?? 'True'))}]" DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
+    return `${pad}<DoWhile Condition="${conditionAttr(activity.properties.condition)}" DisplayName="${escapeAttr(exportDisplayName(activity.displayName))}">
 ${pad}  <Sequence>
 ${kids}
 ${pad}  </Sequence>

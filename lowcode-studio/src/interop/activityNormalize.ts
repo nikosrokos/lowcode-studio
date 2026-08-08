@@ -1,5 +1,5 @@
 import { getActivityDefinition } from '../models/activities';
-import type { ActivityNode, WorkflowDocument } from '../models/workflow';
+import type { ActivityNode, TryCatchClause, WorkflowDocument } from '../models/workflow';
 import { newId } from '../models/workflow';
 import { lcsTypeFromXamlName } from './activityMap';
 import { normalizeLogLevel } from './xamlExport';
@@ -240,6 +240,14 @@ function walk(list: ActivityNode[] | undefined, fn: (n: ActivityNode) => void): 
     fn(n);
     walk(n.children, fn);
     walk(n.elseChildren, fn);
+    walk(n.finallyChildren, fn);
+    // TryCatch.catches — every clause after the first was previously skipped here,
+    // so its children never got an id assigned or PascalCase properties normalized
+    // (see coerceLists below for the matching array-shape fix). That's what made
+    // only the first catch clause render correctly after import.
+    for (const clause of n.catches || []) {
+      walk(clause.children, fn);
+    }
   }
 }
 
@@ -336,8 +344,21 @@ export function normalizeWorkflowDocument(doc: WorkflowDocument): WorkflowDocume
       if (n.elseChildren != null && !Array.isArray(n.elseChildren)) {
         n.elseChildren = [n.elseChildren as unknown as ActivityNode];
       }
+      if (n.finallyChildren != null && !Array.isArray(n.finallyChildren)) {
+        n.finallyChildren = [n.finallyChildren as unknown as ActivityNode];
+      }
+      if (n.catches != null && !Array.isArray(n.catches)) {
+        n.catches = [n.catches as unknown as TryCatchClause];
+      }
       coerceLists(n.children);
       coerceLists(n.elseChildren);
+      coerceLists(n.finallyChildren);
+      for (const clause of n.catches || []) {
+        if (clause && clause.children != null && !Array.isArray(clause.children)) {
+          clause.children = [clause.children as unknown as ActivityNode];
+        }
+        coerceLists(clause?.children);
+      }
     }
   };
   if (!Array.isArray(doc.activities)) {
