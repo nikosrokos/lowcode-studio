@@ -73,7 +73,7 @@ export const ACTIVITY_CATALOG: ActivityDefinition[] = [
     displayName: 'Log Message',
     category: 'System',
     description: 'Writes a message to the execution log.',
-    icon: '$(output)',
+    icon: '$(selection)',
     color: '#3B82F6',
     properties: [
       {

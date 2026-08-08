@@ -20,6 +20,18 @@ export interface ImportWarning {
   message: string;
 }
 
+/**
+ * xmlns:prefix map collected from the root <Activity> element for the current
+ * import. A Catch's x:TypeArguments prefix (e.g. "s" in "s:NullReferenceException")
+ * is normally declared once here — not repeated on each <Catch> (that per-Catch
+ * redeclaration is only something xamlExport.ts happens to write for its own
+ * output). Populated in importXaml(), consumed by extractCatchClauses() via
+ * resolveClrType(). Without this, every multi-catch TryCatch silently degraded
+ * every clause's exception type to a bare, unqualified name (e.g.
+ * "NullReferenceException" instead of "System.NullReferenceException").
+ */
+let rootXmlnsMap: Record<string, string> = {};
+
 export interface XamlImportResult {
   workflow: WorkflowDocument;
   warnings: ImportWarning[];
@@ -62,6 +74,7 @@ export function importXaml(xamlText: string, workflowName = 'Imported'): XamlImp
   if (!activityRoot) {
     throw new Error('No Activity root found in XAML.');
   }
+  rootXmlnsMap = buildXmlnsPrefixMap(activityRoot);
 
   const variables = extractVariables(activityRoot, warnings);
   const argumentsList = extractWorkflowArguments(activityRoot);
@@ -389,7 +402,10 @@ function extractCatchClauses(
     if (!catchEl || typeof catchEl !== 'object') {
       continue;
     }
-    const nsMap = buildXmlnsPrefixMap(catchEl);
+    // Root-level declarations first, then any per-Catch override — a real Studio
+    // Web multi-catch (see Main.xaml) only declares xmlns:s once on <Activity>,
+    // so the per-Catch map alone was always empty for every clause.
+    const nsMap = { ...rootXmlnsMap, ...buildXmlnsPrefixMap(catchEl) };
     const typeArgRaw = String(
       catchEl['@_TypeArguments'] || catchEl['@_x:TypeArguments'] || 's:Exception'
     );

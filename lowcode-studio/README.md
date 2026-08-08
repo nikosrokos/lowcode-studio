@@ -1,6 +1,6 @@
 # LowCode Studio
 
-**Version 0.7.5** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
+**Version 0.7.6** · Studio-like **low-code RPA designer** for VS Code and Cursor on **Mac**, Windows, and Linux.
 
 Built for UiPath practitioners who design, framework, develop, deploy, and test automations, but cannot run UiPath Studio Desktop on macOS. UiPath’s official **Maestro** extension covers Maestro Flows (`.flow`). This extension covers classic **Studio workflows**, **Flowcharts**, and **REFramework** locally — with the easiest path to **Studio Web** publish.
 
